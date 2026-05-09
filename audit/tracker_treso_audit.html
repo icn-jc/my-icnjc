@@ -37,7 +37,7 @@ th{background:#f8f7f5;font-weight:600;font-size:10px;color:var(--text-tertiary);
 td{padding:6px 10px;border-bottom:1px solid var(--border);vertical-align:middle;color:var(--text-primary);}
 tr:last-child td{border-bottom:none;}
 tr:hover td{background:rgba(27,42,74,0.02);}
-.section-row td{background:#f4f3f1;font-weight:600;font-size:10px;color:var(--text-secondary);letter-spacing:.08em;text-transform:uppercase;padding:5px 10px;border-top:2px solid var(--border-strong);}
+.section-row td{background:#f4f3f1;font-weight:600;font-size:10px;color:var(--text-secondary);letter-spacing:.08em;text-transform:uppercase;padding:5px 10px;border-top:2px solid var(--border-strong);text-align:left !important;}
 /* ── Cellules ── */
 td.task-name{min-width:180px;max-width:240px;font-size:13px;line-height:1.4;}
 td.task-name[contenteditable=true]:hover{background:rgba(163,33,95,0.04);border-radius:4px;cursor:text;}
@@ -391,6 +391,8 @@ function render(){
   var isF=(fResp||fPri||fStat||fSec||fLate||search);
   document.getElementById('filter-note').innerText=isF?'Affichage de '+total+' tâche(s) sur '+tasks.length+' au total':'';
 
+  // Trier par order (les tâches sont groupées par section grâce aux orders 100,200,300...)
+  filtered.sort(function(a,b){ return (a.t.order||0)-(b.t.order||0); });
   var html='';var curSec='';
   var archived=isArchived();
 
