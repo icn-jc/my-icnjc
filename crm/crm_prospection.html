@@ -650,56 +650,37 @@ function statCard(label,val,cls){
 }
 
 function renderEvolutionChart(prospectors){
-  var ctx = document.getElementById('chart-evolution');
-  if(!ctx) return;
-
-  var weeks = [];
-  for(var w = 3; w >= 0; w--){
-    var ws = getWeekStart(new Date());
-    ws.setDate(ws.getDate() - w * 7);
-    var we = new Date(ws);
-    we.setDate(we.getDate() + 7);
-    weeks.push({
-      start: ws,
-      end: we,
-      label: (w === 0 ? 'Cette sem.' : 'S-' + w)
-    });
+  var ctx=document.getElementById('chart-evolution');
+  if(!ctx)return;
+  var weeks=[];
+  for(var w=3;w>=0;w--){
+    var ws=getWeekStart(new Date());
+    ws.setDate(ws.getDate()-w*7);
+    var we=new Date(ws); we.setDate(we.getDate()+7);
+    var lbl=w===0?'Cette sem.':'S-'+w;
+    weeks.push({start:ws,end:we,label:lbl});
   }
-
-  var datasets = prospectors.slice(0,5).map(function(u,i){
-    var colors = ['#A3215F','#1B2A4A','#3b82f6','#10b981','#f59e0b'];
+  var datasets=prospectors.slice(0,5).map(function(u,i){
+    var colors=['#A3215F','#1B2A4A','#3b82f6','#10b981','#f59e0b'];
     return {
-      label: (u.prenom || u.email),
-      data: weeks.map(function(wk){
+      label:(u.prenom||u.email),
+      data:weeks.map(function(wk){
         return allProspects.filter(function(p){
-          if(p.owner_email !== u.email || !p.last_action_date) return false;
-          var d = new Date(p.last_action_date);
-          return d >= wk.start && d < wk.end;
+          if(p.owner_email!==u.email||!p.last_action_date)return false;
+          var d=new Date(p.last_action_date);
+          return d>=wk.start&&d<wk.end;
         }).length;
       }),
-      borderColor: colors[i],
-      backgroundColor: colors[i] + '33',
-      tension: 0.4,
-      fill: false
+      borderColor:colors[i],backgroundColor:colors[i]+'33',tension:.4,fill:false
     };
   });
-
-  if(evolutionChart) evolutionChart.destroy();
-
-  evolutionChart = new Chart(ctx, {
-    type: 'line',
-    data: {
-      labels: weeks.map(function(wk){ return wk.label; }),
-      datasets: datasets
-    },
-    options: {
-      responsive: true,
-      plugins: { legend: { labels: { font: { family:'Sora', size:11 } } } },
-      scales: {
-        y: { beginAtZero:true, ticks:{ font:{family:'Sora',size:10} }, grid:{color:'rgba(0,0,0,0.05)'} },
-        x: { ticks:{ font:{family:'Sora',size:10} }, grid:{display:false} }
-      }
-    }
+  if(evolutionChart)evolutionChart.destroy();
+  evolutionChart=new Chart(ctx,{
+    type:'line',
+    data:{labels:weeks.map(function(wk){return wk.label;}),datasets:datasets},
+    options:{responsive:true,plugins:{legend:{labels:{font:{family:'Sora',size:11}}}},
+      scales:{y:{beginAtZero:true,ticks:{font:{family:'Sora',size:10}},grid:{color:'rgba(0,0,0,0.05)'}},
+              x:{ticks:{font:{family:'Sora',size:10}},grid:{display:false}}}}
   });
 }
 
