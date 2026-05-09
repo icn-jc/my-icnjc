@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Tracker Organisationnel — My-ICN-JC</title>
+<link rel="stylesheet" href="../assets/css/global.css"/>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+<script src="../assets/js/firebase.js"></script>
+<script src="../assets/js/auth.js"></script>
+<script src="../assets/js/sidebar.js"></script>
+<style>
+/* ── Stats ── */
+.stats-bar{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:20px;}
+.stat-card{background:var(--bg-card);padding:12px 18px;border-radius:var(--radius-lg);box-shadow:var(--shadow-sm);border:1px solid var(--border);min-width:100px;text-align:center;}
+.stat-card .s-label{font-size:10px;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:.07em;margin-bottom:4px;}
+.stat-card .s-val{font-size:20px;font-weight:700;color:var(--navy);}
+.stat-card.s-done .s-val{color:var(--success);}
+.stat-card.s-prog .s-val{color:var(--warning);}
+.stat-card.s-todo .s-val{color:#2980b9;}
+.stat-card.s-late .s-val{color:var(--danger);}
+.prog-card{min-width:160px;}
+.prog-bar-wrap{background:#eee;border-radius:99px;height:6px;margin-top:6px;}
+.prog-bar{background:linear-gradient(90deg,var(--bordeaux),var(--bordeaux-light));border-radius:99px;height:100%;transition:width .4s;}
+/* ── Toolbar ── */
+.toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px;}
+.toolbar select,.toolbar input[type=text]{padding:7px 10px;border-radius:var(--radius-md);border:1.5px solid var(--border-strong);font-family:'Sora',sans-serif;font-size:12px;background:var(--white);color:var(--text-primary);}
+.toolbar select:focus,.toolbar input:focus{outline:none;border-color:var(--bordeaux);}
+.filter-note{font-size:11px;color:var(--text-tertiary);font-style:italic;}
+/* ── Table ── */
+.tracker-table-wrap{background:var(--bg-card);border-radius:var(--radius-lg);box-shadow:var(--shadow-md);overflow-x:auto;border:1px solid var(--border);}
+table{width:100%;border-collapse:collapse;font-size:13px;min-width:1000px;}
+th{background:#f8f7f5;font-weight:600;font-size:10px;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:.08em;padding:8px 10px;text-align:left;border-bottom:1px solid var(--border);white-space:nowrap;}
+td{padding:6px 10px;border-bottom:1px solid var(--border);vertical-align:middle;color:var(--text-primary);}
+tr:last-child td{border-bottom:none;}
+tr:hover td{background:rgba(27,42,74,0.02);}
+.section-row td{background:#f4f3f1;font-weight:600;font-size:10px;color:var(--text-secondary);letter-spacing:.08em;text-transform:uppercase;padding:5px 10px;border-top:2px solid var(--border-strong);}
+/* ── Cellules ── */
+td.task-name{min-width:180px;max-width:240px;font-size:13px;line-height:1.4;}
+td.task-name[contenteditable=true]:hover{background:rgba(163,33,95,0.04);border-radius:4px;cursor:text;}
+select.cell-sel{border:1px solid var(--border);background:var(--white);font-family:'Sora',sans-serif;font-size:11px;cursor:pointer;width:100%;border-radius:var(--radius-sm);padding:2px 4px;color:var(--text-primary);}
+select.cell-sel:focus{outline:none;border-color:var(--bordeaux);}
+input.date-input{font-size:12px;border:1px solid var(--border);border-radius:var(--radius-sm);padding:3px 6px;font-family:'Sora',sans-serif;background:var(--white);color:var(--text-primary);}
+input.date-input:focus{outline:none;border-color:var(--bordeaux);}
+.note-cell{font-size:11px;color:var(--text-secondary);max-width:160px;min-width:60px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:help;}
+.note-cell:hover{white-space:normal;overflow:visible;background:var(--white);position:relative;z-index:10;box-shadow:var(--shadow-md);border-radius:4px;padding:4px 6px;}
+.note-cell[contenteditable=true]:hover{background:rgba(163,33,95,0.04);border-radius:4px;cursor:text;}
+/* ── Jours ── */
+.days-red{color:var(--danger);font-weight:700;font-size:12px;}
+.days-orange{color:var(--warning);font-weight:700;font-size:12px;}
+.days-green{color:var(--success);font-weight:600;font-size:12px;}
+/* ── Priorité ── */
+.prio-Haute{color:var(--danger);font-weight:600;font-size:12px;}
+.prio-Moyenne{color:var(--warning);font-weight:600;font-size:12px;}
+.prio-Basse{color:var(--success);font-weight:600;font-size:12px;}
+/* ── Statut ── */
+.s-afaire{background:#EBF5FB;color:#1a5276;}
+select.cell-sel{min-width:80px;}
+.s-encours{background:#FEF9E7;color:#7d6608;}
+.s-termine{background:#EAFAF1;color:#1e8449;}
+/* ── Actions col ── */
+.lock-icon{font-size:14px;color:var(--text-tertiary);display:flex;align-items:center;justify-content:center;}
+td:last-child{width:48px;min-width:48px;text-align:center;}
+.del-btn{background:var(--danger-bg);color:var(--danger);padding:4px 8px;border-radius:var(--radius-sm);font-size:12px;border:none;cursor:pointer;font-weight:600;}
+.del-btn:hover{background:#fecaca;}
+/* ── Sync ── */
+.sync-pill-inner{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-tertiary);}
+.sync-dot-inner{width:8px;height:8px;border-radius:50%;background:#b2bec3;flex-shrink:0;}
+.sync-dot-inner.ok{background:var(--success);}
+.sync-dot-inner.syncing{background:var(--warning);animation:blink .8s infinite;}
+.sync-dot-inner.error{background:var(--danger);}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.4}}
+/* ── Back ── */
+.back-link{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--text-secondary);text-decoration:none;margin-bottom:4px;}
+.back-link:hover{color:var(--bordeaux);}
+/* ── Archived banner ── */
+.archived-banner{background:#fef9c3;border:1px solid #fde68a;border-radius:var(--radius-md);padding:10px 16px;font-size:13px;color:#854d0e;margin-bottom:16px;display:flex;align-items:center;gap:8px;}
+/* ── Champ obligatoire ── */
+.input-error{border-color:var(--danger)!important;}
+.field-required-note{font-size:11px;color:var(--danger);margin-top:3px;display:none;}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div class="login-page" id="login-page">
+  <div class="login-box">
+    <div class="login-logo"><img src="../assets/images/ICN-Junior-Conseil_logo.png" style="height:54px;object-fit:contain"/></div>
+    <div class="login-title">Connexion</div>
+    <div class="login-sub">Accès réservé aux membres ICN Junior Conseil.</div>
+    <button class="google-btn" onclick="doGoogleLogin()">
+      <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google"/>
+      Se connecter avec Google
+    </button>
+    <div class="denied-box" id="denied-box"><strong>Accès refusé</strong><p id="denied-msg"></p></div>
+    <div class="login-error" id="login-error"></div>
+  </div>
+</div>
+
+<!-- APP -->
+<div class="app-page" id="app-page">
+  <div id="sidebar-container"></div>
+  <div class="app-content">
+    <div class="page-header">
+      <a class="back-link" href="tracker_orga.html">← Tous les tableaux</a>
+      <div class="flex justify-between items-center" style="flex-wrap:wrap;gap:10px;">
+        <div>
+          <div class="page-title" id="tracker-title">Chargement…</div>
+          <div class="flex items-center gap-3 mt-2">
+            <div class="sync-pill-inner">
+              <div class="sync-dot-inner" id="sync-dot"></div>
+              <span id="sync-label">Connexion…</span>
+            </div>
+            <span style="font-size:12px;color:var(--text-tertiary)" id="today-label"></span>
+          </div>
+        </div>
+        <div class="flex gap-2 items-center" id="action-btns">
+          <button class="btn btn-secondary btn-sm" id="btn-unarchive" onclick="unarchiveTracker()" style="display:none">↩ Désarchiver</button>
+          <button class="btn btn-secondary btn-sm" id="btn-archive" onclick="archiveTracker()" style="display:none">📁 Archiver</button>
+          <button class="btn btn-primary btn-sm" id="btn-add-task" onclick="openAddModal()" style="display:none">+ Ajouter une tâche</button>
+          <button class="btn btn-secondary btn-sm" onclick="exportXLSX()">⬇ Excel</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="page-body">
+      <div id="archived-banner" style="display:none" class="archived-banner">
+        📁 Ce tableau est archivé — consultation et export disponibles, aucune modification possible.
+      </div>
+      <div class="stats-bar" id="stats-bar"></div>
+      <div class="toolbar">
+        <input type="text" id="search" placeholder="🔍 Rechercher…" oninput="render()"/>
+        <select id="filterResp" onchange="render()">
+          <option value="">Responsable</option>
+          <option>GWILHERM</option><option>STELLA</option><option>PAGESAN</option><option>Équipe</option>
+        </select>
+        <select id="filterPriority" onchange="render()">
+          <option value="">Priorité</option><option>Haute</option><option>Moyenne</option><option>Basse</option>
+        </select>
+        <select id="filterStatus" onchange="render()">
+          <option value="">Statut</option><option>À faire</option><option>En cours</option><option>Terminé</option>
+        </select>
+        <select id="filterSection" onchange="render()"><option value="">Section</option></select>
+        <select id="filterLate" onchange="render()">
+          <option value="">Échéance</option>
+          <option value="0">En retard</option><option value="7">≤ 1 sem.</option>
+          <option value="14">≤ 2 sem.</option><option value="21">≤ 3 sem.</option>
+        </select>
+        <button class="btn btn-secondary btn-sm" onclick="clearFilters()">Réinitialiser</button>
+        <span class="filter-note" id="filter-note"></span>
+      </div>
+      <div class="tracker-table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th style="width:24%">Tâche</th>
+              <th style="width:10%">Responsable</th>
+              <th style="width:10%">Statut</th>
+              <th style="width:8%">Priorité</th>
+              <th style="width:11%">Section</th>
+              <th style="width:9%">Échéance</th>
+              <th style="width:5%">Jours</th>
+              <th style="width:17%">Notes</th>
+              <th style="width:6%;text-align:center">Action</th>
+            </tr>
+          </thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL AJOUT TÂCHE -->
+<div class="modal-overlay" id="modal-add" onclick="if(event.target===this)closeAddModal()">
+  <div class="modal-box">
+    <div class="modal-header">
+      <div class="modal-title">Ajouter une tâche</div>
+      <button class="modal-close" onclick="closeAddModal()">×</button>
+    </div>
+    <div class="form-field">
+      <label class="input-label">Section <span style="color:var(--danger)">*</span></label>
+      <select class="select-field" id="m-sec">
+        <option value="">— Choisir une section —</option>
+        <option>RFP & Passation</option><option>Organisation</option><option>Comptabilité</option>
+        <option>Tableaux de suivi</option><option>Budget</option><option>Social</option>
+        <option>Fiscal</option><option>Ventes</option><option>Achats</option>
+        <option>Processus & Risques</option><option>Autres</option>
+      </select>
+      <div class="field-required-note" id="err-sec">Champ obligatoire</div>
+    </div>
+    <div class="form-field">
+      <label class="input-label">Description <span style="color:var(--danger)">*</span></label>
+      <input class="input" type="text" id="m-name" placeholder="Description de la tâche…"/>
+      <div class="field-required-note" id="err-name">Champ obligatoire</div>
+    </div>
+    <div class="form-grid">
+      <div class="form-field">
+        <label class="input-label">Responsable <span style="color:var(--danger)">*</span></label>
+        <select class="select-field" id="m-resp">
+          <option value="">— Choisir —</option>
+          <option>GWILHERM</option><option>STELLA</option><option>PAGESAN</option><option>Équipe</option>
+        </select>
+        <div class="field-required-note" id="err-resp">Champ obligatoire</div>
+      </div>
+      <div class="form-field">
+        <label class="input-label">Priorité <span style="color:var(--danger)">*</span></label>
+        <select class="select-field" id="m-prio">
+          <option value="">— Choisir —</option>
+          <option>Haute</option><option>Moyenne</option><option>Basse</option>
+        </select>
+        <div class="field-required-note" id="err-prio">Champ obligatoire</div>
+      </div>
+      <div class="form-field">
+        <label class="input-label">Échéance <span style="color:var(--danger)">*</span></label>
+        <input class="input" type="date" id="m-date"/>
+        <div class="field-required-note" id="err-date">Champ obligatoire</div>
+      </div>
+      <div class="form-field">
+        <label class="input-label">Statut <span style="color:var(--danger)">*</span></label>
+        <select class="select-field" id="m-status">
+          <option value="">— Choisir —</option>
+          <option>À faire</option><option>En cours</option><option>Terminé</option>
+        </select>
+        <div class="field-required-note" id="err-status">Champ obligatoire</div>
+      </div>
+    </div>
+    <div class="form-field">
+      <label class="input-label">Notes <span style="color:var(--text-tertiary);font-weight:400">(optionnel)</span></label>
+      <textarea class="input" id="m-note" rows="2" placeholder="Remarques…" style="resize:vertical"></textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeAddModal()">Annuler</button>
+      <button class="btn btn-primary" onclick="confirmAdd()">Ajouter →</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Init ──────────────────────────────────────────────────────
+var trackerId=new URLSearchParams(window.location.search).get('id');
+if(!trackerId) window.location.href='tracker_treso.html';
+
+var tasksCol=db.collection('tracker_orga_tasks').doc(trackerId).collection('tasks');
+var tasks=[],taskIds=[],trackerData={},currentRole;
+var SECTIONS=["RFP & Passation","Organisation","Comptabilité","Tableaux de suivi","Budget","Social","Fiscal","Ventes","Achats","Processus & Risques","Autres"];
+var RESPS=["GWILHERM","STELLA","PAGESAN","Équipe"];
+
+var JOURS=['Dimanche','Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi'];
+var MOIS=['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
+var now=new Date();
+document.getElementById('today-label').innerText=JOURS[now.getDay()]+' '+now.getDate()+' '+MOIS[now.getMonth()]+' '+now.getFullYear();
+
+// ── Auth ──────────────────────────────────────────────────────
+initAuth('tracker_orga',function(user,role,profile){
+  currentRole=role;
+  renderSidebar(role,profile,user,'tracker_orga');
+  showAppPage(user,role,profile);
+  loadTracker();
+  updateHealthIndicator();
+});
+
+function loadTracker(){
+  db.collection('trackers_orga').doc(trackerId).get().then(function(doc){
+    if(!doc.exists){window.location.href='tracker_treso.html';return;}
+    trackerData=doc.data();
+    document.getElementById('tracker-title').innerText=trackerData.name;
+    document.title=trackerData.name+' — My-ICN-JC';
+    var isArchived=trackerData.statut==='archivé';
+    var isSuperAdmin=currentRole==='super_admin';
+    var canEdit=['super_admin','president','responsable_qualite','auditeur'].includes(currentRole);
+    // Boutons selon état et rôle
+    if(isSuperAdmin){
+      if(isArchived) document.getElementById('btn-unarchive').style.display='flex';
+      else document.getElementById('btn-archive').style.display='flex';
+    }
+    if(!isArchived && canEdit){
+      document.getElementById('btn-add-task').style.display='flex';
+    }
+    if(isArchived){
+      document.getElementById('archived-banner').style.display='flex';
+    }
+    // Peupler filtre section
+    var secSel=document.getElementById('filterSection');
+    SECTIONS.forEach(function(s){secSel.innerHTML+='<option>'+s+'</option>';});
+    startTasks();
+  });
+}
+
+function startTasks(){
+  setSyncStatus('syncing','Chargement…');
+  tasksCol.orderBy('order').onSnapshot(function(snap){
+    tasks=[];taskIds=[];
+    snap.forEach(function(doc){tasks.push(doc.data());taskIds.push(doc.id);});
+    setSyncStatus('ok','Synchronisé · '+tasks.length+' tâches');
+    updateTrackerStats();
+    render();
+  },function(err){setSyncStatus('error','Erreur — '+err.message);});
+}
+
+function updateTrackerStats(){
+  var done=tasks.filter(function(t){return t.status==='Terminé';}).length;
+  db.collection('trackers_orga').doc(trackerId).update({done:done,total:tasks.length}).catch(function(){});
+}
+
+function setSyncStatus(s,m){
+  document.getElementById('sync-dot').className='sync-dot-inner '+s;
+  document.getElementById('sync-label').innerText=m;
+}
+
+// ── Setters ───────────────────────────────────────────────────
+function saveTask(ri){
+  var id=taskIds[ri];
+  if(id) tasksCol.doc(id).set(tasks[ri]).catch(function(e){setSyncStatus('error',e.message);});
+}
+function setStatus(ri,v){tasks[ri].status=v;saveTask(ri);}
+function setDate(ri,v){tasks[ri].date=v;saveTask(ri);}
+function setNote(ri,v){tasks[ri].note=v;saveTask(ri);}
+function setResp(ri,v){if(!tasks[ri].locked){tasks[ri].resp=v;saveTask(ri);}}
+function setPrio(ri,v){if(!tasks[ri].locked){tasks[ri].priority=v;saveTask(ri);}}
+function setSec(ri,v){if(!tasks[ri].locked){tasks[ri].section=v;saveTask(ri);}}
+function setName(ri,v){if(!tasks[ri].locked){tasks[ri].name=v;saveTask(ri);}}
+function removeTask(ri){
+  if(tasks[ri].locked)return;
+  var id=taskIds[ri];
+  if(id) tasksCol.doc(id).delete().catch(function(e){setSyncStatus('error',e.message);});
+}
+
+// ── Helpers ───────────────────────────────────────────────────
+function daysTo(date){
+  if(!date)return null;
+  var today=new Date();today.setHours(0,0,0,0);
+  return Math.ceil((new Date(date)-today)/86400000);
+}
+function daysClass(d){if(d===null)return'';if(d<=0)return'days-red';if(d<=7)return'days-orange';return'days-green';}
+function statusClass(s){if(s==='Terminé')return's-termine';if(s==='En cours')return's-encours';return's-afaire';}
+function opt(val,cur){return'<option value="'+val+'"'+(val===cur?' selected':'')+'>'+val+'</option>';}
+function isArchived(){return trackerData.statut==='archivé';}
+
+// ── Render ────────────────────────────────────────────────────
+function render(){
+  var search=document.getElementById('search').value.toLowerCase();
+  var fResp=document.getElementById('filterResp').value;
+  var fPri=document.getElementById('filterPriority').value;
+  var fStat=document.getElementById('filterStatus').value;
+  var fSec=document.getElementById('filterSection').value;
+  var fLate=document.getElementById('filterLate').value;
+  var filtered=[];
+  for(var i=0;i<tasks.length;i++){
+    var t=tasks[i];var diff=daysTo(t.date);var lateOk=true;
+    if(fLate!==''){var n=parseInt(fLate);lateOk=diff!==null&&diff<=n;}
+    if((!search||t.name.toLowerCase().indexOf(search)>=0)&&(!fResp||t.resp===fResp)&&(!fPri||t.priority===fPri)&&(!fStat||t.status===fStat)&&(!fSec||t.section===fSec)&&lateOk)
+      filtered.push({t:t,ri:i});
+  }
+  // Stats
+  var total=filtered.length,done=0,inprog=0,todo=0,late=0;
+  for(var j=0;j<filtered.length;j++){
+    var ft=filtered[j].t;
+    if(ft.status==='Terminé')done++;else if(ft.status==='En cours')inprog++;else todo++;
+    var dd=daysTo(ft.date);if(dd!==null&&dd<=0&&ft.status!=='Terminé')late++;
+  }
+  var pct=total?Math.round(done/total*100):0;
+  document.getElementById('stats-bar').innerHTML=
+    '<div class="stat-card"><div class="s-label">Total (vue)</div><div class="s-val">'+total+'</div></div>'+
+    '<div class="stat-card s-done"><div class="s-label">Terminées</div><div class="s-val">'+done+'</div></div>'+
+    '<div class="stat-card s-prog"><div class="s-label">En cours</div><div class="s-val">'+inprog+'</div></div>'+
+    '<div class="stat-card s-todo"><div class="s-label">À faire</div><div class="s-val">'+todo+'</div></div>'+
+    '<div class="stat-card s-late"><div class="s-label">⚠ Retard</div><div class="s-val">'+late+'</div></div>'+
+    '<div class="stat-card prog-card" style="min-width:160px">'+
+      '<div class="s-label">Progression</div><div class="s-val">'+pct+'%</div>'+
+      '<div class="prog-bar-wrap"><div class="prog-bar" style="width:'+pct+'%"></div></div>'+
+    '</div>';
+
+  var isF=(fResp||fPri||fStat||fSec||fLate||search);
+  document.getElementById('filter-note').innerText=isF?'Affichage de '+total+' tâche(s) sur '+tasks.length+' au total':'';
+
+  var html='';var curSec='';
+  var archived=isArchived();
+
+  for(var k=0;k<filtered.length;k++){
+    var item=filtered[k];var t=item.t;var ri=item.ri;
+    var locked=!!t.locked;
+
+    if(t.section!==curSec){
+      curSec=t.section;
+      html+='<tr class="section-row"><td colspan="9">'+t.section+'</td></tr>';
+    }
+
+    // Colonne jours — vide si tâche terminée
+    var diff=daysTo(t.date);
+    var dLabel='',dCls='';
+    if(t.status!=='Terminé'&&diff!==null){
+      dLabel=diff<=0?'⚠ '+diff+'j':diff+'j';
+      dCls=daysClass(diff);
+    }
+
+    var sCls=statusClass(t.status);
+    var secOpts='';SECTIONS.forEach(function(s){secOpts+=opt(s,t.section);});
+    var respOpts='';RESPS.forEach(function(r){respOpts+=opt(r,t.resp);});
+    var prioOpts=opt('Haute',t.priority)+opt('Moyenne',t.priority)+opt('Basse',t.priority);
+    var statOpts=opt('À faire',t.status)+opt('En cours',t.status)+opt('Terminé',t.status);
+
+    // ── Tâche name ──
+    var nameCell=locked||archived
+      ?'<td class="task-name">'+t.name+'</td>'
+      :'<td class="task-name" contenteditable="true" onblur="setName('+ri+',this.innerText.trim())">'+t.name+'</td>';
+
+    // ── Responsable ──
+    var respCell=locked||archived
+      ?'<td style="font-size:12px;color:var(--text-secondary)">'+t.resp+'</td>'
+      :'<td><select class="cell-sel" onchange="setResp('+ri+',this.value)">'+respOpts+'</select></td>';
+
+    // ── Statut — éditable sauf archivé ──
+    var statCell=archived
+      ?'<td><span class="badge '+(t.status==='Terminé'?'badge-success':t.status==='En cours'?'badge-warning':'badge-navy')+'">'+t.status+'</span></td>'
+      :'<td><select class="cell-sel '+sCls+'" onchange="setStatus('+ri+',this.value)">'+statOpts+'</select></td>';
+
+    // ── Priorité ──
+    var prioCell=locked||archived
+      ?'<td class="prio-'+t.priority+'">'+t.priority+'</td>'
+      :'<td class="prio-'+t.priority+'"><select class="cell-sel" onchange="setPrio('+ri+',this.value)">'+prioOpts+'</select></td>';
+
+    // ── Section ──
+    var secCell=locked||archived
+      ?'<td style="font-size:12px;color:var(--text-secondary)">'+t.section+'</td>'
+      :'<td><select class="cell-sel" onchange="setSec('+ri+',this.value)">'+secOpts+'</select></td>';
+
+    // ── Échéance — éditable sauf archivé ──
+    var dateCell=archived
+      ?'<td style="font-size:12px;color:var(--text-tertiary)">'+(t.date||'—')+'</td>'
+      :'<td><input type="date" class="date-input" value="'+(t.date||'')+'" onchange="setDate('+ri+',this.value)"></td>';
+
+    // ── Notes — éditable sauf archivé ──
+    var noteCell=archived
+      ?'<td class="note-cell">'+(t.note||'')+'</td>'
+      :'<td class="note-cell" contenteditable="true" onblur="setNote('+ri+',this.innerText.trim())">'+(t.note||'')+'</td>';
+
+    // ── Colonne action : 🔒 si locked, ✕ si libre, vide si archivé ──
+    var actionCell;
+    if(archived){
+      actionCell='<td></td>';
+    } else if(locked){
+      actionCell='<td style="text-align:center;width:48px"><span class="lock-icon" title="Tâche figée — non supprimable">🔒</span></td>';
+    } else {
+      actionCell='<td style="text-align:center;width:48px"><button class="del-btn" onclick="removeTask('+ri+')">✕</button></td>';
+    }
+
+    html+='<tr>'+nameCell+respCell+statCell+prioCell+secCell+dateCell+
+      '<td class="'+dCls+'" style="text-align:center;white-space:nowrap">'+dLabel+'</td>'+
+      noteCell+actionCell+'</tr>';
+  }
+
+  if(!html)html='<tr><td colspan="9" style="text-align:center;padding:2rem;color:var(--text-tertiary);font-size:13px">Aucune tâche pour ces filtres.</td></tr>';
+  document.getElementById('tbody').innerHTML=html;
+}
+
+// ── Modal ajout ───────────────────────────────────────────────
+function openAddModal(){
+  ['m-sec','m-name','m-resp','m-prio','m-status'].forEach(function(id){
+    document.getElementById(id).value='';
+    document.getElementById(id).classList.remove('input-error');
+  });
+  document.getElementById('m-date').value='';
+  document.getElementById('m-date').classList.remove('input-error');
+  document.getElementById('m-note').value='';
+  ['err-sec','err-name','err-resp','err-prio','err-date','err-status'].forEach(function(id){
+    document.getElementById(id).style.display='none';
+  });
+  document.getElementById('modal-add').classList.add('open');
+  setTimeout(function(){document.getElementById('m-name').focus();},80);
+}
+function closeAddModal(){ document.getElementById('modal-add').classList.remove('open'); }
+
+function confirmAdd(){
+  var fields=[
+    {id:'m-sec',  err:'err-sec'},
+    {id:'m-name', err:'err-name'},
+    {id:'m-resp', err:'err-resp'},
+    {id:'m-prio', err:'err-prio'},
+    {id:'m-date', err:'err-date'},
+    {id:'m-status',err:'err-status'},
+  ];
+  var valid=true;
+  fields.forEach(function(f){
+    var el=document.getElementById(f.id);
+    var errEl=document.getElementById(f.err);
+    if(!el.value.trim()){
+      el.classList.add('input-error');
+      errEl.style.display='block';
+      valid=false;
+    } else {
+      el.classList.remove('input-error');
+      errEl.style.display='none';
+    }
+  });
+  if(!valid)return;
+  var t={
+    section:document.getElementById('m-sec').value,
+    name:document.getElementById('m-name').value.trim(),
+    resp:document.getElementById('m-resp').value,
+    status:document.getElementById('m-status').value,
+    priority:document.getElementById('m-prio').value,
+    date:document.getElementById('m-date').value,
+    note:document.getElementById('m-note').value.trim(),
+    locked:false,
+    order:Date.now()
+  };
+  tasksCol.add(t).then(function(){closeAddModal();}).catch(function(e){alert('Erreur : '+e.message);});
+}
+
+// ── Archiver / Désarchiver ────────────────────────────────────
+function archiveTracker(){
+  if(!confirm('Archiver ce tableau ? Il passera en lecture seule.\nSeule Stella pourra le désarchiver.'))return;
+  db.collection('trackers_orga').doc(trackerId).update({statut:'archivé'}).then(function(){
+    trackerData.statut='archivé';
+    document.getElementById('btn-archive').style.display='none';
+    document.getElementById('btn-add-task').style.display='none';
+    document.getElementById('btn-unarchive').style.display='flex';
+    document.getElementById('archived-banner').style.display='flex';
+    render();
+  });
+}
+function unarchiveTracker(){
+  if(!confirm('Désarchiver ce tableau ? Il redeviendra modifiable.'))return;
+  db.collection('trackers_orga').doc(trackerId).update({statut:'actif'}).then(function(){
+    trackerData.statut='actif';
+    document.getElementById('btn-unarchive').style.display='none';
+    document.getElementById('btn-archive').style.display='flex';
+    document.getElementById('archived-banner').style.display='none';
+    var canEdit=['super_admin','president','responsable_qualite','auditeur'].includes(currentRole);
+    if(canEdit) document.getElementById('btn-add-task').style.display='flex';
+    render();
+  });
+}
+
+// ── Filtres ───────────────────────────────────────────────────
+function clearFilters(){
+  ['search','filterResp','filterPriority','filterStatus','filterSection','filterLate'].forEach(function(id){
+    document.getElementById(id).value='';
+  });
+  render();
+}
+
+
+function exportXLSX(){
+  var rows=[['Section','Tâche','Responsable','Statut','Priorité','Échéance','Notes']];
+  tasks.forEach(function(t){
+    rows.push([t.section||'',t.name||'',t.resp||'',t.status||'',t.priority||'',t.date||'Non renseigné',t.note||'']);
+  });
+  var ws=XLSX.utils.aoa_to_sheet(rows);
+  ws['!cols']=[{wch:18},{wch:45},{wch:14},{wch:12},{wch:10},{wch:16},{wch:35}];
+  var wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'Suivi');
+  XLSX.writeFile(wb,(trackerData.name||'tracker-orga')+'.xlsx');
+}
+</script>
+</body>
+</html>

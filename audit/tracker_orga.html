@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Tracker Organisationnel — My-ICN-JC</title>
+<link rel="stylesheet" href="../assets/css/global.css"/>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script src="../assets/js/firebase.js"></script>
+<script src="../assets/js/auth.js"></script>
+<script src="../assets/js/sidebar.js"></script>
+<style>
+.trackers-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;margin-bottom:32px;}
+.tracker-card{background:var(--bg-card);border-radius:var(--radius-lg);padding:22px 24px;box-shadow:var(--shadow-md);border:1px solid var(--border);cursor:pointer;transition:all .2s;text-decoration:none;display:block;position:relative;overflow:hidden;}
+.tracker-card:hover{box-shadow:var(--shadow-lg);transform:translateY(-2px);border-color:var(--bordeaux);}
+.tracker-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--bordeaux);opacity:0;transition:opacity .2s;}
+.tracker-card:hover::before{opacity:1;}
+.tracker-card.archived{opacity:.75;}
+.tracker-card.archived::before{background:#94a3b8;}
+.tracker-type{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--bordeaux);margin-bottom:8px;}
+.tracker-name{font-family:'Playfair Display',serif;font-size:16px;font-weight:700;color:var(--navy);margin-bottom:4px;}
+.tracker-date{font-size:12px;color:var(--text-tertiary);margin-bottom:14px;}
+.tracker-progress-wrap{background:#eee;border-radius:99px;height:5px;margin-bottom:6px;}
+.tracker-progress-bar{height:100%;border-radius:99px;background:linear-gradient(90deg,var(--bordeaux),var(--bordeaux-light));transition:width .5s;}
+.tracker-stats{display:flex;justify-content:space-between;font-size:11px;color:var(--text-tertiary);}
+.tracker-stat-done{color:var(--success);font-weight:600;}
+.archived-badge{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:600;padding:2px 8px;border-radius:99px;background:#f1f5f9;color:#64748b;position:absolute;top:14px;right:14px;}
+.section-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.12em;color:var(--text-tertiary);margin-bottom:12px;display:flex;align-items:center;gap:8px;}
+.section-label::after{content:'';flex:1;height:1px;background:var(--border);display:block;}
+.del-tracker-btn{position:absolute;bottom:14px;right:14px;background:var(--danger-bg);color:var(--danger);border:none;border-radius:6px;padding:4px 8px;font-size:13px;cursor:pointer;z-index:10;transition:background .15s;}
+.del-tracker-btn:hover{background:#fecaca;}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div class="login-page" id="login-page">
+  <div class="login-box">
+    <div class="login-logo"><img src="../assets/images/ICN-Junior-Conseil_logo.png" style="height:54px;object-fit:contain"/></div>
+    <div class="login-title">Connexion</div>
+    <div class="login-sub">Accès réservé aux membres ICN Junior Conseil.</div>
+    <button class="google-btn" onclick="doGoogleLogin()">
+      <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google"/>
+      Se connecter avec Google
+    </button>
+    <div class="denied-box" id="denied-box"><strong>Accès refusé</strong><p id="denied-msg"></p></div>
+    <div class="login-error" id="login-error"></div>
+  </div>
+</div>
+
+<!-- APP -->
+<div class="app-page" id="app-page">
+  <div id="sidebar-container"></div>
+  <div class="app-content">
+    <div class="page-header flex justify-between items-center">
+      <div>
+        <div class="page-title">Tableaux de suivi — Organisationnel</div>
+        <div class="page-subtitle" id="today-date"></div>
+      </div>
+      <button class="btn btn-primary" id="btn-new-tracker" onclick="openNewModal()" style="display:none">+ Nouveau tableau</button>
+    </div>
+    <div class="page-body">
+      <div class="section-label">Actifs</div>
+      <div class="trackers-grid" id="active-trackers">
+        <div style="font-size:13px;color:var(--text-tertiary)">Chargement…</div>
+      </div>
+      <div class="section-label" style="margin-top:8px">Archivés</div>
+      <div class="trackers-grid" id="archived-trackers">
+        <div style="font-size:13px;color:var(--text-tertiary)">Aucun tableau archivé.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL NOUVEAU TRACKER -->
+<div class="modal-overlay" id="modal-new" onclick="if(event.target===this)closeNewModal()">
+  <div class="modal-box">
+    <div class="modal-header">
+      <div class="modal-title">Nouveau tableau de suivi</div>
+      <button class="modal-close" onclick="closeNewModal()">×</button>
+    </div>
+    <div class="form-field">
+      <label class="input-label">Nom du tableau</label>
+      <input class="input" type="text" id="new-name" placeholder="Ex : Audit 20 Juin 2026…"/>
+    </div>
+    <div class="form-field">
+      <label class="input-label">Type</label>
+      <select class="select-field" id="new-type">
+        <option value="audit">Audit / Suivi de tâches</option>
+        <option value="libre">Tableau libre (colonnes custom)</option>
+      </select>
+    </div>
+    <div class="form-field">
+      <label class="input-label">Date cible (optionnel)</label>
+      <input class="input" type="date" id="new-date"/>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeNewModal()">Annuler</button>
+      <button class="btn btn-primary" onclick="createTracker()">Créer</button>
+    </div>
+  </div>
+</div>
+
+<script>
+var JOURS=['Dimanche','Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi'];
+var MOIS=['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
+var now=new Date();
+document.getElementById('today-date').innerText=JOURS[now.getDay()]+' '+now.getDate()+' '+MOIS[now.getMonth()]+' '+now.getFullYear();
+
+var currentRole;
+initAuth('tracker_orga', function(user, role, profile) {
+  currentRole = role;
+  renderSidebar(role, profile, user, 'tracker_orga');
+  showAppPage(user, role, profile);
+  if(['super_admin','president','responsable_qualite','auditeur'].includes(role)){
+    document.getElementById('btn-new-tracker').style.display='flex';
+  }
+  loadTrackers();
+  updateHealthIndicator();
+});
+
+function loadTrackers(){
+  db.collection('trackers_orga').orderBy('createdAt','desc').onSnapshot(function(snap){
+    if(snap.empty){ renderTrackers([],'active-trackers',false); return; }
+    var active=[],archived=[];
+    snap.forEach(function(doc){
+      var d=Object.assign({id:doc.id},doc.data());
+      if(d.statut==='archivé') archived.push(d); else active.push(d);
+    });
+    renderTrackers(active,'active-trackers',false);
+    renderTrackers(archived,'archived-trackers',true);
+  });
+}
+
+function renderTrackers(list,containerId,isArchived){
+  var el=document.getElementById(containerId);
+  if(list.length===0){
+    el.innerHTML='<div style="font-size:13px;color:var(--text-tertiary)">Aucun tableau '+(isArchived?'archivé':'actif')+'.</div>';
+    return;
+  }
+  var html='';
+  list.forEach(function(t){
+    var pct=t.total>0?Math.round((t.done||0)/t.total*100):0;
+    var typeLabel={audit:'Audit',suivi:'Suivi opérationnel',autre:'Autre'}[t.type]||t.type||'Audit';
+    var dateLabel=t.dateTarget?'Cible : '+formatDate(t.dateTarget):'';
+    var deleteBtn='';
+    if(isArchived && currentRole==='super_admin'){
+      deleteBtn='<button class="del-tracker-btn" onclick="deleteTracker(event,this)" data-id="'+t.id+'" data-name="'+t.name.replace(/"/g,'&quot;')+'" title="Supprimer définitivement">🗑</button>';
+    }
+    html+='<a class="tracker-card'+(isArchived?' archived':'')+'" href="'+(t.type==='relances'?'tracker_orga_detail.html':t.type==='libre'?'tracker_orga_detail.html':'tracker_orga_detail.html')+'?id='+t.id+'" style="position:relative">'+
+      (isArchived?'<span class="archived-badge">📁 Archivé</span>':'')+
+      deleteBtn+
+      '<div class="tracker-type">'+typeLabel+'</div>'+
+      '<div class="tracker-name">'+t.name+'</div>'+
+      '<div class="tracker-date">'+dateLabel+'</div>'+
+      '<div class="tracker-progress-wrap"><div class="tracker-progress-bar" style="width:'+pct+'%"></div></div>'+
+      '<div class="tracker-stats">'+
+        '<span>'+pct+'% terminé</span>'+
+        '<span><span class="tracker-stat-done">'+(t.done||0)+'</span> / '+(t.total||0)+' tâches</span>'+
+      '</div>'+
+    '</a>';
+  });
+  el.innerHTML=html;
+}
+
+function deleteTracker(event, btn){
+  event.preventDefault();
+  event.stopPropagation();
+  var trackerId=btn.getAttribute('data-id');
+  var name=btn.getAttribute('data-name');
+  if(!confirm('Supprimer définitivement le tableau "'+name+'" ?\nCette action est irréversible.'))return;
+  db.collection('trackers_orga').doc(trackerId).delete().then(function(){
+    // Note : les sous-collections tracker_tasks ne sont pas supprimées automatiquement
+    // Firebase ne supporte pas la suppression récursive côté client
+    // Les tâches orphelines restent dans Firestore mais sont inaccessibles
+    console.log('Tracker supprimé');
+  }).catch(function(e){alert('Erreur : '+e.message);});
+}
+
+function formatDate(d){
+  if(!d)return'';
+  var p=d.split('-');
+  return p.length===3?p[2]+'/'+p[1]+'/'+p[0]:d;
+}
+
+function createTracker(){
+  var name=document.getElementById('new-name').value.trim();
+  if(!name){alert('Merci de donner un nom au tableau.');return;}
+  db.collection('trackers_orga').add({
+    name:name,
+    type:document.getElementById('new-type').value,
+    dateTarget:document.getElementById('new-date').value||null,
+    statut:'actif',done:0,total:0,
+    createdAt:firebase.firestore.FieldValue.serverTimestamp()
+  }).then(function(ref){
+    closeNewModal();
+    window.location.href='tracker_orga_detail.html?id='+ref.id;
+  });
+}
+
+</script>
+</body>
+</html>
