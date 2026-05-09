@@ -134,11 +134,29 @@ function renderSidebar(role, profile, user, activeKey) {
 
   // Injecter dans le DOM
   const container = document.getElementById('sidebar-container');
-  if (container) container.innerHTML = sidebarHTML;
+  if (container) container.innerHTML = sidebarHTML +
+    // Overlay mobile
+    '<div class="sidebar-overlay" id="sidebar-overlay" onclick="closeMobileSidebar()"></div>' +
+    // Bouton hamburger mobile
+    '<button class="mobile-menu-btn" id="mobile-menu-btn" onclick="openMobileSidebar()">☰</button>';
 
   // Appliquer l'état au contenu principal
   const appContent = document.querySelector('.app-content');
   if (appContent && isCollapsed) appContent.classList.add('sidebar-collapsed');
+}
+
+function openMobileSidebar() {
+  var sidebar = document.getElementById('sidebar');
+  var overlay = document.getElementById('sidebar-overlay');
+  if (sidebar) sidebar.classList.add('mobile-open');
+  if (overlay) overlay.classList.add('active');
+}
+
+function closeMobileSidebar() {
+  var sidebar = document.getElementById('sidebar');
+  var overlay = document.getElementById('sidebar-overlay');
+  if (sidebar) sidebar.classList.remove('mobile-open');
+  if (overlay) overlay.classList.remove('active');
 }
 
 function toggleSidebar() {
