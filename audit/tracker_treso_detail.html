@@ -45,7 +45,7 @@ select.cell-sel{border:1px solid var(--border);background:var(--white);font-fami
 select.cell-sel:focus{outline:none;border-color:var(--bordeaux);}
 input.date-input{font-size:12px;border:1px solid var(--border);border-radius:var(--radius-sm);padding:3px 6px;font-family:'Sora',sans-serif;background:var(--white);color:var(--text-primary);}
 input.date-input:focus{outline:none;border-color:var(--bordeaux);}
-.note-cell{font-size:11px;color:var(--text-secondary);max-width:140px;min-width:80px;}
+.note-cell{font-size:11px;color:var(--text-secondary);max-width:200px;min-width:80px;word-break:break-word;white-space:normal;line-height:1.4;}
 .note-cell[contenteditable=true]:hover{background:rgba(163,33,95,0.04);border-radius:4px;cursor:text;}
 /* ── Jours ── */
 .days-red{color:var(--danger);font-weight:700;font-size:12px;}
@@ -57,10 +57,12 @@ input.date-input:focus{outline:none;border-color:var(--bordeaux);}
 .prio-Basse{color:var(--success);font-weight:600;font-size:12px;}
 /* ── Statut ── */
 .s-afaire{background:#EBF5FB;color:#1a5276;}
+select.cell-sel{min-width:80px;}
 .s-encours{background:#FEF9E7;color:#7d6608;}
 .s-termine{background:#EAFAF1;color:#1e8449;}
 /* ── Actions col ── */
 .lock-icon{font-size:14px;color:var(--text-tertiary);display:flex;align-items:center;justify-content:center;}
+td:last-child{width:48px;min-width:48px;text-align:center;}
 .del-btn{background:var(--danger-bg);color:var(--danger);padding:4px 8px;border-radius:var(--radius-sm);font-size:12px;border:none;cursor:pointer;font-weight:600;}
 .del-btn:hover{background:#fecaca;}
 /* ── Sync ── */
@@ -153,15 +155,15 @@ input.date-input:focus{outline:none;border-color:var(--bordeaux);}
         <table>
           <thead>
             <tr>
-              <th style="width:27%">Tâche</th>
+              <th style="width:24%">Tâche</th>
               <th style="width:10%">Responsable</th>
-              <th style="width:9%">Statut</th>
+              <th style="width:10%">Statut</th>
               <th style="width:8%">Priorité</th>
               <th style="width:11%">Section</th>
-              <th style="width:10%">Échéance</th>
+              <th style="width:9%">Échéance</th>
               <th style="width:5%">Jours</th>
-              <th style="width:13%">Notes</th>
-              <th style="width:7%" style="text-align:center">Action</th>
+              <th style="width:17%">Notes</th>
+              <th style="width:6%;text-align:center">Action</th>
             </tr>
           </thead>
           <tbody id="tbody"></tbody>
@@ -440,9 +442,9 @@ function render(){
     if(archived){
       actionCell='<td></td>';
     } else if(locked){
-      actionCell='<td style="text-align:center"><span class="lock-icon" title="Tâche figée — non supprimable">🔒</span></td>';
+      actionCell='<td style="text-align:center;width:48px"><span class="lock-icon" title="Tâche figée — non supprimable">🔒</span></td>';
     } else {
-      actionCell='<td style="text-align:center"><button class="del-btn" onclick="removeTask('+ri+')">✕</button></td>';
+      actionCell='<td style="text-align:center;width:48px"><button class="del-btn" onclick="removeTask('+ri+')">✕</button></td>';
     }
 
     html+='<tr>'+nameCell+respCell+statCell+prioCell+secCell+dateCell+
