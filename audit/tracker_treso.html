@@ -148,7 +148,7 @@ function renderTrackers(list,containerId,isArchived){
     var dateLabel=t.dateTarget?'Cible : '+formatDate(t.dateTarget):'';
     var deleteBtn='';
     if(isArchived && currentRole==='super_admin'){
-      deleteBtn='<button class="del-tracker-btn" onclick="deleteTracker(event,''+t.id+'',''+t.name.replace(/'/g,"\'")+'')" title="Supprimer définitivement">🗑</button>';
+      deleteBtn='<button class="del-tracker-btn" onclick="deleteTracker(event,this)" data-id="'+t.id+'" data-name="'+t.name.replace(/"/g,'&quot;')+'" title="Supprimer définitivement">🗑</button>';
     }
     html+='<a class="tracker-card'+(isArchived?' archived':'')+'" href="tracker_treso_detail.html?id='+t.id+'" style="position:relative">'+
       (isArchived?'<span class="archived-badge">📁 Archivé</span>':'')+
@@ -166,11 +166,12 @@ function renderTrackers(list,containerId,isArchived){
   el.innerHTML=html;
 }
 
-function deleteTracker(event, trackerId, name){
+function deleteTracker(event, btn){
   event.preventDefault();
   event.stopPropagation();
+  var trackerId=btn.getAttribute('data-id');
+  var name=btn.getAttribute('data-name');
   if(!confirm('Supprimer définitivement le tableau "'+name+'" ?\nCette action est irréversible.'))return;
-  // Supprimer le document tracker
   db.collection('trackers').doc(trackerId).delete().then(function(){
     // Note : les sous-collections tracker_tasks ne sont pas supprimées automatiquement
     // Firebase ne supporte pas la suppression récursive côté client
