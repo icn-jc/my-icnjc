@@ -123,15 +123,26 @@ initAuth('tracker_treso', function(user, role, profile) {
 });
 
 function loadTrackers(){
-  db.collection('trackers').orderBy('createdAt','desc').onSnapshot(function(snap){
-    if(snap.empty){ createDefaultTracker(); return; }
+  // Sans orderBy pour éviter les erreurs si index manquant ou collection vide
+  db.collection('trackers').onSnapshot(function(snap){
+    if(snap.empty){
+      createDefaultTracker();
+      return;
+    }
     var active=[],archived=[];
     snap.forEach(function(doc){
       var d=Object.assign({id:doc.id},doc.data());
       if(d.statut==='archivé') archived.push(d); else active.push(d);
     });
+    // Trier par date côté client
+    active.sort(function(a,b){ return (b.createdAt||0)-(a.createdAt||0); });
+    archived.sort(function(a,b){ return (b.createdAt||0)-(a.createdAt||0); });
     renderTrackers(active,'active-trackers',false);
     renderTrackers(archived,'archived-trackers',true);
+  }, function(err){
+    console.error('Firestore error:', err);
+    // En cas d'erreur, essayer quand même de créer le tracker par défaut
+    createDefaultTracker();
   });
 }
 
