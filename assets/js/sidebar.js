@@ -32,49 +32,56 @@ const SIDEBAR_CSS = `
 
 // Structure de navigation par rôle
 function buildNavItems(role, basePath) {
+  const ALL = ['super_admin','president','vice_president','tresorerie','secretaire',
+               'responsable_commercial','responsable_qualite','responsable_marketing',
+               'marketing','auditeur','commercial'];
   const all = [
-    { section: null, key:'home', label:'Accueil', icon:'home', href: basePath + 'index.html',
-      roles:['super_admin','president','tresorerie','responsable_commercial','responsable_qualite','secretaire','marketing','auditeur','membre'] },
+    { section: null, key:'home', label:'Accueil', icon:'home',
+      href: basePath + 'index.html', roles: ALL },
 
     { section:'AUDIT', key:'tracker_treso', label:'Tracker Tréso', icon:'clipboard',
       href: basePath + 'audit/tracker_treso.html',
-      roles:['super_admin','president','tresorerie'] },
+      roles:['super_admin','vice_president','tresorerie','responsable_qualite'] },
 
     { section:null, key:'tracker_orga', label:'Tracker Orga', icon:'check-square',
       href: basePath + 'audit/tracker_orga.html',
-      roles:['super_admin','president','responsable_qualite','auditeur'] },
+      roles:['super_admin','president','vice_president','responsable_qualite','auditeur'] },
 
     { section:'DASHBOARD', key:'kpi_treso', label:'KPI Trésorerie', icon:'trending-up',
       href: basePath + 'dashboard/kpi_treso.html',
-      roles:['super_admin','president','tresorerie','secretaire','marketing','responsable_commercial','responsable_qualite'] },
+      roles:['super_admin','president','vice_president','tresorerie','secretaire',
+             'responsable_marketing','responsable_commercial','responsable_qualite'] },
 
     { section:null, key:'kpi_commercial', label:'KPI Commercial', icon:'bar-chart',
       href: basePath + 'dashboard/kpi_commercial.html',
-      roles:['super_admin','president','responsable_commercial','secretaire','marketing','auditeur','membre'] },
+      roles:['super_admin','president','vice_president','responsable_commercial',
+             'secretaire','marketing','responsable_marketing','auditeur','commercial'] },
 
     { section:'CRM', key:'crm_prospection', label:'Prospection', icon:'target',
-      href: basePath + 'crm/crm_prospection.html',
-      roles:['super_admin','president','tresorerie','responsable_commercial','responsable_qualite','secretaire','marketing','auditeur','membre'] },
+      href: basePath + 'crm/crm_prospection.html', roles: ALL },
 
     { section:null, key:'crm_clients', label:'Clients', icon:'briefcase',
       href: basePath + 'crm/crm_clients.html',
-      roles:['super_admin','president','responsable_commercial','secretaire'] },
+      roles:['super_admin','president','vice_president','responsable_commercial',
+             'responsable_marketing','responsable_qualite','secretaire','tresorerie','commercial'] },
 
     { section:null, key:'crm_intervenants', label:'Intervenants', icon:'users',
       href: basePath + 'crm/crm_intervenants.html',
-      roles:['super_admin','president','responsable_commercial','responsable_qualite','secretaire'] },
+      roles:['super_admin','president','vice_president','responsable_commercial',
+             'responsable_marketing','responsable_qualite','secretaire','tresorerie'] },
 
     { section:null, key:'crm_partenariats', label:'Partenariats', icon:'link',
       href: basePath + 'crm/crm_partenariats.html',
-      roles:['super_admin','president','secretaire'] },
+      roles:['super_admin','president','vice_president','responsable_commercial',
+             'responsable_marketing','responsable_qualite','secretaire','tresorerie','commercial'] },
 
     { section:'ÉTUDES', key:'etudes', label:'Suivi études', icon:'folder',
       href: basePath + 'etudes/etudes_index.html',
-      roles:['super_admin','president','responsable_commercial','responsable_qualite','secretaire'] },
+      roles:['super_admin','president','vice_president','responsable_commercial',
+             'responsable_qualite','secretaire','tresorerie','responsable_marketing'] },
 
     { section:'ÉVÉNEMENTS', key:'evenements', label:'Événements', icon:'calendar',
-      href: basePath + 'evenements/evenements_index.html',
-      roles:['super_admin','president','tresorerie','responsable_commercial','responsable_qualite','secretaire','marketing','auditeur','membre'] },
+      href: basePath + 'evenements/evenements_index.html', roles: ALL },
 
     { section:'ADMIN', key:'admin', label:'Administration', icon:'settings',
       href: basePath + 'admin/admin_index.html',
