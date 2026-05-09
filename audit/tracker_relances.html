@@ -341,7 +341,7 @@ function updateStats(){
   var aRelancer=rows.filter(function(r){return r.statut==='À relancer';}).length;
   var litigieux=rows.filter(function(r){return r.statut==='Litigieux';}).length;
   var payes=rows.filter(function(r){return r.statut==='Payé';}).length;
-  var totalMontant=rows.reduce(function(s,r){return s+(parseFloat(r.montant)||0);},0);
+  var totalMontant=rows.filter(function(r){return r.statut!=='Payé';}).reduce(function(s,r){return s+(parseFloat(r.montant)||0);},0);
   var enRetard=rows.filter(function(r){
     return r.statut!=='Payé'&&r.echeance&&daysRetard(r.echeance)>0;
   }).length;
@@ -351,7 +351,7 @@ function updateStats(){
     '<div class="stat-card s-orange"><div class="s-label">À relancer</div><div class="s-val">'+aRelancer+'</div></div>'+
     '<div class="stat-card s-red"><div class="s-label">Litigieux</div><div class="s-val">'+litigieux+'</div></div>'+
     '<div class="stat-card s-green"><div class="s-label">Payés</div><div class="s-val">'+payes+'</div></div>'+
-    '<div class="stat-card"><div class="s-label">Montant total</div><div class="s-val" style="font-size:16px">'+fmtMoney(totalMontant)+'</div></div>';
+    '<div class="stat-card"><div class="s-label">Montant restant dû</div><div class="s-val" style="font-size:16px">'+fmtMoney(totalMontant)+'</div></div>';
 }
 
 function daysRetard(date){
