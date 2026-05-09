@@ -122,7 +122,7 @@ initAuth('tracker_orga', function(user, role, profile) {
 });
 
 function loadTrackers(){
-  db.collection('trackers_orga').orderBy('createdAt','desc').onSnapshot(function(snap){
+  db.collection('trackers_orga').onSnapshot(function(snap){
     if(snap.empty){ renderTrackers([],'active-trackers',false); return; }
     var active=[],archived=[];
     snap.forEach(function(doc){
