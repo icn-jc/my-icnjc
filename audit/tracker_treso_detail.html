@@ -8,11 +8,12 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
 <script src="../assets/js/firebase.js"></script>
 <script src="../assets/js/auth.js"></script>
 <script src="../assets/js/sidebar.js"></script>
 <style>
-/* ── Stats bar ── */
+/* ── Stats ── */
 .stats-bar{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:20px;}
 .stat-card{background:var(--bg-card);padding:12px 18px;border-radius:var(--radius-lg);box-shadow:var(--shadow-sm);border:1px solid var(--border);min-width:100px;text-align:center;}
 .stat-card .s-label{font-size:10px;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:.07em;margin-bottom:4px;}
@@ -22,16 +23,13 @@
 .stat-card.s-todo .s-val{color:#2980b9;}
 .stat-card.s-late .s-val{color:var(--danger);}
 .prog-card{min-width:160px;}
-.prog-card .s-val{font-size:16px;}
 .prog-bar-wrap{background:#eee;border-radius:99px;height:6px;margin-top:6px;}
 .prog-bar{background:linear-gradient(90deg,var(--bordeaux),var(--bordeaux-light));border-radius:99px;height:100%;transition:width .4s;}
-
 /* ── Toolbar ── */
 .toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px;}
 .toolbar select,.toolbar input[type=text]{padding:7px 10px;border-radius:var(--radius-md);border:1.5px solid var(--border-strong);font-family:'Sora',sans-serif;font-size:12px;background:var(--white);color:var(--text-primary);}
 .toolbar select:focus,.toolbar input:focus{outline:none;border-color:var(--bordeaux);}
 .filter-note{font-size:11px;color:var(--text-tertiary);font-style:italic;}
-
 /* ── Table ── */
 .tracker-table-wrap{background:var(--bg-card);border-radius:var(--radius-lg);box-shadow:var(--shadow-md);overflow:hidden;border:1px solid var(--border);}
 table{width:100%;border-collapse:collapse;font-size:13px;}
@@ -40,58 +38,46 @@ td{padding:9px 12px;border-bottom:1px solid var(--border);vertical-align:middle;
 tr:last-child td{border-bottom:none;}
 tr:hover td{background:rgba(27,42,74,0.02);}
 .section-row td{background:#f4f3f1;font-weight:600;font-size:10px;color:var(--text-secondary);letter-spacing:.08em;text-transform:uppercase;padding:6px 12px;border-top:2px solid var(--border-strong);}
-
 /* ── Cellules ── */
 td.task-name{min-width:200px;max-width:280px;}
-td.task-name[contenteditable=true]{cursor:text;}
-td.task-name[contenteditable=true]:hover{background:rgba(163,33,95,0.04);border-radius:4px;}
-td.task-name.locked-cell{cursor:default;color:var(--text-primary);}
-
+td.task-name[contenteditable=true]:hover{background:rgba(163,33,95,0.04);border-radius:4px;cursor:text;}
 select.cell-sel{border:1px solid var(--border);background:var(--white);font-family:'Sora',sans-serif;font-size:12px;cursor:pointer;width:100%;border-radius:var(--radius-sm);padding:3px 6px;color:var(--text-primary);}
 select.cell-sel:focus{outline:none;border-color:var(--bordeaux);}
-select.cell-sel:disabled{background:#f8f7f5;cursor:not-allowed;opacity:.7;}
-
 input.date-input{font-size:12px;border:1px solid var(--border);border-radius:var(--radius-sm);padding:3px 6px;font-family:'Sora',sans-serif;background:var(--white);color:var(--text-primary);}
 input.date-input:focus{outline:none;border-color:var(--bordeaux);}
-
 .note-cell{font-size:11px;color:var(--text-secondary);max-width:140px;min-width:80px;}
-.note-cell[contenteditable=true]:hover{background:rgba(163,33,95,0.04);border-radius:4px;}
-
+.note-cell[contenteditable=true]:hover{background:rgba(163,33,95,0.04);border-radius:4px;cursor:text;}
+/* ── Jours ── */
 .days-red{color:var(--danger);font-weight:700;font-size:12px;}
 .days-orange{color:var(--warning);font-weight:700;font-size:12px;}
 .days-green{color:var(--success);font-weight:600;font-size:12px;}
-
+/* ── Priorité ── */
 .prio-Haute{color:var(--danger);font-weight:600;font-size:12px;}
 .prio-Moyenne{color:var(--warning);font-weight:600;font-size:12px;}
 .prio-Basse{color:var(--success);font-weight:600;font-size:12px;}
-
+/* ── Statut ── */
 .s-afaire{background:#EBF5FB;color:#1a5276;}
 .s-encours{background:#FEF9E7;color:#7d6608;}
 .s-termine{background:#EAFAF1;color:#1e8449;}
-
-.lock-icon{font-size:10px;color:var(--text-tertiary);margin-left:4px;vertical-align:middle;}
+/* ── Actions col ── */
+.lock-icon{font-size:14px;color:var(--text-tertiary);display:flex;align-items:center;justify-content:center;}
 .del-btn{background:var(--danger-bg);color:var(--danger);padding:4px 8px;border-radius:var(--radius-sm);font-size:12px;border:none;cursor:pointer;font-weight:600;}
 .del-btn:hover{background:#fecaca;}
-
 /* ── Sync ── */
 .sync-pill-inner{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-tertiary);}
 .sync-dot-inner{width:8px;height:8px;border-radius:50%;background:#b2bec3;flex-shrink:0;}
 .sync-dot-inner.ok{background:var(--success);}
-.sync-dot-inner.syncing{background:var(--warning);animation:pulse .8s infinite;}
+.sync-dot-inner.syncing{background:var(--warning);animation:blink .8s infinite;}
 .sync-dot-inner.error{background:var(--danger);}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
-
-/* ── Back link ── */
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.4}}
+/* ── Back ── */
 .back-link{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--text-secondary);text-decoration:none;margin-bottom:4px;}
 .back-link:hover{color:var(--bordeaux);}
-
-/* ── Archive btn ── */
-.archive-btn{background:#f1f5f9;color:#475569;border:1px solid #cbd5e1;border-radius:var(--radius-md);padding:7px 14px;font-size:12px;font-weight:500;cursor:pointer;font-family:'Sora',sans-serif;}
-.archive-btn:hover{background:#e2e8f0;}
-
-/* ── Modal ── */
-.modal-overlay{display:none;position:fixed;inset:0;background:rgba(15,25,35,0.6);backdrop-filter:blur(4px);z-index:500;align-items:center;justify-content:center;}
-.modal-overlay.open{display:flex;}
+/* ── Archived banner ── */
+.archived-banner{background:#fef9c3;border:1px solid #fde68a;border-radius:var(--radius-md);padding:10px 16px;font-size:13px;color:#854d0e;margin-bottom:16px;display:flex;align-items:center;gap:8px;}
+/* ── Champ obligatoire ── */
+.input-error{border-color:var(--danger)!important;}
+.field-required-note{font-size:11px;color:var(--danger);margin-top:3px;display:none;}
 </style>
 </head>
 <body>
@@ -128,36 +114,46 @@ input.date-input:focus{outline:none;border-color:var(--bordeaux);}
             <span style="font-size:12px;color:var(--text-tertiary)" id="today-label"></span>
           </div>
         </div>
-        <div class="flex gap-2 items-center">
-          <button class="archive-btn" id="btn-archive" style="display:none" onclick="archiveTracker()">Archiver ce tableau</button>
-          <button class="btn btn-primary" id="btn-add-task" onclick="addTask()" style="display:none">+ Ajouter une tâche</button>
-          <button class="btn btn-secondary btn-sm" onclick="exportCSV()">⬇ CSV</button>
+        <div class="flex gap-2 items-center" id="action-btns">
+          <button class="btn btn-secondary btn-sm" id="btn-unarchive" onclick="unarchiveTracker()" style="display:none">↩ Désarchiver</button>
+          <button class="btn btn-secondary btn-sm" id="btn-archive" onclick="archiveTracker()" style="display:none">📁 Archiver</button>
+          <button class="btn btn-primary btn-sm" id="btn-add-task" onclick="openAddModal()" style="display:none">+ Ajouter une tâche</button>
+          <button class="btn btn-secondary btn-sm" onclick="exportXLSX()">⬇ Excel</button>
         </div>
       </div>
     </div>
 
     <div class="page-body">
-      <!-- Stats -->
+      <div id="archived-banner" style="display:none" class="archived-banner">
+        📁 Ce tableau est archivé — consultation et export disponibles, aucune modification possible.
+      </div>
       <div class="stats-bar" id="stats-bar"></div>
-
-      <!-- Filtres -->
       <div class="toolbar">
         <input type="text" id="search" placeholder="🔍 Rechercher…" oninput="render()"/>
-        <select id="filterResp" onchange="render()"><option value="">Responsable</option><option>GWILHERM</option><option>STELLA</option><option>PAGESAN</option><option>Équipe</option></select>
-        <select id="filterPriority" onchange="render()"><option value="">Priorité</option><option>Haute</option><option>Moyenne</option><option>Basse</option></select>
-        <select id="filterStatus" onchange="render()"><option value="">Statut</option><option>À faire</option><option>En cours</option><option>Terminé</option></select>
+        <select id="filterResp" onchange="render()">
+          <option value="">Responsable</option>
+          <option>GWILHERM</option><option>STELLA</option><option>PAGESAN</option><option>Équipe</option>
+        </select>
+        <select id="filterPriority" onchange="render()">
+          <option value="">Priorité</option><option>Haute</option><option>Moyenne</option><option>Basse</option>
+        </select>
+        <select id="filterStatus" onchange="render()">
+          <option value="">Statut</option><option>À faire</option><option>En cours</option><option>Terminé</option>
+        </select>
         <select id="filterSection" onchange="render()"><option value="">Section</option></select>
-        <select id="filterLate" onchange="render()"><option value="">Échéance</option><option value="0">En retard</option><option value="7">≤ 1 sem.</option><option value="14">≤ 2 sem.</option><option value="21">≤ 3 sem.</option></select>
+        <select id="filterLate" onchange="render()">
+          <option value="">Échéance</option>
+          <option value="0">En retard</option><option value="7">≤ 1 sem.</option>
+          <option value="14">≤ 2 sem.</option><option value="21">≤ 3 sem.</option>
+        </select>
         <button class="btn btn-secondary btn-sm" onclick="clearFilters()">Réinitialiser</button>
         <span class="filter-note" id="filter-note"></span>
       </div>
-
-      <!-- Table -->
       <div class="tracker-table-wrap">
         <table>
           <thead>
             <tr>
-              <th style="width:28%">Tâche</th>
+              <th style="width:27%">Tâche</th>
               <th style="width:10%">Responsable</th>
               <th style="width:9%">Statut</th>
               <th style="width:8%">Priorité</th>
@@ -165,7 +161,7 @@ input.date-input:focus{outline:none;border-color:var(--bordeaux);}
               <th style="width:10%">Échéance</th>
               <th style="width:5%">Jours</th>
               <th style="width:13%">Notes</th>
-              <th style="width:6%"></th>
+              <th style="width:7%" style="text-align:center">Action</th>
             </tr>
           </thead>
           <tbody id="tbody"></tbody>
@@ -176,99 +172,121 @@ input.date-input:focus{outline:none;border-color:var(--bordeaux);}
 </div>
 
 <!-- MODAL AJOUT TÂCHE -->
-<div class="modal-overlay" id="modal-add" onclick="if(event.target===this)closeModal()">
-  <div class="modal-box" style="background:var(--white);border-radius:var(--radius-xl);padding:36px 40px;width:520px;max-width:95vw;box-shadow:0 24px 80px rgba(0,0,0,0.2);">
+<div class="modal-overlay" id="modal-add" onclick="if(event.target===this)closeAddModal()">
+  <div class="modal-box">
     <div class="modal-header">
       <div class="modal-title">Ajouter une tâche</div>
-      <button class="modal-close" onclick="closeModal()">×</button>
+      <button class="modal-close" onclick="closeAddModal()">×</button>
     </div>
     <div class="form-field">
-      <label class="input-label">Section</label>
-      <select class="select-field" id="m-sec"><option value="RFP & Passation">RFP & Passation</option><option value="Organisation">Organisation</option><option value="Comptabilité">Comptabilité</option><option value="Tableaux de suivi">Tableaux de suivi</option><option value="Budget">Budget</option><option value="Social">Social</option><option value="Fiscal">Fiscal</option><option value="Ventes">Ventes</option><option value="Achats">Achats</option><option value="Processus & Risques">Processus & Risques</option><option value="Autres">Autres</option></select>
+      <label class="input-label">Section <span style="color:var(--danger)">*</span></label>
+      <select class="select-field" id="m-sec">
+        <option value="">— Choisir une section —</option>
+        <option>RFP & Passation</option><option>Organisation</option><option>Comptabilité</option>
+        <option>Tableaux de suivi</option><option>Budget</option><option>Social</option>
+        <option>Fiscal</option><option>Ventes</option><option>Achats</option>
+        <option>Processus & Risques</option><option>Autres</option>
+      </select>
+      <div class="field-required-note" id="err-sec">Champ obligatoire</div>
     </div>
     <div class="form-field">
-      <label class="input-label">Description</label>
+      <label class="input-label">Description <span style="color:var(--danger)">*</span></label>
       <input class="input" type="text" id="m-name" placeholder="Description de la tâche…"/>
+      <div class="field-required-note" id="err-name">Champ obligatoire</div>
     </div>
     <div class="form-grid">
       <div class="form-field">
-        <label class="input-label">Responsable</label>
-        <select class="select-field" id="m-resp"><option>GWILHERM</option><option>STELLA</option><option>PAGESAN</option><option>Équipe</option></select>
+        <label class="input-label">Responsable <span style="color:var(--danger)">*</span></label>
+        <select class="select-field" id="m-resp">
+          <option value="">— Choisir —</option>
+          <option>GWILHERM</option><option>STELLA</option><option>PAGESAN</option><option>Équipe</option>
+        </select>
+        <div class="field-required-note" id="err-resp">Champ obligatoire</div>
       </div>
       <div class="form-field">
-        <label class="input-label">Priorité</label>
-        <select class="select-field" id="m-prio"><option>Haute</option><option selected>Moyenne</option><option>Basse</option></select>
+        <label class="input-label">Priorité <span style="color:var(--danger)">*</span></label>
+        <select class="select-field" id="m-prio">
+          <option value="">— Choisir —</option>
+          <option>Haute</option><option>Moyenne</option><option>Basse</option>
+        </select>
+        <div class="field-required-note" id="err-prio">Champ obligatoire</div>
       </div>
       <div class="form-field">
-        <label class="input-label">Échéance</label>
+        <label class="input-label">Échéance <span style="color:var(--danger)">*</span></label>
         <input class="input" type="date" id="m-date"/>
+        <div class="field-required-note" id="err-date">Champ obligatoire</div>
       </div>
       <div class="form-field">
-        <label class="input-label">Statut</label>
-        <select class="select-field" id="m-status"><option selected>À faire</option><option>En cours</option><option>Terminé</option></select>
+        <label class="input-label">Statut <span style="color:var(--danger)">*</span></label>
+        <select class="select-field" id="m-status">
+          <option value="">— Choisir —</option>
+          <option>À faire</option><option>En cours</option><option>Terminé</option>
+        </select>
+        <div class="field-required-note" id="err-status">Champ obligatoire</div>
       </div>
     </div>
     <div class="form-field">
-      <label class="input-label">Notes (optionnel)</label>
+      <label class="input-label">Notes <span style="color:var(--text-tertiary);font-weight:400">(optionnel)</span></label>
       <textarea class="input" id="m-note" rows="2" placeholder="Remarques…" style="resize:vertical"></textarea>
     </div>
     <div class="modal-actions">
-      <button class="btn btn-secondary" onclick="closeModal()">Annuler</button>
+      <button class="btn btn-secondary" onclick="closeAddModal()">Annuler</button>
       <button class="btn btn-primary" onclick="confirmAdd()">Ajouter →</button>
     </div>
   </div>
 </div>
 
 <script>
-// ── Params URL ────────────────────────────────────────────────
-var trackerId = new URLSearchParams(window.location.search).get('id');
-if (!trackerId) window.location.href = 'tracker_treso.html';
+// ── Init ──────────────────────────────────────────────────────
+var trackerId=new URLSearchParams(window.location.search).get('id');
+if(!trackerId) window.location.href='tracker_treso.html';
 
-var tasksCol = db.collection('tracker_tasks').doc(trackerId).collection('tasks');
-var tasks=[], taskIds=[], trackerData={}, currentRole;
+var tasksCol=db.collection('tracker_tasks').doc(trackerId).collection('tasks');
+var tasks=[],taskIds=[],trackerData={},currentRole;
+var SECTIONS=["RFP & Passation","Organisation","Comptabilité","Tableaux de suivi","Budget","Social","Fiscal","Ventes","Achats","Processus & Risques","Autres"];
+var RESPS=["GWILHERM","STELLA","PAGESAN","Équipe"];
 
 var JOURS=['Dimanche','Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi'];
 var MOIS=['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
 var now=new Date();
 document.getElementById('today-label').innerText=JOURS[now.getDay()]+' '+now.getDate()+' '+MOIS[now.getMonth()]+' '+now.getFullYear();
 
-var SECTIONS=["RFP & Passation","Organisation","Comptabilité","Tableaux de suivi","Budget","Social","Fiscal","Ventes","Achats","Processus & Risques","Autres"];
-var RESPS=["GWILHERM","STELLA","PAGESAN","Équipe"];
-
 // ── Auth ──────────────────────────────────────────────────────
-initAuth('tracker_treso', function(user, role, profile) {
-  currentRole = role;
-  renderSidebar(role, profile, user, 'tracker_treso');
-  showAppPage(user, role, profile);
+initAuth('tracker_treso',function(user,role,profile){
+  currentRole=role;
+  renderSidebar(role,profile,user,'tracker_treso');
+  showAppPage(user,role,profile);
   loadTracker();
   updateHealthIndicator();
 });
 
-// ── Charger tracker ───────────────────────────────────────────
 function loadTracker(){
   db.collection('trackers').doc(trackerId).get().then(function(doc){
-    if(!doc.exists){ window.location.href='tracker_treso.html'; return; }
+    if(!doc.exists){window.location.href='tracker_treso.html';return;}
     trackerData=doc.data();
     document.getElementById('tracker-title').innerText=trackerData.name;
     document.title=trackerData.name+' — My-ICN-JC';
-
     var isArchived=trackerData.statut==='archivé';
+    var isSuperAdmin=currentRole==='super_admin';
     var canEdit=['super_admin','president','tresorerie'].includes(currentRole);
-
+    // Boutons selon état et rôle
+    if(isSuperAdmin){
+      if(isArchived) document.getElementById('btn-unarchive').style.display='flex';
+      else document.getElementById('btn-archive').style.display='flex';
+    }
     if(!isArchived && canEdit){
       document.getElementById('btn-add-task').style.display='flex';
-      document.getElementById('btn-archive').style.display='flex';
     }
-
-    // Peupler le filtre section
+    if(isArchived){
+      document.getElementById('archived-banner').style.display='flex';
+    }
+    // Peupler filtre section
     var secSel=document.getElementById('filterSection');
-    SECTIONS.forEach(function(s){ secSel.innerHTML+='<option>'+s+'</option>'; });
-
+    SECTIONS.forEach(function(s){secSel.innerHTML+='<option>'+s+'</option>';});
     startTasks();
   });
 }
 
-// ── Firestore listener ────────────────────────────────────────
 function startTasks(){
   setSyncStatus('syncing','Chargement…');
   tasksCol.orderBy('order').onSnapshot(function(snap){
@@ -280,7 +298,6 @@ function startTasks(){
   },function(err){setSyncStatus('error','Erreur — '+err.message);});
 }
 
-// ── Mise à jour stats tracker ─────────────────────────────────
 function updateTrackerStats(){
   var done=tasks.filter(function(t){return t.status==='Terminé';}).length;
   db.collection('trackers').doc(trackerId).update({done:done,total:tasks.length}).catch(function(){});
@@ -299,7 +316,6 @@ function saveTask(ri){
 function setStatus(ri,v){tasks[ri].status=v;saveTask(ri);}
 function setDate(ri,v){tasks[ri].date=v;saveTask(ri);}
 function setNote(ri,v){tasks[ri].note=v;saveTask(ri);}
-// Pour tâches non-locked uniquement
 function setResp(ri,v){if(!tasks[ri].locked){tasks[ri].resp=v;saveTask(ri);}}
 function setPrio(ri,v){if(!tasks[ri].locked){tasks[ri].priority=v;saveTask(ri);}}
 function setSec(ri,v){if(!tasks[ri].locked){tasks[ri].section=v;saveTask(ri);}}
@@ -336,7 +352,6 @@ function render(){
     if((!search||t.name.toLowerCase().indexOf(search)>=0)&&(!fResp||t.resp===fResp)&&(!fPri||t.priority===fPri)&&(!fStat||t.status===fStat)&&(!fSec||t.section===fSec)&&lateOk)
       filtered.push({t:t,ri:i});
   }
-
   // Stats
   var total=filtered.length,done=0,inprog=0,todo=0,late=0;
   for(var j=0;j<filtered.length;j++){
@@ -352,8 +367,7 @@ function render(){
     '<div class="stat-card s-todo"><div class="s-label">À faire</div><div class="s-val">'+todo+'</div></div>'+
     '<div class="stat-card s-late"><div class="s-label">⚠ Retard</div><div class="s-val">'+late+'</div></div>'+
     '<div class="stat-card prog-card" style="min-width:160px">'+
-      '<div class="s-label">Progression (vue)</div>'+
-      '<div class="s-val">'+pct+'%</div>'+
+      '<div class="s-label">Progression</div><div class="s-val">'+pct+'%</div>'+
       '<div class="prog-bar-wrap"><div class="prog-bar" style="width:'+pct+'%"></div></div>'+
     '</div>';
 
@@ -372,112 +386,117 @@ function render(){
       html+='<tr class="section-row"><td colspan="9">'+t.section+'</td></tr>';
     }
 
+    // Colonne jours — vide si tâche terminée
     var diff=daysTo(t.date);
-    // Ne pas afficher les jours si tâche terminée
-    var dLabel='';
-    var dCls='';
-    if(t.status!=='Terminé' && diff!==null){
+    var dLabel='',dCls='';
+    if(t.status!=='Terminé'&&diff!==null){
       dLabel=diff<=0?'⚠ '+diff+'j':diff+'j';
       dCls=daysClass(diff);
     }
 
     var sCls=statusClass(t.status);
-    var secOpts='';for(var s=0;s<SECTIONS.length;s++)secOpts+=opt(SECTIONS[s],t.section);
-    var respOpts='';for(var r=0;r<RESPS.length;r++)respOpts+=opt(RESPS[r],t.resp);
+    var secOpts='';SECTIONS.forEach(function(s){secOpts+=opt(s,t.section);});
+    var respOpts='';RESPS.forEach(function(r){respOpts+=opt(r,t.resp);});
     var prioOpts=opt('Haute',t.priority)+opt('Moyenne',t.priority)+opt('Basse',t.priority);
     var statOpts=opt('À faire',t.status)+opt('En cours',t.status)+opt('Terminé',t.status);
 
-    var readOnly=archived;
+    // ── Tâche name ──
+    var nameCell=locked||archived
+      ?'<td class="task-name">'+t.name+'</td>'
+      :'<td class="task-name" contenteditable="true" onblur="setName('+ri+',this.innerText.trim())">'+t.name+'</td>';
 
-    // Tâche name
-    var nameCell;
-    if(locked||readOnly){
-      nameCell='<td class="task-name locked-cell">'+t.name+(locked?'<span class="lock-icon">🔒</span>':'')+'</td>';
-    } else {
-      nameCell='<td class="task-name" contenteditable="true" onblur="setName('+ri+',this.innerText)">'+t.name+'</td>';
-    }
+    // ── Responsable ──
+    var respCell=locked||archived
+      ?'<td style="font-size:12px;color:var(--text-secondary)">'+t.resp+'</td>'
+      :'<td><select class="cell-sel" onchange="setResp('+ri+',this.value)">'+respOpts+'</select></td>';
 
-    // Responsable
-    var respCell;
-    if(locked||readOnly){
-      respCell='<td style="font-size:12px;color:var(--text-secondary)">'+t.resp+'</td>';
-    } else {
-      respCell='<td><select class="cell-sel" onchange="setResp('+ri+',this.value)">'+respOpts+'</select></td>';
-    }
+    // ── Statut — éditable sauf archivé ──
+    var statCell=archived
+      ?'<td><span class="badge '+(t.status==='Terminé'?'badge-success':t.status==='En cours'?'badge-warning':'badge-navy')+'">'+t.status+'</span></td>'
+      :'<td><select class="cell-sel '+sCls+'" onchange="setStatus('+ri+',this.value)">'+statOpts+'</select></td>';
 
-    // Statut — toujours éditable sauf si archivé
-    var statCell;
-    if(readOnly){
-      statCell='<td><span class="badge '+(t.status==='Terminé'?'badge-success':t.status==='En cours'?'badge-warning':'badge-navy')+'">'+t.status+'</span></td>';
-    } else {
-      statCell='<td><select class="cell-sel '+sCls+'" onchange="setStatus('+ri+',this.value)">'+statOpts+'</select></td>';
-    }
+    // ── Priorité ──
+    var prioCell=locked||archived
+      ?'<td class="prio-'+t.priority+'">'+t.priority+'</td>'
+      :'<td class="prio-'+t.priority+'"><select class="cell-sel" onchange="setPrio('+ri+',this.value)">'+prioOpts+'</select></td>';
 
-    // Priorité
-    var prioCell;
-    if(locked||readOnly){
-      prioCell='<td class="prio-'+t.priority+'">'+t.priority+'</td>';
-    } else {
-      prioCell='<td class="prio-'+t.priority+'"><select class="cell-sel" onchange="setPrio('+ri+',this.value)">'+prioOpts+'</select></td>';
-    }
+    // ── Section ──
+    var secCell=locked||archived
+      ?'<td style="font-size:12px;color:var(--text-secondary)">'+t.section+'</td>'
+      :'<td><select class="cell-sel" onchange="setSec('+ri+',this.value)">'+secOpts+'</select></td>';
 
-    // Section
-    var secCell;
-    if(locked||readOnly){
-      secCell='<td style="font-size:12px;color:var(--text-secondary)">'+t.section+'</td>';
-    } else {
-      secCell='<td><select class="cell-sel" onchange="setSec('+ri+',this.value)">'+secOpts+'</select></td>';
-    }
+    // ── Échéance — éditable sauf archivé ──
+    var dateCell=archived
+      ?'<td style="font-size:12px;color:var(--text-tertiary)">'+(t.date||'—')+'</td>'
+      :'<td><input type="date" class="date-input" value="'+(t.date||'')+'" onchange="setDate('+ri+',this.value)"></td>';
 
-    // Échéance — éditable si non archivé
-    var dateCell;
-    if(readOnly){
-      dateCell='<td style="font-size:12px;color:var(--text-tertiary)">'+(t.date||'—')+'</td>';
-    } else {
-      dateCell='<td><input type="date" class="date-input" value="'+(t.date||'')+'" onchange="setDate('+ri+',this.value)"></td>';
-    }
+    // ── Notes — éditable sauf archivé ──
+    var noteCell=archived
+      ?'<td class="note-cell">'+(t.note||'')+'</td>'
+      :'<td class="note-cell" contenteditable="true" onblur="setNote('+ri+',this.innerText.trim())">'+(t.note||'')+'</td>';
 
-    // Notes — toujours éditable sauf si archivé
-    var noteCell;
-    if(readOnly){
-      noteCell='<td class="note-cell">'+(t.note||'')+'</td>';
+    // ── Colonne action : 🔒 si locked, ✕ si libre, vide si archivé ──
+    var actionCell;
+    if(archived){
+      actionCell='<td></td>';
+    } else if(locked){
+      actionCell='<td style="text-align:center"><span class="lock-icon" title="Tâche figée — non supprimable">🔒</span></td>';
     } else {
-      noteCell='<td class="note-cell" contenteditable="true" onblur="setNote('+ri+',this.innerText)">'+(t.note||'')+'</td>';
-    }
-
-    // Bouton supprimer — masqué si locked ou archivé
-    var delCell;
-    if(locked||readOnly){
-      delCell='<td></td>';
-    } else {
-      delCell='<td style="text-align:center"><button class="del-btn" onclick="removeTask('+ri+')">✕</button></td>';
+      actionCell='<td style="text-align:center"><button class="del-btn" onclick="removeTask('+ri+')">✕</button></td>';
     }
 
     html+='<tr>'+nameCell+respCell+statCell+prioCell+secCell+dateCell+
       '<td class="'+dCls+'" style="text-align:center;white-space:nowrap">'+dLabel+'</td>'+
-      noteCell+delCell+'</tr>';
+      noteCell+actionCell+'</tr>';
   }
 
   if(!html)html='<tr><td colspan="9" style="text-align:center;padding:2rem;color:var(--text-tertiary);font-size:13px">Aucune tâche pour ces filtres.</td></tr>';
   document.getElementById('tbody').innerHTML=html;
 }
 
-// ── Ajouter tâche ─────────────────────────────────────────────
-function addTask(){
-  document.getElementById('m-name').value='';document.getElementById('m-note').value='';
-  document.getElementById('m-date').value='';document.getElementById('m-sec').selectedIndex=0;
-  document.getElementById('m-resp').selectedIndex=0;document.getElementById('m-prio').value='Moyenne';
-  document.getElementById('m-status').value='À faire';
+// ── Modal ajout ───────────────────────────────────────────────
+function openAddModal(){
+  ['m-sec','m-name','m-resp','m-prio','m-status'].forEach(function(id){
+    document.getElementById(id).value='';
+    document.getElementById(id).classList.remove('input-error');
+  });
+  document.getElementById('m-date').value='';
+  document.getElementById('m-date').classList.remove('input-error');
+  document.getElementById('m-note').value='';
+  ['err-sec','err-name','err-resp','err-prio','err-date','err-status'].forEach(function(id){
+    document.getElementById(id).style.display='none';
+  });
   document.getElementById('modal-add').classList.add('open');
   setTimeout(function(){document.getElementById('m-name').focus();},80);
 }
-function closeModal(){ document.getElementById('modal-add').classList.remove('open'); }
+function closeAddModal(){ document.getElementById('modal-add').classList.remove('open'); }
+
 function confirmAdd(){
-  var name=document.getElementById('m-name').value.trim();
-  if(!name){document.getElementById('m-name').focus();return;}
+  var fields=[
+    {id:'m-sec',  err:'err-sec'},
+    {id:'m-name', err:'err-name'},
+    {id:'m-resp', err:'err-resp'},
+    {id:'m-prio', err:'err-prio'},
+    {id:'m-date', err:'err-date'},
+    {id:'m-status',err:'err-status'},
+  ];
+  var valid=true;
+  fields.forEach(function(f){
+    var el=document.getElementById(f.id);
+    var errEl=document.getElementById(f.err);
+    if(!el.value.trim()){
+      el.classList.add('input-error');
+      errEl.style.display='block';
+      valid=false;
+    } else {
+      el.classList.remove('input-error');
+      errEl.style.display='none';
+    }
+  });
+  if(!valid)return;
   var t={
     section:document.getElementById('m-sec').value,
-    name:name,
+    name:document.getElementById('m-name').value.trim(),
     resp:document.getElementById('m-resp').value,
     status:document.getElementById('m-status').value,
     priority:document.getElementById('m-prio').value,
@@ -486,33 +505,62 @@ function confirmAdd(){
     locked:false,
     order:Date.now()
   };
-  tasksCol.add(t).then(function(){ closeModal(); }).catch(function(e){alert('Erreur : '+e.message);});
+  tasksCol.add(t).then(function(){closeAddModal();}).catch(function(e){alert('Erreur : '+e.message);});
 }
 
-// ── Archiver ──────────────────────────────────────────────────
+// ── Archiver / Désarchiver ────────────────────────────────────
 function archiveTracker(){
-  if(!confirm('Archiver ce tableau ? Il passera en lecture seule.')) return;
+  if(!confirm('Archiver ce tableau ? Il passera en lecture seule.\nSeule Stella pourra le désarchiver.'))return;
   db.collection('trackers').doc(trackerId).update({statut:'archivé'}).then(function(){
     trackerData.statut='archivé';
-    document.getElementById('btn-add-task').style.display='none';
     document.getElementById('btn-archive').style.display='none';
+    document.getElementById('btn-add-task').style.display='none';
+    document.getElementById('btn-unarchive').style.display='flex';
+    document.getElementById('archived-banner').style.display='flex';
+    render();
+  });
+}
+function unarchiveTracker(){
+  if(!confirm('Désarchiver ce tableau ? Il redeviendra modifiable.'))return;
+  db.collection('trackers').doc(trackerId).update({statut:'actif'}).then(function(){
+    trackerData.statut='actif';
+    document.getElementById('btn-unarchive').style.display='none';
+    document.getElementById('btn-archive').style.display='flex';
+    document.getElementById('archived-banner').style.display='none';
+    var canEdit=['super_admin','president','tresorerie'].includes(currentRole);
+    if(canEdit) document.getElementById('btn-add-task').style.display='flex';
     render();
   });
 }
 
-// ── Filtres & export ──────────────────────────────────────────
+// ── Filtres ───────────────────────────────────────────────────
 function clearFilters(){
   ['search','filterResp','filterPriority','filterStatus','filterSection','filterLate'].forEach(function(id){
     document.getElementById(id).value='';
   });
   render();
 }
-function exportCSV(){
-  var bom='\uFEFF';
-  var rows=tasks.map(function(t){return['"'+t.section+'"','"'+(t.name||'').replace(/"/g,'""')+'"',t.resp,t.status,t.priority,(t.date||''),'"'+(t.note||'').replace(/"/g,'""')+'"'];});
-  var csv=bom+[['Section','Tâche','Responsable','Statut','Priorité','Échéance','Notes']].concat(rows).map(function(r){return r.join(';');}).join('\n');
-  var blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});
-  var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=(trackerData.name||'tracker')+'.csv';a.click();
+
+// ── Export Excel ──────────────────────────────────────────────
+function exportXLSX(){
+  var rows=[['Section','Tâche','Responsable','Statut','Priorité','Échéance','Notes']];
+  tasks.forEach(function(t){
+    rows.push([
+      t.section||'',
+      t.name||'',
+      t.resp||'',
+      t.status||'',
+      t.priority||'',
+      t.date||'Non renseigné',
+      t.note||''
+    ]);
+  });
+  var ws=XLSX.utils.aoa_to_sheet(rows);
+  // Largeurs colonnes
+  ws['!cols']=[{wch:18},{wch:45},{wch:14},{wch:12},{wch:10},{wch:16},{wch:35}];
+  var wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'Suivi');
+  XLSX.writeFile(wb,(trackerData.name||'tracker')+'.xlsx');
 }
 </script>
 </body>
