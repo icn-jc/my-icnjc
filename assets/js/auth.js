@@ -174,11 +174,12 @@ function showAppPage(user, role, profile) {
 
 // ── Chemin relatif vers la racine ──────────────────────────────
 function getBasePath() {
-  const path = window.location.pathname;
-  const depth = (path.match(/\//g) || []).length - 1;
-  // Sur GitHub Pages le repo est dans /my-icnjc/
-  const parts = path.split('/').filter(Boolean);
+  const parts = window.location.pathname.split('/').filter(Boolean);
   const repoIdx = parts.indexOf('my-icnjc');
-  const levelsFromRepo = parts.length - repoIdx - 1;
-  return levelsFromRepo > 0 ? '../'.repeat(levelsFromRepo) : './';
+  if (repoIdx === -1) return './';
+  // Nombre de niveaux entre le fichier courant et la racine du repo
+  // ex: /my-icnjc/admin/admin_index.html → parts après repo = ['admin','admin_index.html'] → 1 dossier
+  const afterRepo = parts.slice(repoIdx + 1);
+  const levels = afterRepo.length > 0 ? afterRepo.length - (afterRepo[afterRepo.length-1].includes('.') ? 1 : 0) : 0;
+  return levels > 0 ? '../'.repeat(levels) : './';
 }
