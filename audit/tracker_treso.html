@@ -29,6 +29,8 @@
 .archived-badge{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:600;padding:2px 8px;border-radius:99px;background:#f1f5f9;color:#64748b;position:absolute;top:14px;right:14px;}
 .section-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.12em;color:var(--text-tertiary);margin-bottom:12px;display:flex;align-items:center;gap:8px;}
 .section-label::after{content:'';flex:1;height:1px;background:var(--border);display:block;}
+.del-tracker-btn{position:absolute;bottom:14px;right:14px;background:var(--danger-bg);color:var(--danger);border:none;border-radius:6px;padding:4px 8px;font-size:13px;cursor:pointer;z-index:10;transition:background .15s;}
+.del-tracker-btn:hover{background:#fecaca;}
 </style>
 </head>
 <body>
@@ -108,7 +110,9 @@ var MOIS=['janvier','février','mars','avril','mai','juin','juillet','août','se
 var now=new Date();
 document.getElementById('today-date').innerText=JOURS[now.getDay()]+' '+now.getDate()+' '+MOIS[now.getMonth()]+' '+now.getFullYear();
 
+var currentRole;
 initAuth('tracker_treso', function(user, role, profile) {
+  currentRole = role;
   renderSidebar(role, profile, user, 'tracker_treso');
   showAppPage(user, role, profile);
   if(['super_admin','president','tresorerie'].includes(role)){
@@ -142,9 +146,13 @@ function renderTrackers(list,containerId,isArchived){
     var pct=t.total>0?Math.round((t.done||0)/t.total*100):0;
     var typeLabel={audit:'Audit',suivi:'Suivi opérationnel',autre:'Autre'}[t.type]||t.type||'Audit';
     var dateLabel=t.dateTarget?'Cible : '+formatDate(t.dateTarget):'';
-    // Les archivés sont aussi cliquables
-    html+='<a class="tracker-card'+(isArchived?' archived':'')+'" href="tracker_treso_detail.html?id='+t.id+'">'+
+    var deleteBtn='';
+    if(isArchived && currentRole==='super_admin'){
+      deleteBtn='<button class="del-tracker-btn" onclick="deleteTracker(event,''+t.id+'',''+t.name.replace(/'/g,"\'")+'')" title="Supprimer définitivement">🗑</button>';
+    }
+    html+='<a class="tracker-card'+(isArchived?' archived':'')+'" href="tracker_treso_detail.html?id='+t.id+'" style="position:relative">'+
       (isArchived?'<span class="archived-badge">📁 Archivé</span>':'')+
+      deleteBtn+
       '<div class="tracker-type">'+typeLabel+'</div>'+
       '<div class="tracker-name">'+t.name+'</div>'+
       '<div class="tracker-date">'+dateLabel+'</div>'+
@@ -156,6 +164,19 @@ function renderTrackers(list,containerId,isArchived){
     '</a>';
   });
   el.innerHTML=html;
+}
+
+function deleteTracker(event, trackerId, name){
+  event.preventDefault();
+  event.stopPropagation();
+  if(!confirm('Supprimer définitivement le tableau "'+name+'" ?\nCette action est irréversible.'))return;
+  // Supprimer le document tracker
+  db.collection('trackers').doc(trackerId).delete().then(function(){
+    // Note : les sous-collections tracker_tasks ne sont pas supprimées automatiquement
+    // Firebase ne supporte pas la suppression récursive côté client
+    // Les tâches orphelines restent dans Firestore mais sont inaccessibles
+    console.log('Tracker supprimé');
+  }).catch(function(e){alert('Erreur : '+e.message);});
 }
 
 function formatDate(d){
