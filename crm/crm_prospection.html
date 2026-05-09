@@ -10,7 +10,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <script src="../assets/js/firebase.js"></script>
 <script src="../assets/js/auth.js"></script>
 <script src="../assets/js/sidebar.js"></script>
@@ -643,7 +643,7 @@ var ROLE_LABELS_MAP={super_admin:'Super Admin',president:'Président',vice_presi
   tresorerie:'Trésorerie',auditeur:'Auditeur',marketing:'Marketing',commercial:'Commercial'};
 
 function statCard(label,val,cls){
-  return '<div class="stat-card '+(cls||')'+'"><div class="s-label">'+label+'</div><div class="s-val">'+val+'</div></div>';
+  return '<div class="stat-card '+(cls||'')+'"><div class="s-label">'+label+'</div><div class="s-val">'+val+'</div></div>';
 }
 
 function renderEvolutionChart(prospectors){
