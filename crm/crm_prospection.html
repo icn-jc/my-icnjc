@@ -10,7 +10,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
 <script src="../assets/js/firebase.js"></script>
 <script src="../assets/js/auth.js"></script>
 <script src="../assets/js/sidebar.js"></script>
@@ -250,7 +250,7 @@ td[contenteditable=true]:hover{background:rgba(163,33,95,0.04);border-radius:4px
 
         <!-- Graphique évolution -->
         <div class="section-title">Évolution hebdomadaire</div>
-        <div class="chart-wrap"><canvas id="chart-evolution" style="max-height:220px"></canvas></div>
+        <div class="chart-wrap" id="chart-evolution" style="min-height:220px"></div>
       </div>
 
       <!-- ── ONGLET MES PROSPECTS ── -->
@@ -470,7 +470,6 @@ var currentUserEmail='', currentUserName='', currentRole='';
 var isCA=false;
 var allProspects=[], allRdvs=[], allUsers=[], goalWeek=10;
 var currentHistId=null;
-var evolutionChart=null;
 
 var JOURS=['Dimanche','Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi'];
 var MOIS=['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
@@ -643,52 +642,113 @@ var ROLE_LABELS_MAP={super_admin:'Super Admin',president:'Président',vice_presi
   tresorerie:'Trésorerie',auditeur:'Auditeur',marketing:'Marketing',commercial:'Commercial'};
 
 function statCard(label,val,cls){
-  return '<div class="stat-card '+(cls||')'+'"><div class="s-label">'+label+'</div><div class="s-val">'+val+'</div></div>';
+  return '<div class="stat-card '+(cls||'')+'">'+
+    '<div class="s-label">'+label+'</div>'+
+    '<div class="s-val">'+val+'</div>'+
+  '</div>';
 }
 
 function renderEvolutionChart(prospectors){
-  var ctx=document.getElementById('chart-evolution');
-  if(!ctx)return;
+  var wrap=document.getElementById('chart-evolution');
+  if(!wrap)return;
+  var colors=['#A3215F','#1B2A4A','#3b82f6','#10b981','#f59e0b','#8b5cf6'];
   var weeks=[];
   for(var w=3;w>=0;w--){
     var ws=getWeekStart(new Date());
     ws.setDate(ws.getDate()-w*7);
-    var we=new Date(ws); we.setDate(we.getDate()+7);
-    weeks.push({start:ws,end:we,label:'S-'+w===0?'Cette sem.':'S-'+w});
+    var we=new Date(ws);we.setDate(we.getDate()+7);
+    weeks.push({start:ws,end:we,label:w===0?'Cette sem.':'S-'+w});
   }
-  weeks[weeks.length-1].label='Cette sem.';
-  var datasets=prospectors.slice(0,5).map(function(u,i){
-    var colors=['#A3215F','#1B2A4A','#3b82f6','#10b981','#f59e0b'];
-    return {
-      label:(u.prenom||u.email),
-      data:weeks.map(function(w){
-        return allProspects.filter(function(p){
-          if(p.owner_email!==u.email||!p.last_action_date)return false;
-          var d=new Date(p.last_action_date);
-          return d>=w.start&&d<w.end;
-        }).length;
-      }),
-      borderColor:colors[i],backgroundColor:colors[i]+'33',tension:.4,fill:false
-    };
+  var people=prospectors.slice(0,6);
+  var allData=people.map(function(u){
+    return {name:(u.prenom||u.email.split('@')[0]),vals:weeks.map(function(wk){
+      return allProspects.filter(function(p){
+        if(p.owner_email!==u.email||!p.last_action_date)return false;
+        var d=new Date(p.last_action_date);return d>=wk.start&&d<wk.end;
+      }).length;
+    })};
   });
-  if(evolutionChart) evolutionChart.destroy();
-  evolutionChart=new Chart(ctx,{
-    type:'line',
-    data:{labels:weeks.map(function(w){return w.label;}),datasets:datasets},
-    options:{responsive:true,plugins:{legend:{labels:{font:{family:'Sora',size:11}}}},
-      scales:{y:{beginAtZero:true,ticks:{font:{family:'Sora',size:10}},grid:{color:'rgba(0,0,0,0.05)'}},
-              x:{ticks:{font:{family:'Sora',size:10}},grid:{display:false}}}}
+  var maxVal=Math.max(goalWeek,allData.reduce(function(mx,u){return Math.max(mx,Math.max.apply(null,u.vals));},1));
+  var html='<div style="display:flex;height:180px;align-items:flex-end;gap:6px;padding:0 8px">';
+  weeks.forEach(function(wk,wi){
+    html+='<div style="flex:1;display:flex;flex-direction:column;align-items:center">';
+    html+='<div style="display:flex;align-items:flex-end;gap:2px;height:150px">';
+    allData.forEach(function(u,ui){
+      var v=u.vals[wi];
+      var h=maxVal>0?Math.round(v/maxVal*140):0;
+      html+='<div title="'+u.name+': '+v+'" style="width:14px;height:'+Math.max(h,v>0?3:0)+'px;background:'+colors[ui%colors.length]+';border-radius:3px 3px 0 0;opacity:.85"></div>';
+    });
+    html+='</div><div style="font-size:10px;color:var(--text-tertiary);margin-top:4px">'+wk.label+'</div></div>';
   });
+  html+='</div><div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:10px;padding:0 8px">';
+  allData.forEach(function(u,ui){
+    html+='<div style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text-secondary)"><div style="width:10px;height:10px;border-radius:2px;background:'+colors[ui%colors.length]+'"></div>'+u.name+'</div>';
+  });
+  html+='</div>';
+  wrap.innerHTML=html;
 }
 
-// ── Render Mine (Kanban) ──────────────────────────────────────
+
+// ── Render CA ─────────────────────────────────────────────────
+function renderCA(){
+  var prospectors=allUsers.filter(function(u){return u.prospecte;});
+  var total=allProspects.length;
+  var signes=allProspects.filter(function(p){return p.statut==='Signé';}).length;
+  var enCours=allProspects.filter(function(p){return p.statut!=='Signé'&&p.statut!=='Perdu';}).length;
+  var pipeline=allProspects.filter(function(p){return p.statut!=='Perdu';}).reduce(function(s,p){return s+(parseFloat(p.montant)||0);},0);
+  var taux=total>0?Math.round(signes/total*100):0;
+  document.getElementById('ca-stats').innerHTML=
+    statCard('Total prospects',total,'')+statCard('En cours',enCours,'warning')+
+    statCard('Signés',signes,'success')+statCard('Pipeline',fmtMoney(pipeline),'')+
+    statCard('Taux conversion',taux+'%',taux>=20?'success':taux>=10?'warning':'danger');
+  // Alertes
+  var late=prospectors.filter(function(u){return countThisWeek(u.email)<goalWeek;});
+  if(late.length>0){
+    document.getElementById('alert-section').style.display='block';
+    document.getElementById('alert-list').innerHTML=late.map(function(u){
+      var n=countThisWeek(u.email);
+      return '<div class="alert-item">👤 '+(u.prenom||u.email)+' — <strong>'+n+'/'+goalWeek+'</strong> cette semaine</div>';
+    }).join('');
+  } else { document.getElementById('alert-section').style.display='none'; }
+  // Classement
+  var ranked=prospectors.map(function(u){
+    return {u:u,count:countThisWeek(u.email),total:allProspects.filter(function(p){return p.owner_email===u.email;}).length};
+  }).sort(function(a,b){return b.count-a.count;});
+  var medals=['🥇','🥈','🥉'];
+  var RLMAP={super_admin:'Super Admin',president:'Président',vice_president:'VP',tresorier:'Trésorier',
+    secretaire:'Secrétaire',responsable_commercial:'Resp. Commercial',responsable_qualite:'Resp. Qualité',
+    responsable_marketing:'Resp. Marketing',tresorerie:'Trésorerie',auditeur:'Auditeur',marketing:'Marketing',commercial:'Commercial'};
+  document.getElementById('ranking-grid').innerHTML=ranked.map(function(r,i){
+    var pct=Math.min(100,Math.round(r.count/goalWeek*100));
+    var badgeCls=r.count>=goalWeek?'ok':r.count>=goalWeek*0.5?'warn':'late';
+    var badgeTxt=r.count>=goalWeek?'✅ Objectif atteint':r.count>=goalWeek*0.5?'⚡ En cours':'🔴 En retard';
+    var cardCls=i===0?'top1':i===1?'top2':i===2?'top3':'';
+    var initials=((r.u.prenom||'?')[0]+(r.u.nom||'?')[0]).toUpperCase();
+    return '<div class="ranking-card '+cardCls+'">'+
+      '<div class="rank-medal">'+(medals[i]||i+1+'.')+'</div>'+
+      '<div class="rank-avatar">'+initials+'</div>'+
+      '<div class="rank-info"><div class="rank-name">'+(r.u.prenom||'')+' '+(r.u.nom||'')+'</div>'+
+      '<div class="rank-role">'+(RLMAP[r.u.role]||r.u.role||'')+'</div>'+
+      '<span class="rank-badge '+badgeCls+'">'+badgeTxt+'</span></div>'+
+      '<div class="rank-stats"><div class="rank-count">'+r.count+'</div><div class="rank-label">cette sem.</div>'+
+      '<div class="rank-prog"><div class="rank-prog-fill" style="width:'+pct+'%"></div></div>'+
+      '<div style="font-size:10px;color:var(--text-tertiary);text-align:right">'+r.total+' total</div></div>'+
+    '</div>';
+  }).join('');
+  renderEvolutionChart(prospectors);
+}
+
+function statCard(label,val,cls){
+  return '<div class="stat-card '+(cls||'')+'">'+'<div class="s-label">'+label+'</div><div class="s-val">'+val+'</div></div>';
+}
+
+// ── Render Mine ────────────────────────────────────────────────
 function renderMine(){
-  var mine=allProspects.filter(function(p){ return p.owner_email===currentUserEmail; });
-  var weekCount=mine.filter(function(p){ return p.last_action_date&&isThisWeek(p.last_action_date); }).length;
+  var mine=allProspects.filter(function(p){return p.owner_email===currentUserEmail;});
+  var weekCount=mine.filter(function(p){return p.last_action_date&&isThisWeek(p.last_action_date);}).length;
   var pct=Math.min(100,Math.round(weekCount/goalWeek*100));
   var badgeCls=weekCount>=goalWeek?'ok':weekCount>=goalWeek*0.5?'warn':'late';
   var badgeTxt=weekCount>=goalWeek?'🎯 Objectif atteint !':weekCount>=goalWeek*0.5?'⚡ Bon rythme':'🔴 Accélère !';
-
   document.getElementById('week-goal-bar').innerHTML=
     '<div class="week-goal">'+
       '<div class="week-goal-text">'+
@@ -702,11 +762,18 @@ function renderMine(){
       '</div>'+
       '<div class="week-goal-badge '+badgeCls+'">'+badgeTxt+'</div>'+
     '</div>';
-
-  var kanban=document.getElementById('kanban-mine');
-  kanban.innerHTML=STATUTS.map(function(s){
+  var SCOLORS={
+    'À contacter':{bg:'#e0f2fe',color:'#0c4a6e'},
+    'Contacté':{bg:'#ede9fe',color:'#4c1d95'},
+    'RDV planifié':{bg:'#fef3c7',color:'#78350f'},
+    'Proposition envoyée':{bg:'#dbeafe',color:'#1e3a5f'},
+    'Négociation':{bg:'#fce7f3',color:'#831843'},
+    'Signé':{bg:'#dcfce7',color:'#14532d'},
+    'Perdu':{bg:'#fee2e2',color:'#7f1d1d'}
+  };
+  document.getElementById('kanban-mine').innerHTML=STATUTS.map(function(s){
     var cards=mine.filter(function(p){return p.statut===s;});
-    var col=STATUT_COL_BG[s]||{bg:'#f4f3f1',color:'#1B2A4A'};
+    var col=SCOLORS[s]||{bg:'#f4f3f1',color:'#1B2A4A'};
     return '<div class="kanban-col">'+
       '<div class="kanban-col-header" style="background:'+col.bg+';color:'+col.color+'">'+
         '<span>'+s+'</span><span>'+cards.length+'</span>'+
@@ -714,9 +781,12 @@ function renderMine(){
       '<div class="kanban-col-body">'+
         (cards.length===0?'<div class="kanban-empty">—</div>':
         cards.map(function(p){
-          return '<div class="kanban-card" onclick="openHist(\''+p.id+'\',\''+encodeURIComponent(p.entreprise||'')+'\',\''+encodeURIComponent(p.contact||'')+'\')">'+
+          var eid=p.id.replace(/'/g,'');
+          var ec=encodeURIComponent(p.entreprise||'');
+          var ct=encodeURIComponent(p.contact||'');
+          return '<div class="kanban-card" onclick="openHist(\''+eid+'\',\''+ec+'\',\''+ct+'\')">'+
             '<div class="kanban-card-company">'+(p.entreprise||'')+'</div>'+
-            '<div class="kanban-card-contact">'+(p.contact||'—')+' '+(p.poste?'· '+p.poste:'')+'</div>'+
+            '<div class="kanban-card-contact">'+(p.contact||'—')+(p.poste?' · '+p.poste:'')+'</div>'+
             '<div class="kanban-card-meta">'+
               '<span class="kanban-card-amount">'+(p.montant?fmtMoney(p.montant):'')+'</span>'+
               '<span class="kanban-card-date">'+(p.last_action_date?fmtDate(p.last_action_date):'')+'</span>'+
@@ -728,13 +798,13 @@ function renderMine(){
   }).join('');
 }
 
-// ── Render All (table) ────────────────────────────────────────
+// ── Render All ─────────────────────────────────────────────────
 function renderAll(){
   var search=(document.getElementById('search-all').value||'').toLowerCase();
   var fMember=document.getElementById('filter-member').value;
   var fStatut=document.getElementById('filter-statut').value;
   var fSecteur=document.getElementById('filter-secteur').value;
-
+  var isOwner=function(p){return p.owner_email===currentUserEmail;};
   var data=allProspects.filter(function(p){
     var visible=isCA||(p.owner_email===currentUserEmail);
     if(!visible)return false;
@@ -744,37 +814,39 @@ function renderAll(){
     if(fSecteur&&p.secteur!==fSecteur)return false;
     return true;
   });
-
   document.getElementById('filter-note-all').innerText=
     data.length<allProspects.length?'Affichage de '+data.length+' / '+allProspects.length:'';
-
-  var isOwner=function(p){return p.owner_email===currentUserEmail;};
+  var STATUT_COLORS={'À contacter':'st-acontacter','Contacté':'st-contacte','RDV planifié':'st-rdv',
+    'Proposition envoyée':'st-proposition','Négociation':'st-negociation','Signé':'st-signe','Perdu':'st-perdu'};
   var html=data.length===0
     ?'<tr><td colspan="12" style="text-align:center;padding:2rem;color:var(--text-tertiary)">Aucun prospect.</td></tr>'
     :data.map(function(p){
       var own=isOwner(p)||isCA;
       var statCls=STATUT_COLORS[p.statut]||'';
       var statOpts=STATUTS.map(function(s){return'<option'+(p.statut===s?' selected':'')+'>'+s+'</option>';}).join('');
-      return '<tr class="'+(isOwner(p)?'':'readonly-row')+'">'+
-        (own?'<td contenteditable="true" onblur="saveField(\''+p.id+'\',\'entreprise\',this.innerText.trim())">'+(p.entreprise||'')+'</td>':'<td>'+(p.entreprise||'')+'</td>')+
-        (own?'<td contenteditable="true" onblur="saveField(\''+p.id+'\',\'contact\',this.innerText.trim())">'+(p.contact||'')+'</td>':'<td>'+(p.contact||'')+'</td>')+
+      var pid=p.id.replace(/'/g,'');
+      var ec=encodeURIComponent(p.entreprise||'');
+      var ct=encodeURIComponent(p.contact||'');
+      return '<tr>'+
+        (own?'<td contenteditable="true" onblur="saveField(\''+pid+'\',\'entreprise\',this.innerText.trim())">'+(p.entreprise||'')+'</td>':'<td>'+(p.entreprise||'')+'</td>')+
+        (own?'<td contenteditable="true" onblur="saveField(\''+pid+'\',\'contact\',this.innerText.trim())">'+(p.contact||'')+'</td>':'<td>'+(p.contact||'')+'</td>')+
         '<td style="font-size:11px;color:var(--text-tertiary)">'+(p.poste||'')+'</td>'+
         '<td style="font-size:11px">'+(p.tel||'')+'</td>'+
         '<td style="font-size:11px">'+(p.secteur||'')+'</td>'+
         '<td style="font-size:11px">'+(p.source||'')+'</td>'+
         '<td style="font-size:12px;font-weight:500;color:var(--bordeaux)">'+(p.montant?fmtMoney(p.montant):'—')+'</td>'+
-        (own?'<td><select class="cell-sel '+statCls+'" onchange="saveField(\''+p.id+'\',\'statut\',this.value)">'+statOpts+'</select></td>'
+        (own?'<td><select class="cell-sel '+statCls+'" onchange="saveField(\''+pid+'\',\'statut\',this.value)">'+statOpts+'</select></td>'
             :'<td><span class="badge '+statCls+'">'+(p.statut||'')+'</span></td>')+
         '<td><span class="'+(isOwner(p)?'owner-me':'owner-other')+'">'+(p.owner_name||p.owner_email||'')+'</span></td>'+
         '<td style="font-size:11px;color:var(--text-tertiary)">'+(p.last_action_date?fmtDate(p.last_action_date):'—')+'</td>'+
-        '<td style="text-align:center"><button class="hist-btn" onclick="openHist(\''+p.id+'\',\''+encodeURIComponent(p.entreprise||'')+'\',\''+encodeURIComponent(p.contact||'')+'\')">📋</button></td>'+
-        '<td style="text-align:center">'+(isOwner(p)?'<button class="del-btn" onclick="deleteProspect(\''+p.id+'\')">✕</button>':'')+'</td>'+
+        '<td style="text-align:center"><button class="hist-btn" onclick="openHist(\''+pid+'\',\''+ec+'\',\''+ct+'\')">📋</button></td>'+
+        '<td style="text-align:center">'+(isOwner(p)?'<button class="del-btn" onclick="deleteProspect(\''+pid+'\')">✕</button>':'')+'</td>'+
       '</tr>';
     }).join('');
   document.getElementById('tbody-all').innerHTML=html;
 }
 
-// ── Render RDV ────────────────────────────────────────────────
+// ── Render RDV ─────────────────────────────────────────────────
 function renderRdv(){
   var data=isCA?allRdvs:allRdvs.filter(function(r){return r.owner_email===currentUserEmail;});
   var html=data.length===0
@@ -796,63 +868,50 @@ function renderRdv(){
 }
 
 // ── Prospect CRUD ─────────────────────────────────────────────
-function saveField(id, field, val){
-  var update={}; update[field]=val;
-  db.collection('prospects').doc(id).update(update);
+function saveField(id,field,val){
+  var u={};u[field]=val;
+  db.collection('prospects').doc(id).update(u);
 }
 function deleteProspect(id){
   if(!confirm('Supprimer ce prospect ?'))return;
   db.collection('prospects').doc(id).delete();
 }
-
-function openAddProspect(){ document.getElementById('modal-add-prospect').classList.add('open'); }
-function closeAddProspect(){ document.getElementById('modal-add-prospect').classList.remove('open'); }
-
+function openAddProspect(){document.getElementById('modal-add-prospect').classList.add('open');}
+function closeAddProspect(){document.getElementById('modal-add-prospect').classList.remove('open');}
 function confirmAddProspect(){
   var company=document.getElementById('ap-company').value.trim();
   var statut=document.getElementById('ap-statut').value;
   if(!company){alert('Merci de renseigner l\'entreprise.');return;}
   if(!statut){alert('Merci de choisir un statut.');return;}
   db.collection('prospects').add({
-    entreprise:company,
-    contact:document.getElementById('ap-contact').value.trim(),
-    poste:document.getElementById('ap-poste').value.trim(),
-    email:document.getElementById('ap-email').value.trim(),
-    tel:document.getElementById('ap-tel').value.trim(),
-    secteur:document.getElementById('ap-secteur').value,
-    source:document.getElementById('ap-source').value,
-    montant:parseFloat(document.getElementById('ap-montant').value)||0,
-    statut:statut,
-    notes:document.getElementById('ap-notes').value.trim(),
-    owner_email:currentUserEmail,
-    owner_name:currentUserName.trim(),
+    entreprise:company,contact:document.getElementById('ap-contact').value.trim(),
+    poste:document.getElementById('ap-poste').value.trim(),email:document.getElementById('ap-email').value.trim(),
+    tel:document.getElementById('ap-tel').value.trim(),secteur:document.getElementById('ap-secteur').value,
+    source:document.getElementById('ap-source').value,montant:parseFloat(document.getElementById('ap-montant').value)||0,
+    statut:statut,notes:document.getElementById('ap-notes').value.trim(),
+    owner_email:currentUserEmail,owner_name:currentUserName.trim(),
     last_action_date:new Date().toISOString().split('T')[0],
     createdAt:firebase.firestore.FieldValue.serverTimestamp()
-  }).then(function(){ closeAddProspect(); });
+  }).then(function(){closeAddProspect();});
 }
 
 // ── RDV CRUD ──────────────────────────────────────────────────
-function openAddRdv(){ document.getElementById('rdv-date').value=new Date().toISOString().split('T')[0]; document.getElementById('modal-add-rdv').classList.add('open'); }
-function closeAddRdv(){ document.getElementById('modal-add-rdv').classList.remove('open'); }
-
+function openAddRdv(){document.getElementById('rdv-date').value=new Date().toISOString().split('T')[0];document.getElementById('modal-add-rdv').classList.add('open');}
+function closeAddRdv(){document.getElementById('modal-add-rdv').classList.remove('open');}
 function confirmAddRdv(){
   var company=document.getElementById('rdv-company').value.trim();
   if(!company){alert('Merci de renseigner l\'entreprise.');return;}
   db.collection('prospects_rdv').add({
-    entreprise:company,
-    date:document.getElementById('rdv-date').value,
-    signe:document.getElementById('rdv-signe').value,
-    raison:document.getElementById('rdv-raison').value.trim(),
-    demande:document.getElementById('rdv-demande').value.trim(),
-    suite:document.getElementById('rdv-suite').value.trim(),
-    owner_email:currentUserEmail,
-    owner_name:currentUserName.trim(),
+    entreprise:company,date:document.getElementById('rdv-date').value,
+    signe:document.getElementById('rdv-signe').value,raison:document.getElementById('rdv-raison').value.trim(),
+    demande:document.getElementById('rdv-demande').value.trim(),suite:document.getElementById('rdv-suite').value.trim(),
+    owner_email:currentUserEmail,owner_name:currentUserName.trim(),
     createdAt:firebase.firestore.FieldValue.serverTimestamp()
-  }).then(function(){ closeAddRdv(); });
+  }).then(function(){closeAddRdv();});
 }
 
 // ── Historique ────────────────────────────────────────────────
-function openHist(id, companyEnc, contactEnc){
+function openHist(id,companyEnc,contactEnc){
   currentHistId=id;
   document.getElementById('hist-company').innerText=decodeURIComponent(companyEnc);
   document.getElementById('hist-contact').innerText=decodeURIComponent(contactEnc);
@@ -869,18 +928,17 @@ function closeHist(){
   document.getElementById('overlay-bg').classList.remove('open');
   currentHistId=null;
 }
-
 function loadHistEntries(id){
   db.collection('prospects').doc(id).collection('historique')
     .orderBy('createdAt','desc').get().then(function(snap){
-      if(snap.empty){ document.getElementById('hist-body').innerHTML='<div class="hist-empty">Aucune action enregistrée.</div>'; return; }
-      var canalIcons={Appel:'📞',Mail:'📧',RDV:'🤝',LinkedIn:'💼',Autre:'💬'};
+      if(snap.empty){document.getElementById('hist-body').innerHTML='<div class="hist-empty">Aucune action enregistrée.</div>';return;}
+      var icons={Appel:'📞',Mail:'📧',RDV:'🤝',LinkedIn:'💼',Autre:'💬'};
       document.getElementById('hist-body').innerHTML=snap.docs.map(function(doc){
         var h=doc.data();
         return '<div class="hist-entry">'+
           '<div class="hist-entry-top">'+
             '<span class="hist-entry-date">'+(h.date?fmtDate(h.date):'')+'</span>'+
-            '<span class="hist-entry-canal">'+(canalIcons[h.canal]||'💬')+' '+h.canal+'</span>'+
+            '<span class="hist-entry-canal">'+(icons[h.canal]||'💬')+' '+h.canal+'</span>'+
           '</div>'+
           (h.resultat?'<div class="hist-entry-result" style="color:var(--bordeaux)">→ '+h.resultat+'</div>':'')+
           (h.note?'<div class="hist-entry-note">'+h.note+'</div>':'')+
@@ -888,7 +946,6 @@ function loadHistEntries(id){
       }).join('');
     });
 }
-
 function saveHist(){
   if(!currentHistId)return;
   var canal=document.getElementById('hist-canal').value;
@@ -897,13 +954,12 @@ function saveHist(){
   var note=document.getElementById('hist-note').value.trim();
   if(!date){alert('Merci de renseigner une date.');return;}
   db.collection('prospects').doc(currentHistId).collection('historique').add({
-    canal:canal, date:date, resultat:result, note:note,
+    canal:canal,date:date,resultat:result,note:note,
     createdAt:firebase.firestore.FieldValue.serverTimestamp()
   }).then(function(){
-    // Update last_action_date + statut si pertinent
     var update={last_action_date:date};
-    var statutMap={'RDV fixé':'RDV planifié','Proposition envoyée':'Proposition envoyée','Signé':'Signé'};
-    if(statutMap[result]) update.statut=statutMap[result];
+    var sm={'RDV fixé':'RDV planifié','Proposition envoyée':'Proposition envoyée','Signé':'Signé'};
+    if(sm[result])update.statut=sm[result];
     db.collection('prospects').doc(currentHistId).update(update);
     document.getElementById('hist-note').value='';
     document.getElementById('hist-result').value='';
@@ -911,29 +967,26 @@ function saveHist(){
   });
 }
 
-// ── Objectif ─────────────────────────────────────────────────
-function openGoalModal(){ document.getElementById('modal-goal').classList.add('open'); }
-function closeGoalModal(){ document.getElementById('modal-goal').classList.remove('open'); }
+// ── Objectif ──────────────────────────────────────────────────
+function openGoalModal(){document.getElementById('modal-goal').classList.add('open');}
+function closeGoalModal(){document.getElementById('modal-goal').classList.remove('open');}
 function saveGoal(){
   var val=parseInt(document.getElementById('goal-input').value)||10;
   db.collection('crm_config').doc('objectifs').set({
-    objectif_semaine:val,
-    modifie_par:currentUserName.trim()||currentUserEmail,
+    objectif_semaine:val,modifie_par:currentUserName.trim()||currentUserEmail,
     modifie_le:new Date().toISOString().split('T')[0]
   }).then(function(){
     goalWeek=val;
     document.getElementById('goal-display').innerText=val;
     closeGoalModal();
     renderMine();
-    if(isCA) renderCA();
+    if(isCA)renderCA();
   });
 }
 
 // ── Filtres ───────────────────────────────────────────────────
 function clearFilters(){
-  ['search-all','filter-member','filter-statut','filter-secteur'].forEach(function(id){
-    document.getElementById(id).value='';
-  });
+  ['search-all','filter-member','filter-statut','filter-secteur'].forEach(function(id){document.getElementById(id).value='';});
   renderAll();
 }
 
@@ -943,25 +996,17 @@ function exportXLSX(){
   var rows=[['Entreprise','Contact','Poste','Email','Tél','Secteur','Source','Montant HT','Statut','Responsable','Dernière action','Notes']];
   data.forEach(function(p){
     rows.push([p.entreprise||'',p.contact||'',p.poste||'',p.email||'',p.tel||'',
-               p.secteur||'',p.source||'',p.montant||0,p.statut||'',
-               p.owner_name||p.owner_email||'',p.last_action_date||'',p.notes||'']);
+      p.secteur||'',p.source||'',p.montant||0,p.statut||'',p.owner_name||'',p.last_action_date||'',p.notes||'']);
   });
   var ws=XLSX.utils.aoa_to_sheet(rows);
-  ws['!cols']=[{wch:22},{wch:18},{wch:16},{wch:24},{wch:14},{wch:12},{wch:16},{wch:12},{wch:18},{wch:20},{wch:14},{wch:30}];
   var wb=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb,ws,'Prospection');
   XLSX.writeFile(wb,'Prospection_ICN_JC.xlsx');
 }
 
 // ── Helpers ───────────────────────────────────────────────────
-function fmtDate(d){
-  if(!d)return'';
-  var p=d.split('-');
-  return p.length===3?p[2]+'/'+p[1]+'/'+p[0]:d;
-}
-function fmtMoney(n){
-  return Number(n||0).toLocaleString('fr-FR',{minimumFractionDigits:0,maximumFractionDigits:0})+' €';
-}
+function fmtDate(d){if(!d)return'';var p=d.split('-');return p.length===3?p[2]+'/'+p[1]+'/'+p[0]:d;}
+function fmtMoney(n){return Number(n||0).toLocaleString('fr-FR',{minimumFractionDigits:0,maximumFractionDigits:0})+' €';}
 </script>
 </body>
 </html>
