@@ -88,9 +88,9 @@
     <div class="form-field">
       <label class="input-label">Type</label>
       <select class="select-field" id="new-type">
-        <option value="audit">Audit</option>
-        <option value="suivi">Suivi opérationnel</option>
-        <option value="autre">Autre</option>
+        <option value="audit">Audit / Suivi de tâches</option>
+        <option value="relances">Relances clients</option>
+        <option value="libre">Tableau libre (colonnes custom)</option>
       </select>
     </div>
     <div class="form-field">
@@ -150,7 +150,7 @@ function renderTrackers(list,containerId,isArchived){
     if(isArchived && currentRole==='super_admin'){
       deleteBtn='<button class="del-tracker-btn" onclick="deleteTracker(event,this)" data-id="'+t.id+'" data-name="'+t.name.replace(/"/g,'&quot;')+'" title="Supprimer définitivement">🗑</button>';
     }
-    html+='<a class="tracker-card'+(isArchived?' archived':'')+'" href="tracker_treso_audit.html?id='+t.id+'" style="position:relative">'+
+    html+='<a class="tracker-card'+(isArchived?' archived':'')+'" href="'+(t.type==='relances'?'tracker_relances.html':t.type==='libre'?'tracker_libre.html':'tracker_treso_audit.html')+'?id='+t.id+'" style="position:relative">'+
       (isArchived?'<span class="archived-badge">📁 Archivé</span>':'')+
       deleteBtn+
       '<div class="tracker-type">'+typeLabel+'</div>'+
@@ -211,7 +211,10 @@ function createTracker(){
     createdAt:firebase.firestore.FieldValue.serverTimestamp()
   }).then(function(ref){
     closeNewModal();
-    window.location.href='tracker_treso_audit.html?id='+ref.id;
+    var type=document.getElementById('new-type').value;
+    if(type==='relances') window.location.href='tracker_relances.html?id='+ref.id;
+    else if(type==='libre') window.location.href='tracker_libre.html?id='+ref.id;
+    else window.location.href='tracker_treso_audit.html?id='+ref.id;
   });
 }
 
