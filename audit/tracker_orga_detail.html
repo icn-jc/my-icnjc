@@ -81,6 +81,13 @@ td:last-child{width:48px;min-width:48px;text-align:center;}
 /* ── Champ obligatoire ── */
 .input-error{border-color:var(--danger)!important;}
 .field-required-note{font-size:11px;color:var(--danger);margin-top:3px;display:none;}
+/* ── Double scrollbar ── */
+.scroll-top-bar{overflow-x:auto;overflow-y:hidden;height:12px;margin-bottom:2px;}
+.scroll-top-inner{height:1px;}
+/* ── Boutons flottants haut/bas ── */
+.float-nav{position:fixed;bottom:24px;right:24px;display:flex;flex-direction:column;gap:8px;z-index:200;}
+.float-btn{width:38px;height:38px;border-radius:50%;background:var(--navy);color:white;border:none;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 12px rgba(27,42,74,0.25);transition:all .2s;}
+.float-btn:hover{background:var(--bordeaux);transform:scale(1.08);}
 </style>
 </head>
 <body>
@@ -152,7 +159,8 @@ td:last-child{width:48px;min-width:48px;text-align:center;}
         <button class="btn btn-secondary btn-sm" onclick="clearFilters()">Réinitialiser</button>
         <span class="filter-note" id="filter-note"></span>
       </div>
-      <div class="tracker-table-wrap">
+      <div class="scroll-top-bar" id="scroll-top-bar"><div class="scroll-top-inner" id="scroll-top-inner"></div></div>
+      <div class="tracker-table-wrap" id="table-wrap-main">
         <table>
           <thead>
             <tr>
@@ -506,7 +514,7 @@ function confirmAdd(){
     date:document.getElementById('m-date').value,
     note:document.getElementById('m-note').value.trim(),
     locked:false,
-    order:Date.now()
+    order:(function(){var max=0;tasks.forEach(function(tk){if(tk.section===document.getElementById('m-sec').value&&(tk.order||0)>max)max=tk.order||0;});return max+1;})()
   };
   tasksCol.add(t).then(function(){closeAddModal();}).catch(function(e){alert('Erreur : '+e.message);});
 }
@@ -556,6 +564,21 @@ function exportXLSX(){
   XLSX.utils.book_append_sheet(wb,ws,'Suivi');
   XLSX.writeFile(wb,(trackerData.name||'tracker-orga')+'.xlsx');
 }
+
+// ── Double scrollbar sync ──────────────────────────────────────
+window.addEventListener('load', function(){
+  var topBar = document.getElementById('scroll-top-bar');
+  var wrapMain = document.getElementById('table-wrap-main');
+  if(!topBar||!wrapMain)return;
+  function syncWidth(){
+    var inner = document.getElementById('scroll-top-inner');
+    if(inner) inner.style.width = wrapMain.scrollWidth + 'px';
+  }
+  syncWidth();
+  topBar.addEventListener('scroll', function(){ wrapMain.scrollLeft = topBar.scrollLeft; });
+  wrapMain.addEventListener('scroll', function(){ topBar.scrollLeft = wrapMain.scrollLeft; });
+  new MutationObserver(syncWidth).observe(wrapMain, {childList:true, subtree:true});
+});
 </script>
 </body>
 </html>
