@@ -200,6 +200,16 @@ function createTracker(){
   });
 }
 
+function openNewModal(){
+  document.getElementById('new-name').value='';
+  document.getElementById('new-date').value='';
+  document.getElementById('new-type').selectedIndex=0;
+  document.getElementById('modal-new').classList.add('open');
+}
+function closeNewModal(){
+  document.getElementById('modal-new').classList.remove('open');
+}
+
 </script>
 </body>
 </html>
