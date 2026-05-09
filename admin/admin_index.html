@@ -121,7 +121,7 @@
       <div class="form-field full">
         <label class="input-label">Rôles (plusieurs possibles — le plus élevé définit les accès)</label>
         <div class="roles-checkboxes" id="add-roles-checks"></div>
-        <div class="hierarchy-note">Hiérarchie : Super Admin > Président > Secrétaire > Resp. Commercial > Resp. Qualité > Trésorerie > Marketing > Auditeur > Membre</div>
+        <div class="hierarchy-note">Hiérarchie : Super Admin > Président > VP > Trésorerie > Secrétaire > Resp. Commercial > Resp. Qualité > Resp. Marketing > Marketing > Auditeur > Commercial</div>
       </div>
       <div class="form-field">
         <label class="input-label">Prospecte ?</label>
@@ -163,7 +163,7 @@
       <div class="form-field full">
         <label class="input-label">Rôles</label>
         <div class="roles-checkboxes" id="edit-roles-checks"></div>
-        <div class="hierarchy-note">Hiérarchie : Super Admin > Président > Secrétaire > Resp. Commercial > Resp. Qualité > Trésorerie > Marketing > Auditeur > Membre</div>
+        <div class="hierarchy-note">Hiérarchie : Super Admin > Président > VP > Trésorerie > Secrétaire > Resp. Commercial > Resp. Qualité > Resp. Marketing > Marketing > Auditeur > Commercial</div>
       </div>
       <div class="form-field">
         <label class="input-label">Prospecte ?</label>
@@ -187,19 +187,22 @@
 const ROLE_LABELS = {
   super_admin:'Super Admin',
   president:'Président',
+  vice_president:'Vice-Président',
+  tresorerie:'Trésorerie',
   secretaire:'Secrétaire Gén.',
   responsable_commercial:'Resp. Commercial',
   responsable_qualite:'Resp. Qualité',
-  tresorerie:'Trésorerie',
+  responsable_marketing:'Resp. Marketing',
   marketing:'Marketing',
   auditeur:'Auditeur',
-  membre:'Membre'
+  commercial:'Commercial',
 };
 
 // Ordre hiérarchique (index 0 = le plus élevé)
 const ROLE_HIERARCHY = [
-  'super_admin','president','secretaire','responsable_commercial',
-  'responsable_qualite','tresorerie','marketing','auditeur','membre'
+  'super_admin','president','vice_president','tresorerie','secretaire',
+  'responsable_commercial','responsable_qualite','responsable_marketing',
+  'marketing','auditeur','commercial'
 ];
 
 // Prend le rôle le plus élevé parmi un tableau de rôles
@@ -212,7 +215,10 @@ function getHighestRole(roles) {
 }
 
 // ── Auth ──────────────────────────────────────────────────────
+var currentUserRole = null;
+
 initAuth('admin', function(user, role, profile) {
+  currentUserRole = role;
   renderSidebar(role, profile, user, 'admin');
   showAppPage(user, role, profile);
   buildRolesCheckboxes('add-roles-checks', []);
@@ -226,9 +232,13 @@ function buildRolesCheckboxes(containerId, selectedRoles) {
   var container = document.getElementById(containerId);
   container.innerHTML = Object.keys(ROLE_LABELS).map(function(r) {
     var checked = selectedRoles.indexOf(r) !== -1;
-    return '<label class="role-checkbox' + (checked?' checked':'') + '" id="lbl-' + containerId + '-' + r + '">' +
-      '<input type="checkbox" value="' + r + '"' + (checked?' checked':'') + ' onchange="toggleRoleLabel(this)">' +
-      ROLE_LABELS[r] +
+    // Seul super_admin peut attribuer le rôle super_admin
+    var disabled = (r === 'super_admin' && currentUserRole !== 'super_admin');
+    var disabledAttr = disabled ? ' disabled title="Seule Stella peut attribuer ce rôle"' : '';
+    var disabledStyle = disabled ? ';opacity:.4;cursor:not-allowed' : '';
+    return '<label class="role-checkbox' + (checked?' checked':'') + '" id="lbl-' + containerId + '-' + r + '" style="' + disabledStyle + '">' +
+      '<input type="checkbox" value="' + r + '"' + (checked?' checked':'') + disabledAttr + ' onchange="toggleRoleLabel(this)">' +
+      ROLE_LABELS[r] + (disabled ? ' 🔒' : '') +
       '</label>';
   }).join('');
 }
