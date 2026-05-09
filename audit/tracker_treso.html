@@ -123,18 +123,14 @@ initAuth('tracker_treso', function(user, role, profile) {
 });
 
 function loadTrackers(){
-  console.log('[DEBUG] loadTrackers appelé');
   db.collection('trackers').onSnapshot(function(snap){
-    console.log('[DEBUG] onSnapshot reçu, size:', snap.size, 'empty:', snap.empty);
     if(snap.empty){
-      console.log('[DEBUG] Collection vide → createDefaultTracker');
       createDefaultTracker();
       return;
     }
     var active=[],archived=[];
     snap.forEach(function(doc){
       var d=Object.assign({id:doc.id},doc.data());
-      console.log('[DEBUG] doc trouvé:', doc.id, d.name, d.statut);
       if(d.statut==='archivé') archived.push(d); else active.push(d);
     });
     active.sort(function(a,b){ return (b.createdAt||0)-(a.createdAt||0); });
@@ -142,7 +138,6 @@ function loadTrackers(){
     renderTrackers(active,'active-trackers',false);
     renderTrackers(archived,'archived-trackers',true);
   }, function(err){
-    console.error('[DEBUG] Firestore error:', err.code, err.message);
   });
 }
 
@@ -198,7 +193,6 @@ function formatDate(d){
 }
 
 function createDefaultTracker(){
-  console.log('[DEBUG] createDefaultTracker appelé');
   db.collection('trackers').add({
     name:'Audit-Conseil — 20 Juin 2026',
     type:'audit',
@@ -207,10 +201,8 @@ function createDefaultTracker(){
     done:0,total:0,
     createdAt:firebase.firestore.FieldValue.serverTimestamp()
   }).then(function(ref){
-    console.log('[DEBUG] Tracker créé avec ID:', ref.id);
     seedTasksForTracker(ref.id);
   }).catch(function(e){
-    console.error('[DEBUG] Erreur création tracker:', e.code, e.message);
   });
 }
 
