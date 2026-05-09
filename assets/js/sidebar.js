@@ -15,18 +15,21 @@ const SIDEBAR_CSS = `
   /* ── Nav ── */
   .sidebar-nav{flex:1;overflow-y:auto;overflow-x:hidden;padding:12px 0;}
   .sidebar-section{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.14em;color:rgba(255,255,255,0.25);padding:14px 16px 6px;white-space:nowrap;overflow:hidden;transition:opacity .2s;}
-  .sidebar.collapsed .sidebar-section{opacity:0;}
+  .sidebar.collapsed .sidebar-section{opacity:0;height:0;padding:0;overflow:hidden;}
   .sidebar-item{display:flex;align-items:center;gap:10px;padding:8px 16px;font-size:13px;color:rgba(255,255,255,0.55);text-decoration:none;transition:all .15s;cursor:pointer;border-left:2px solid transparent;white-space:nowrap;overflow:hidden;}
   .sidebar-item:hover{color:#fff;background:rgba(255,255,255,0.05);}
   .sidebar-item.active{color:#fff;background:rgba(163,33,95,0.15);border-left-color:#A3215F;}
   .sidebar-item .icon{width:16px;height:16px;flex-shrink:0;opacity:.7;min-width:16px;}
   .sidebar-item.active .icon{opacity:1;}
-  .sidebar-item span{transition:opacity .2s;white-space:nowrap;}
-  .sidebar.collapsed .sidebar-item span{opacity:0;pointer-events:none;}
-  .sidebar.collapsed .sidebar-item{justify-content:center;padding:8px 0;}
+  .sidebar-item span{transition:opacity .15s,width .25s;white-space:nowrap;overflow:hidden;}
+  .sidebar.collapsed .sidebar-item span{opacity:0;width:0;pointer-events:none;}
+  .sidebar.collapsed .sidebar-item{justify-content:center;padding:8px 0;gap:0;}
+  .sidebar.collapsed .sidebar-item .icon{opacity:.8;width:18px;height:18px;}
+  .sidebar.collapsed .sidebar-item.active .icon{opacity:1;}
   /* ── Tooltip sur icône quand collapsed ── */
   .sidebar.collapsed .sidebar-item{position:relative;}
-  .sidebar.collapsed .sidebar-item:hover::after{content:attr(data-label);position:absolute;left:54px;background:#1B2A4A;color:#fff;font-size:12px;padding:4px 10px;border-radius:6px;white-space:nowrap;pointer-events:none;z-index:200;border:1px solid rgba(255,255,255,0.1);}
+  .sidebar.collapsed .sidebar-item:hover::after{content:attr(data-label);position:absolute;left:58px;top:50%;transform:translateY(-50%);background:#1B2A4A;color:#fff;font-size:12px;padding:5px 12px;border-radius:6px;white-space:nowrap;pointer-events:none;z-index:200;border:1px solid rgba(255,255,255,0.15);box-shadow:0 4px 12px rgba(0,0,0,0.3);}
+  .sidebar.collapsed .sidebar-item:hover::before{content:'';position:absolute;left:52px;top:50%;transform:translateY(-50%);border:5px solid transparent;border-right-color:#1B2A4A;pointer-events:none;z-index:200;}
   /* ── Footer ── */
   .sidebar-footer{padding:12px 14px;border-top:1px solid rgba(255,255,255,0.06);overflow:hidden;}
   .sidebar-health{display:flex;align-items:center;gap:8px;margin-bottom:10px;font-size:11px;color:rgba(255,255,255,0.4);white-space:nowrap;}
