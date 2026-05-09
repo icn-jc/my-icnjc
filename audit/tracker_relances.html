@@ -437,13 +437,13 @@ function render(){
         (canEdit
           ?'<td><select class="cell-sel" onchange="save('+ri+',\'statut\',this.value)">'+statOpts+'</select></td>'
           :'<td><span class="'+statCls+'">'+(r.statut||'')+'</span></td>')+
+        '<td style="text-align:center"><button class="hist-btn" onclick="openHist(\''+rowIds[ri]+'\',\''+encodeURIComponent(r.client||'Client')+'\',\''+encodeURIComponent(r.facture||'')+'\')">📋 Voir</button></td>'+
         (canEdit
           ?'<td><input class="cell-input" value="'+(r.contact||'')+'" onchange="save('+ri+',\'contact\',this.value)"/></td>'
           :'<td>'+(r.contact||'')+'</td>')+
         (canEdit
           ?'<td style="max-width:150px;min-width:80px" contenteditable="true" onblur="save('+ri+',\'notes\',this.innerText.trim())">'+(r.notes||'')+'</td>'
           :'<td style="font-size:12px;color:var(--text-secondary)">'+(r.notes||'')+'</td>')+
-        '<td style="text-align:center"><button class="hist-btn" onclick="openHist(\''+rowIds[ri]+'\',\''+encodeURIComponent(r.client||'Client')+'\',\''+encodeURIComponent(r.facture||'')+'\')">📋 Voir</button></td>'+
         '<td style="text-align:center;width:40px">'+(canEdit?'<button class="del-btn" onclick="deleteRow('+ri+')">✕</button>':'')+'</td>'+
       '</tr>';
     });
