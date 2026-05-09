@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Tracker Trésorerie — My-ICN-JC</title>
+<link rel="stylesheet" href="../assets/css/global.css"/>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script src="../assets/js/firebase.js"></script>
+<script src="../assets/js/auth.js"></script>
+<script src="../assets/js/sidebar.js"></script>
+<style>
+.trackers-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;margin-bottom:32px;}
+.tracker-card{background:var(--bg-card);border-radius:var(--radius-lg);padding:22px 24px;box-shadow:var(--shadow-md);border:1px solid var(--border);cursor:pointer;transition:all .2s;text-decoration:none;display:block;position:relative;overflow:hidden;}
+.tracker-card:hover{box-shadow:var(--shadow-lg);transform:translateY(-2px);border-color:var(--bordeaux);}
+.tracker-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--bordeaux);opacity:0;transition:opacity .2s;}
+.tracker-card:hover::before,.tracker-card.active-card::before{opacity:1;}
+.tracker-card.archived{opacity:.65;cursor:default;}
+.tracker-card.archived:hover{transform:none;box-shadow:var(--shadow-md);border-color:var(--border);}
+.tracker-card.archived::before{display:none;}
+.tracker-type{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--bordeaux);margin-bottom:8px;}
+.tracker-name{font-family:'Playfair Display',serif;font-size:16px;font-weight:700;color:var(--navy);margin-bottom:4px;}
+.tracker-date{font-size:12px;color:var(--text-tertiary);margin-bottom:14px;}
+.tracker-progress-wrap{background:#eee;border-radius:99px;height:5px;margin-bottom:6px;}
+.tracker-progress-bar{height:100%;border-radius:99px;background:linear-gradient(90deg,var(--bordeaux),var(--bordeaux-light));transition:width .5s;}
+.tracker-stats{display:flex;justify-content:space-between;font-size:11px;color:var(--text-tertiary);}
+.tracker-stat-done{color:var(--success);font-weight:600;}
+.archived-badge{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:600;padding:2px 8px;border-radius:99px;background:#f1f5f9;color:#64748b;position:absolute;top:14px;right:14px;}
+.new-tracker-card{background:transparent;border:2px dashed var(--border-strong);border-radius:var(--radius-lg);padding:22px 24px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;cursor:pointer;transition:all .2s;min-height:140px;}
+.new-tracker-card:hover{border-color:var(--bordeaux);background:var(--bordeaux-bg);}
+.new-tracker-icon{font-size:24px;color:var(--text-tertiary);}
+.new-tracker-label{font-size:13px;font-weight:500;color:var(--text-secondary);}
+
+/* Modal nouveau tracker */
+.modal-section-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--bordeaux);margin:16px 0 8px;}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div class="login-page" id="login-page">
+  <div class="login-box">
+    <div class="login-logo">
+      <img src="../assets/images/ICN-Junior-Conseil_logo.png" style="height:54px;object-fit:contain"/>
+    </div>
+    <div class="login-title">Connexion</div>
+    <div class="login-sub">Accès réservé aux membres ICN Junior Conseil.</div>
+    <button class="google-btn" onclick="doGoogleLogin()">
+      <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google"/>
+      Se connecter avec Google
+    </button>
+    <div class="denied-box" id="denied-box"><strong>Accès refusé</strong><p id="denied-msg"></p></div>
+    <div class="login-error" id="login-error"></div>
+  </div>
+</div>
+
+<!-- APP -->
+<div class="app-page" id="app-page">
+  <div id="sidebar-container"></div>
+  <div class="app-content">
+    <div class="page-header flex justify-between items-center">
+      <div>
+        <div class="page-title">Tableaux de suivi — Trésorerie</div>
+        <div class="page-subtitle" id="today-date"></div>
+      </div>
+      <button class="btn btn-primary" id="btn-new-tracker" onclick="openNewModal()" style="display:none">+ Nouveau tableau</button>
+    </div>
+    <div class="page-body">
+
+      <div class="hub-section-title" style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.12em;color:var(--text-tertiary);margin-bottom:12px;display:flex;align-items:center;gap:8px;">
+        Actifs
+        <span style="flex:1;height:1px;background:var(--border);display:block"></span>
+      </div>
+      <div class="trackers-grid" id="active-trackers"></div>
+
+      <div class="hub-section-title" style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.12em;color:var(--text-tertiary);margin-bottom:12px;display:flex;align-items:center;gap:8px;margin-top:8px;">
+        Archivés
+        <span style="flex:1;height:1px;background:var(--border);display:block"></span>
+      </div>
+      <div class="trackers-grid" id="archived-trackers">
+        <div style="font-size:13px;color:var(--text-tertiary)">Aucun tableau archivé pour l'instant.</div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- MODAL NOUVEAU TRACKER -->
+<div class="modal-overlay" id="modal-new" onclick="if(event.target===this)closeNewModal()">
+  <div class="modal-box">
+    <div class="modal-header">
+      <div class="modal-title">Nouveau tableau de suivi</div>
+      <button class="modal-close" onclick="closeNewModal()">×</button>
+    </div>
+    <div class="form-field">
+      <label class="input-label">Nom du tableau</label>
+      <input class="input" type="text" id="new-name" placeholder="Ex : Audit 20 Juin 2026, Relances clients…"/>
+    </div>
+    <div class="form-field">
+      <label class="input-label">Type</label>
+      <select class="select-field" id="new-type">
+        <option value="audit">Audit</option>
+        <option value="suivi">Suivi opérationnel</option>
+        <option value="autre">Autre</option>
+      </select>
+    </div>
+    <div class="form-field">
+      <label class="input-label">Date cible (optionnel)</label>
+      <input class="input" type="date" id="new-date"/>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeNewModal()">Annuler</button>
+      <button class="btn btn-primary" onclick="createTracker()">Créer</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Date du jour ──────────────────────────────────────────────
+var JOURS=['Dimanche','Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi'];
+var MOIS=['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
+var now=new Date();
+document.getElementById('today-date').innerText=JOURS[now.getDay()]+' '+now.getDate()+' '+MOIS[now.getMonth()]+' '+now.getFullYear();
+
+var currentRole;
+
+initAuth('tracker_treso', function(user, role, profile) {
+  currentRole = role;
+  renderSidebar(role, profile, user, 'tracker_treso');
+  showAppPage(user, role, profile);
+  // Bouton nouveau tracker : tréso + admins seulement
+  if(['super_admin','president','tresorerie'].includes(role)){
+    document.getElementById('btn-new-tracker').style.display='flex';
+  }
+  loadTrackers();
+  updateHealthIndicator();
+});
+
+// ── Charger les trackers ──────────────────────────────────────
+function loadTrackers(){
+  db.collection('trackers').orderBy('createdAt','desc').onSnapshot(function(snap){
+    if(snap.empty){
+      // Créer le tracker audit 20 juin par défaut
+      createDefaultTracker();
+      return;
+    }
+    var active=[], archived=[];
+    snap.forEach(function(doc){
+      var d=Object.assign({id:doc.id},doc.data());
+      if(d.statut==='archivé') archived.push(d);
+      else active.push(d);
+    });
+    renderTrackers(active, 'active-trackers', false);
+    renderTrackers(archived, 'archived-trackers', true);
+  });
+}
+
+function renderTrackers(list, containerId, isArchived){
+  var el=document.getElementById(containerId);
+  if(list.length===0){
+    el.innerHTML='<div style="font-size:13px;color:var(--text-tertiary)">Aucun tableau '+(isArchived?'archivé':'actif')+'.</div>';
+    return;
+  }
+  var html='';
+  list.forEach(function(t){
+    var pct=t.total>0?Math.round((t.done||0)/t.total*100):0;
+    var href='tracker_treso_detail.html?id='+t.id;
+    var typeLabel={audit:'Audit',suivi:'Suivi opérationnel',autre:'Autre'}[t.type]||t.type;
+    var dateLabel=t.dateTarget?'Cible : '+formatDate(t.dateTarget):'';
+    html+='<a class="tracker-card'+(isArchived?' archived':'')+'" href="'+(isArchived?'#':href)+'" '+(isArchived?'onclick="return false"':'')+'>'+
+      (isArchived?'<span class="archived-badge">Archivé</span>':'')+
+      '<div class="tracker-type">'+typeLabel+'</div>'+
+      '<div class="tracker-name">'+t.name+'</div>'+
+      '<div class="tracker-date">'+dateLabel+'</div>'+
+      '<div class="tracker-progress-wrap"><div class="tracker-progress-bar" style="width:'+pct+'%"></div></div>'+
+      '<div class="tracker-stats">'+
+        '<span>'+pct+'% terminé</span>'+
+        '<span><span class="tracker-stat-done">'+(t.done||0)+'</span> / '+(t.total||0)+' tâches</span>'+
+      '</div>'+
+    '</a>';
+  });
+  el.innerHTML=html;
+}
+
+function formatDate(d){
+  if(!d)return'';
+  var parts=d.split('-');
+  if(parts.length!==3)return d;
+  return parts[2]+'/'+parts[1]+'/'+parts[0];
+}
+
+// ── Créer tracker par défaut ──────────────────────────────────
+function createDefaultTracker(){
+  db.collection('trackers').add({
+    name:'Audit-Conseil — 20 Juin 2026',
+    type:'audit',
+    dateTarget:'2026-06-20',
+    statut:'actif',
+    done:0, total:0,
+    createdAt:firebase.firestore.FieldValue.serverTimestamp()
+  }).then(function(ref){
+    // Seed les tâches dans tracker_tasks/{trackerId}
+    seedTasksForTracker(ref.id);
+  });
+}
+
+// ── Nouveau tracker ───────────────────────────────────────────
+function openNewModal(){ document.getElementById('modal-new').classList.add('open'); }
+function closeNewModal(){ document.getElementById('modal-new').classList.remove('open'); }
+
+function createTracker(){
+  var name=document.getElementById('new-name').value.trim();
+  if(!name){alert('Merci de donner un nom au tableau.');return;}
+  var type=document.getElementById('new-type').value;
+  var dateTarget=document.getElementById('new-date').value;
+  db.collection('trackers').add({
+    name:name, type:type,
+    dateTarget:dateTarget||null,
+    statut:'actif',
+    done:0, total:0,
+    createdAt:firebase.firestore.FieldValue.serverTimestamp()
+  }).then(function(ref){
+    closeNewModal();
+    window.location.href='tracker_treso_detail.html?id='+ref.id;
+  }).catch(function(e){alert('Erreur : '+e.message);});
+}
+
+// ── Seed tâches audit 20 juin ─────────────────────────────────
+function seedTasksForTracker(trackerId){
+  var col=db.collection('tracker_tasks').doc(trackerId).collection('tasks');
+  var T=[
+    {section:"RFP & Passation",name:"Fiches de poste du pôle Trésorerie",resp:"STELLA",status:"À faire",priority:"Haute",date:"",note:"Book de preuves",locked:true},
+    {section:"RFP & Passation",name:"Tests de recrutement éventuels + tableau suivi postulants",resp:"STELLA",status:"À faire",priority:"Moyenne",date:"",note:"",locked:true},
+    {section:"RFP & Passation",name:"Supports de formation + outils de passation (books, checklists)",resp:"STELLA",status:"À faire",priority:"Haute",date:"",note:"Inclure book technique",locked:true},
+    {section:"RFP & Passation",name:"Briefer PAGESAN sur le processus comptable et les outils",resp:"STELLA",status:"À faire",priority:"Haute",date:"",note:"Transmission via book tech",locked:true},
+    {section:"RFP & Passation",name:"Préparer book technique pôle Trésorerie",resp:"STELLA",status:"À faire",priority:"Haute",date:"",note:"",locked:true},
+    {section:"Organisation",name:"Cartographie archivage papier (classeurs) et numérique (Drive)",resp:"GWILHERM",status:"À faire",priority:"Haute",date:"",note:"Préparer classeurs physiques",locked:true},
+    {section:"Organisation",name:"Documents sociaux des 3 dernières années",resp:"GWILHERM",status:"À faire",priority:"Haute",date:"",note:"",locked:true},
+    {section:"Organisation",name:"Documents fiscaux des 6 dernières années",resp:"GWILHERM",status:"À faire",priority:"Haute",date:"",note:"",locked:true},
+    {section:"Organisation",name:"BV et notes de frais des membres avec droits de paiement",resp:"GWILHERM",status:"À faire",priority:"Haute",date:"",note:"",locked:true},
+    {section:"Organisation",name:"Chèques annulés + bordereaux de remise + photocopies chèques",resp:"GWILHERM",status:"À faire",priority:"Moyenne",date:"",note:"",locked:true},
+    {section:"Organisation",name:"Slides et CR de CA avec points trésorerie",resp:"GWILHERM",status:"À faire",priority:"Moyenne",date:"",note:"",locked:true},
+    {section:"Organisation",name:"CR des audits internes réalisés sur le mandat",resp:"STELLA",status:"À faire",priority:"Haute",date:"",note:"Rôle auditrice interne",locked:true},
+    {section:"Organisation",name:"Réserver salle calme accessible 8h-19h le 20 juin",resp:"GWILHERM",status:"À faire",priority:"Haute",date:"",note:"",locked:true},
+    {section:"Organisation",name:"Préparer connexion internet + identifiants pour auditeurs",resp:"GWILHERM",status:"À faire",priority:"Haute",date:"",note:"",locked:true},
+    {section:"Organisation",name:"Contrats de leasing éventuels",resp:"GWILHERM",status:"À faire",priority:"Basse",date:"",note:"Si applicable",locked:true},
+    {section:"Comptabilité",name:"Grand-Livre et Balance Générale exercice en cours",resp:"STELLA",status:"À faire",priority:"Haute",date:"",note:"Logiciel compta à dispo",locked:true},
+    {section:"Comptabilité",name:"Grand-Livre et Balance Générale exercice précédent",resp:"STELLA",status:"À faire",priority:"Haute",date:"",note:"",locked:true},
+    {section:"Comptabilité",name:"Liasses fiscales des 2 derniers exercices clôturés",resp:"GWILHERM",status:"À faire",priority:"Haute",date:"",note:"",locked:true},
+    {section:"Comptabilité",name:"Fichier FEC + sauvegardes de comptabilité",resp:"STELLA",status:"À faire",priority:"Haute",date:"",note:"",locked:true},
+    {section:"Comptabilité",name:"Ensemble des ERB + relevés bancaires de l'année",resp:"GWILHERM",status:"À faire",priority:"Haute",date:"",note:"",locked:true},
+    {section:"Comptabilité",name:"Lettre de mission de l'Expert-Comptable",resp:"GWILHERM",status:"À faire",priority:"Moyenne",date:"",note:"",locked:true},
+    {section:"Comptabilité",name:"Processus clôture comptable + tableau cut-off + dossier de clôture",resp:"STELLA",status:"À faire",priority:"Haute",date:"",note:"Rôle VT",locked:true},
+    {section:"Comptabilité",name:"Relecture et validation des entrées comptables (logiciel VT)",resp:"STELLA",status:"À faire",priority:"Haute",date:"",note:"Double contrôle VT",locked:true},
+    {section:"Comptabilité",name:"Contrôle cohérence TSC et comptabilité",resp:"STELLA",status:"À faire",priority:"Haute",date:"",note:"TSC = outil auditrice interne",locked:true},
+    {section:"Tableaux de suivi",name:"Tableau suivi ventes / créances à jour (TSC)",resp:"STELLA",status:"À faire",priority:"Haute",date:"",note:"TSC Google Sheet",locked:true},
+    {section:"Tableaux de suivi",name:"Tableau suivi achats / dettes à jour (TSC)",resp:"STELLA",status:"À faire",priority:"Haute",date:"",note:"TSC Google Sheet",locked:true},
+    {section:"Tableaux de suivi",name:"Tableau suivi TVA à jour",resp:"GWILHERM",status:"À faire",priority:"Haute",date:"",note:"",locked:true},
+    {section:"Tableaux de suivi",name:"Tableau suivi des BV à jour",resp:"GWILHERM",status:"À faire",priority:"Haute",date:"",note:"",locked:true},
+    {section:"Tableaux de suivi",name:"Tableau suivi URSSAF à jour",resp:"GWILHERM",status:"À faire",priority:"Haute",date:"",note:"",locked:true},
+    {section:"Tableaux de suivi",name:"Tableau suivi DADS/DAS2 à jour",resp:"GWILHERM",status:"À faire",priority:"Moyenne",date:"",note:"",locked:true},
+    {section:"Tableaux de suivi",name:"Tableau de suivi Taux d'Ouverture (TSC)",resp:"STELLA",status:"À faire",priority:"Haute",date:"",note:"TSC",locked:true},
+    {section:"Tableaux de suivi",name:"Relances clients — mise à jour TSC",resp:"STELLA",status:"À faire",priority:"Haute",date:"",note:"Suivi recouvrement",locked:true},
+    {section:"Tableaux de suivi",name:"Forecasts et budget actualisés dans le TSC",resp:"STELLA",status:"À faire",priority:"Haute",date:"",note:"TSC forecasts",locked:true},
+    {section:"Budget",name:"Processus de création et suivi du budget formalisé",resp:"GWILHERM",status:"À faire",priority:"Moyenne",date:"",note:"",locked:true},
+    {section:"Budget",name:"Note de stratégie + plan d'actions mandat sortant",resp:"GWILHERM",status:"À faire",priority:"Haute",date:"",note:"",locked:true},
+    {section:"Budget",name:"Toutes les versions du budget mandat sortant (avec actualisations)",resp:"GWILHERM",status:"À faire",priority:"Haute",date:"",note:"",locked:true},
+    {section:"Budget",name:"Budget mandat entrant — version initiale",resp:"PAGESAN",status:"À faire",priority:"Haute",date:"",note:"Coordination avec STELLA",locked:true},
+    {section:"Social",name:"Processus sociaux formalisés (BV, BRC, TR, DADS)",resp:"GWILHERM",status:"À faire",priority:"Haute",date:"",note:"3 règles d'or",locked:true},
+    {section:"Social",name:"BV type + lettre CARSAT + tous BV émis depuis dernier audit",resp:"GWILHERM",status:"À faire",priority:"Haute",date:"",note:"",locked:true},
+    {section:"Social",name:"12 derniers BRC émis + conventions de stage",resp:"GWILHERM",status:"À faire",priority:"Haute",date:"",note:"",locked:true},
+    {section:"Social",name:"Tableau Récapitulatif dernière année civile (DADS)",resp:"GWILHERM",status:"À faire",priority:"Haute",date:"",note:"",locked:true},
+    {section:"Social",name:"Relecture processus BV par STELLA (double contrôle VT)",resp:"STELLA",status:"À faire",priority:"Haute",date:"",note:"",locked:true},
+    {section:"Fiscal",name:"Processus fiscaux formalisés (TVA, IS, DAS2)",resp:"GWILHERM",status:"À faire",priority:"Haute",date:"",note:"3 règles d'or",locked:true},
+    {section:"Fiscal",name:"Déclaratifs TVA depuis dernier audit + accusés + ordres paiement (6 ans)",resp:"GWILHERM",status:"À faire",priority:"Haute",date:"",note:"",locked:true},
+    {section:"Fiscal",name:"Justificatifs subventions + Déclarations Européennes de Services",resp:"GWILHERM",status:"À faire",priority:"Moyenne",date:"",note:"Si applicable",locked:true},
+    {section:"Fiscal",name:"Déclarations IS 3 derniers exercices + accusés + ordres de paiement",resp:"GWILHERM",status:"À faire",priority:"Haute",date:"",note:"",locked:true},
+    {section:"Fiscal",name:"DAS2 dernière année civile + dernier avis CFE + bordereau CVAE",resp:"GWILHERM",status:"À faire",priority:"Haute",date:"",note:"",locked:true},
+    {section:"Fiscal",name:"Relecture et contrôle cohérence déclaratifs fiscaux (TSC)",resp:"STELLA",status:"À faire",priority:"Haute",date:"",note:"Contrôle auditrice interne",locked:true},
+    {section:"Ventes",name:"Processus d'émission des factures de vente formalisé",resp:"GWILHERM",status:"À faire",priority:"Haute",date:"",note:"",locked:true},
+    {section:"Ventes",name:"Processus hors études (refacturations, adhésions, subventions)",resp:"GWILHERM",status:"À faire",priority:"Moyenne",date:"",note:"",locked:true},
+    {section:"Ventes",name:"Factures types (acompte, intermédiaire, solde, refacturation) + PVRI",resp:"GWILHERM",status:"À faire",priority:"Haute",date:"",note:"Upload prégrille",locked:true},
+    {section:"Ventes",name:"Toutes les factures émises depuis le dernier audit (classeur Ventes)",resp:"GWILHERM",status:"À faire",priority:"Haute",date:"",note:"",locked:true},
+    {section:"Ventes",name:"Processus de relance client formalisé",resp:"STELLA",status:"À faire",priority:"Haute",date:"",note:"TSC — suivi créances",locked:true},
+    {section:"Ventes",name:"Balance âgée / tableau créances à jour",resp:"STELLA",status:"À faire",priority:"Haute",date:"",note:"TSC",locked:true},
+    {section:"Achats",name:"Processus des achats formalisé",resp:"GWILHERM",status:"À faire",priority:"Haute",date:"",note:"",locked:true},
+    {section:"Achats",name:"Processus notes de frais + RI seuil vote achats non budgétés",resp:"GWILHERM",status:"À faire",priority:"Haute",date:"",note:"",locked:true},
+    {section:"Achats",name:"Toutes les factures reçues depuis dernier audit + preuves de paiement",resp:"GWILHERM",status:"À faire",priority:"Haute",date:"",note:"Classeur Achats",locked:true},
+    {section:"Achats",name:"Notes de frais fonctionnement + kilométriques + justificatifs",resp:"GWILHERM",status:"À faire",priority:"Haute",date:"",note:"",locked:true},
+    {section:"Achats",name:"Vérification cohérence factures achats dans le TSC",resp:"STELLA",status:"À faire",priority:"Haute",date:"",note:"Contrôle auditrice interne",locked:true},
+    {section:"Processus & Risques",name:"Cartographie des processus à jour",resp:"STELLA",status:"À faire",priority:"Haute",date:"",note:"Auditrice interne",locked:true},
+    {section:"Processus & Risques",name:"Cartographie des risques de la structure à jour",resp:"STELLA",status:"À faire",priority:"Haute",date:"",note:"",locked:true},
+    {section:"Processus & Risques",name:"Processus de gestion des risques documenté",resp:"STELLA",status:"À faire",priority:"Haute",date:"",note:"",locked:true},
+    {section:"Processus & Risques",name:"Documentation des modifications de processus du mandat",resp:"STELLA",status:"À faire",priority:"Moyenne",date:"",note:"",locked:true},
+    {section:"Processus & Risques",name:"Remplir et valider les prégrilles (upload docs) — deadline J-7",resp:"Équipe",status:"À faire",priority:"Haute",date:"",note:"Deadline impérative CNJE",locked:true},
+    {section:"Processus & Risques",name:"Briefer PAGESAN sur les processus en vigueur",resp:"STELLA",status:"À faire",priority:"Haute",date:"",note:"Passation entrant",locked:true},
+  ];
+  var batch=db.batch();
+  T.forEach(function(t,i){
+    t.order=i;
+    batch.set(col.doc(),t);
+  });
+  batch.commit().then(function(){
+    // Mettre à jour le total dans le tracker
+    db.collection('trackers').doc(trackerId).update({total:T.length,done:0});
+  });
+}
+</script>
+</body>
+</html>
