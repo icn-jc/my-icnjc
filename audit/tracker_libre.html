@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Tableau libre — My-ICN-JC</title>
+<link rel="stylesheet" href="../assets/css/global.css"/>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+<script src="../assets/js/firebase.js"></script>
+<script src="../assets/js/auth.js"></script>
+<script src="../assets/js/sidebar.js"></script>
+<style>
+.back-link{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--text-secondary);text-decoration:none;margin-bottom:4px;}
+.back-link:hover{color:var(--bordeaux);}
+.sync-pill{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-tertiary);}
+.sync-dot{width:8px;height:8px;border-radius:50%;background:#b2bec3;}
+.sync-dot.ok{background:var(--success);}
+.sync-dot.syncing{background:var(--warning);animation:blink .8s infinite;}
+.sync-dot.error{background:var(--danger);}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.4}}
+.toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px;}
+.toolbar input[type=text]{padding:7px 10px;border-radius:var(--radius-md);border:1.5px solid var(--border-strong);font-family:'Sora',sans-serif;font-size:12px;background:var(--white);color:var(--text-primary);}
+.toolbar input:focus{outline:none;border-color:var(--bordeaux);}
+/* ── Stats (progression si colonne statut) ── */
+.stats-bar{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:20px;}
+.stat-card{background:var(--bg-card);padding:12px 18px;border-radius:var(--radius-lg);box-shadow:var(--shadow-sm);border:1px solid var(--border);min-width:100px;text-align:center;}
+.stat-card .s-label{font-size:10px;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:.07em;margin-bottom:4px;}
+.stat-card .s-val{font-size:20px;font-weight:700;color:var(--navy);}
+.prog-bar-wrap{background:#eee;border-radius:99px;height:5px;margin-top:6px;}
+.prog-bar{background:linear-gradient(90deg,var(--bordeaux),var(--bordeaux-light));border-radius:99px;height:100%;transition:width .4s;}
+/* ── Table ── */
+.table-wrap{background:var(--bg-card);border-radius:var(--radius-lg);box-shadow:var(--shadow-md);overflow-x:auto;border:1px solid var(--border);}
+table{width:100%;border-collapse:collapse;font-size:13px;min-width:600px;}
+th{background:#f8f7f5;font-weight:600;font-size:10px;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:.08em;padding:10px 12px;text-align:left;border-bottom:1px solid var(--border);white-space:nowrap;cursor:pointer;user-select:none;}
+th:hover{background:#f0eeeb;color:var(--bordeaux);}
+th .sort-icon{margin-left:4px;opacity:.4;font-size:10px;}
+th.sorted .sort-icon{opacity:1;color:var(--bordeaux);}
+td{padding:9px 12px;border-bottom:1px solid var(--border);vertical-align:middle;}
+tr:last-child td{border-bottom:none;}
+tr:hover td{background:rgba(27,42,74,0.02);}
+td[contenteditable=true]:hover{background:rgba(163,33,95,0.04);border-radius:4px;cursor:text;}
+select.cell-sel{border:1px solid var(--border);background:var(--white);font-family:'Sora',sans-serif;font-size:12px;cursor:pointer;border-radius:var(--radius-sm);padding:3px 6px;color:var(--text-primary);min-width:80px;}
+select.cell-sel:focus{outline:none;border-color:var(--bordeaux);}
+input.cell-input{border:1px solid var(--border);background:var(--white);font-family:'Sora',sans-serif;font-size:12px;border-radius:var(--radius-sm);padding:3px 6px;color:var(--text-primary);width:100%;min-width:80px;}
+input.cell-input:focus{outline:none;border-color:var(--bordeaux);}
+input.date-input{font-size:12px;border:1px solid var(--border);border-radius:var(--radius-sm);padding:3px 6px;font-family:'Sora',sans-serif;background:var(--white);}
+.check-cell{display:flex;align-items:center;justify-content:center;}
+.check-cell input{width:16px;height:16px;accent-color:var(--bordeaux);cursor:pointer;}
+.del-btn{background:var(--danger-bg);color:var(--danger);padding:4px 8px;border-radius:var(--radius-sm);font-size:12px;border:none;cursor:pointer;font-weight:600;}
+.del-btn:hover{background:#fecaca;}
+/* ── Setup colonnes ── */
+.setup-card{background:var(--bg-card);border-radius:var(--radius-lg);padding:32px 36px;box-shadow:var(--shadow-md);border:1px solid var(--border);max-width:700px;margin:0 auto;}
+.setup-title{font-family:'Playfair Display',serif;font-size:20px;color:var(--navy);margin-bottom:6px;}
+.setup-sub{font-size:13px;color:var(--text-secondary);margin-bottom:28px;}
+.col-row{display:grid;grid-template-columns:1fr 140px 32px;gap:8px;align-items:center;margin-bottom:8px;}
+.col-row input{padding:8px 10px;border:1.5px solid var(--border-strong);border-radius:var(--radius-md);font-family:'Sora',sans-serif;font-size:13px;}
+.col-row input:focus{outline:none;border-color:var(--bordeaux);}
+.col-row select{padding:8px 10px;border:1.5px solid var(--border-strong);border-radius:var(--radius-md);font-family:'Sora',sans-serif;font-size:13px;background:white;}
+.remove-col-btn{background:var(--danger-bg);color:var(--danger);border:none;border-radius:var(--radius-sm);width:32px;height:36px;cursor:pointer;font-size:16px;font-weight:700;}
+.add-col-btn{background:transparent;border:1.5px dashed var(--border-strong);border-radius:var(--radius-md);width:100%;padding:9px;color:var(--text-secondary);font-family:'Sora',sans-serif;font-size:13px;cursor:pointer;margin-top:4px;transition:all .2s;}
+.add-col-btn:hover{border-color:var(--bordeaux);color:var(--bordeaux);background:var(--bordeaux-bg);}
+/* Liste options */
+.options-input{font-size:11px;color:var(--text-tertiary);margin-top:4px;}
+.options-input input{width:100%;padding:5px 8px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:11px;font-family:'Sora',sans-serif;}
+/* Modal ajout ligne */
+.field-required-note{font-size:11px;color:var(--danger);margin-top:3px;display:none;}
+.input-error{border-color:var(--danger)!important;}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div class="login-page" id="login-page">
+  <div class="login-box">
+    <div class="login-logo"><img src="../assets/images/ICN-Junior-Conseil_logo.png" style="height:54px;object-fit:contain"/></div>
+    <div class="login-title">Connexion</div>
+    <div class="login-sub">Accès réservé aux membres ICN Junior Conseil.</div>
+    <button class="google-btn" onclick="doGoogleLogin()">
+      <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google"/>
+      Se connecter avec Google
+    </button>
+    <div class="denied-box" id="denied-box"><strong>Accès refusé</strong><p id="denied-msg"></p></div>
+    <div class="login-error" id="login-error"></div>
+  </div>
+</div>
+
+<!-- APP -->
+<div class="app-page" id="app-page">
+  <div id="sidebar-container"></div>
+  <div class="app-content">
+
+    <!-- VUE SETUP (si colonnes pas encore définies) -->
+    <div id="view-setup" style="display:none">
+      <div class="page-header">
+        <a class="back-link" href="tracker_treso.html">← Tous les tableaux</a>
+        <div class="page-title" id="setup-tracker-title">Nouveau tableau libre</div>
+        <div class="page-subtitle">Définis les colonnes de ton tableau avant de commencer.</div>
+      </div>
+      <div class="page-body">
+        <div class="setup-card">
+          <div class="setup-title">Configuration des colonnes</div>
+          <div class="setup-sub">Ajoute jusqu'à 12 colonnes. Tu pourras modifier les colonnes plus tard depuis les paramètres du tableau.</div>
+          <div id="cols-config"></div>
+          <button class="add-col-btn" id="btn-add-col" onclick="addColRow()">+ Ajouter une colonne</button>
+          <div style="margin-top:24px;padding-top:20px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:10px;">
+            <a href="tracker_treso.html" class="btn btn-secondary">Annuler</a>
+            <button class="btn btn-primary" onclick="saveColumns()">Créer le tableau →</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- VUE TABLEAU -->
+    <div id="view-table" style="display:none">
+      <div class="page-header">
+        <a class="back-link" href="tracker_treso.html">← Tous les tableaux</a>
+        <div class="flex justify-between items-center" style="flex-wrap:wrap;gap:10px;">
+          <div>
+            <div class="page-title" id="tracker-title">Chargement…</div>
+            <div class="flex items-center gap-3 mt-2">
+              <div class="sync-pill"><div class="sync-dot" id="sync-dot"></div><span id="sync-label">Connexion…</span></div>
+              <span style="font-size:12px;color:var(--text-tertiary)" id="today-label"></span>
+            </div>
+          </div>
+          <div class="flex gap-2 items-center">
+            <button class="btn btn-secondary btn-sm" id="btn-unarchive" onclick="unarchiveTracker()" style="display:none">↩ Désarchiver</button>
+            <button class="btn btn-secondary btn-sm" id="btn-archive" onclick="archiveTracker()" style="display:none">📁 Archiver</button>
+            <button class="btn btn-secondary btn-sm" id="btn-edit-cols" onclick="openEditCols()" style="display:none">⚙ Colonnes</button>
+            <button class="btn btn-primary btn-sm" id="btn-add-row" onclick="openAddRowModal()" style="display:none">+ Ajouter une ligne</button>
+            <button class="btn btn-secondary btn-sm" onclick="exportXLSX()">⬇ Excel</button>
+          </div>
+        </div>
+      </div>
+      <div class="page-body">
+        <div id="archived-banner" style="display:none;background:#fef9c3;border:1px solid #fde68a;border-radius:var(--radius-md);padding:10px 16px;font-size:13px;color:#854d0e;margin-bottom:16px;">
+          📁 Ce tableau est archivé — consultation et export disponibles, aucune modification possible.
+        </div>
+        <div class="stats-bar" id="stats-bar" style="display:none"></div>
+        <div class="toolbar">
+          <input type="text" id="search" placeholder="🔍 Rechercher…" oninput="render()"/>
+          <span style="font-size:11px;color:var(--text-tertiary);font-style:italic" id="filter-note"></span>
+        </div>
+        <div class="table-wrap">
+          <table id="main-table">
+            <thead id="thead"></thead>
+            <tbody id="tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- MODAL AJOUT LIGNE -->
+<div class="modal-overlay" id="modal-add-row" onclick="if(event.target===this)closeAddRowModal()">
+  <div class="modal-box">
+    <div class="modal-header">
+      <div class="modal-title">Ajouter une ligne</div>
+      <button class="modal-close" onclick="closeAddRowModal()">×</button>
+    </div>
+    <div id="add-row-fields"></div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeAddRowModal()">Annuler</button>
+      <button class="btn btn-primary" onclick="confirmAddRow()">Ajouter →</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL EDIT COLONNES -->
+<div class="modal-overlay" id="modal-edit-cols" onclick="if(event.target===this)closeEditCols()">
+  <div class="modal-box" style="max-width:600px">
+    <div class="modal-header">
+      <div class="modal-title">Modifier les colonnes</div>
+      <button class="modal-close" onclick="closeEditCols()">×</button>
+    </div>
+    <p style="font-size:12px;color:var(--text-tertiary);margin-bottom:16px">⚠ Supprimer une colonne efface les données de cette colonne pour toutes les lignes.</p>
+    <div id="edit-cols-config"></div>
+    <button class="add-col-btn" onclick="addEditColRow()">+ Ajouter une colonne</button>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeEditCols()">Annuler</button>
+      <button class="btn btn-primary" onclick="saveEditColumns()">Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<script>
+var trackerId=new URLSearchParams(window.location.search).get('id');
+if(!trackerId) window.location.href='tracker_treso.html';
+
+var rowsCol=db.collection('tracker_tasks').doc(trackerId).collection('tasks');
+var trackerRef=db.collection('trackers').doc(trackerId);
+var rows=[],rowIds=[],columns=[],trackerData={},currentRole;
+var sortField='',sortDir=1,colSortIdx=-1;
+
+var JOURS=['Dimanche','Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi'];
+var MOIS=['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
+var now=new Date();
+
+initAuth('tracker_treso',function(user,role,profile){
+  currentRole=role;
+  renderSidebar(role,profile,user,'tracker_treso');
+  showAppPage(user,role,profile);
+  loadTracker();
+  updateHealthIndicator();
+});
+
+function loadTracker(){
+  trackerRef.get().then(function(doc){
+    if(!doc.exists){window.location.href='tracker_treso.html';return;}
+    trackerData=doc.data();
+    columns=trackerData.columns||[];
+    document.getElementById('today-label').innerText=JOURS[now.getDay()]+' '+now.getDate()+' '+MOIS[now.getMonth()]+' '+now.getFullYear();
+
+    if(columns.length===0){
+      // Mode setup
+      document.getElementById('view-setup').style.display='block';
+      document.getElementById('setup-tracker-title').innerText=trackerData.name;
+      addColRow();addColRow();addColRow(); // 3 colonnes par défaut
+    } else {
+      showTableView();
+    }
+  });
+}
+
+function showTableView(){
+  document.getElementById('view-setup').style.display='none';
+  document.getElementById('view-table').style.display='block';
+  document.getElementById('tracker-title').innerText=trackerData.name;
+  document.title=trackerData.name+' — My-ICN-JC';
+
+  var isArchived=trackerData.statut==='archivé';
+  var isSuperAdmin=currentRole==='super_admin';
+  var canEdit=['super_admin','president','tresorerie','responsable_commercial','responsable_qualite','secretaire'].includes(currentRole)&&!isArchived;
+
+  if(isSuperAdmin){
+    if(isArchived) document.getElementById('btn-unarchive').style.display='flex';
+    else document.getElementById('btn-archive').style.display='flex';
+  }
+  if(canEdit){
+    document.getElementById('btn-add-row').style.display='flex';
+    document.getElementById('btn-edit-cols').style.display='flex';
+  }
+  if(isArchived) document.getElementById('archived-banner').style.display='block';
+
+  // Stats si colonne statut
+  var hasStatut=columns.some(function(c){return c.type==='liste'&&c.name.toLowerCase().includes('statut');});
+  if(hasStatut) document.getElementById('stats-bar').style.display='flex';
+
+  startRows();
+}
+
+function startRows(){
+  setSyncStatus('syncing','Chargement…');
+  rowsCol.orderBy('order').onSnapshot(function(snap){
+    rows=[];rowIds=[];
+    snap.forEach(function(doc){rows.push(doc.data());rowIds.push(doc.id);});
+    setSyncStatus('ok','Synchronisé · '+rows.length+' lignes');
+    updateStats();
+    render();
+  },function(err){setSyncStatus('error','Erreur — '+err.message);});
+}
+
+function setSyncStatus(s,m){
+  document.getElementById('sync-dot').className='sync-dot '+s;
+  document.getElementById('sync-label').innerText=m;
+}
+
+function updateStats(){
+  var statCol=columns.find(function(c){return c.type==='liste'&&c.name.toLowerCase().includes('statut');});
+  if(!statCol)return;
+  var total=rows.length;
+  var key='col_'+columns.indexOf(statCol);
+  var counts={};
+  rows.forEach(function(r){var v=r[key]||'';counts[v]=(counts[v]||0)+1;});
+  var done=counts['Terminé']||counts['Payé']||counts['Clôturé']||0;
+  var pct=total?Math.round(done/total*100):0;
+  var html='<div class="stat-card"><div class="s-label">Total</div><div class="s-val">'+total+'</div></div>';
+  Object.keys(counts).forEach(function(k){
+    html+='<div class="stat-card"><div class="s-label">'+k+'</div><div class="s-val">'+counts[k]+'</div></div>';
+  });
+  html+='<div class="stat-card" style="min-width:160px"><div class="s-label">Progression</div><div class="s-val">'+pct+'%</div><div class="prog-bar-wrap"><div class="prog-bar" style="width:'+pct+'%"></div></div></div>';
+  document.getElementById('stats-bar').innerHTML=html;
+}
+
+// ── Render ────────────────────────────────────────────────────
+function render(){
+  var search=document.getElementById('search').value.toLowerCase();
+  var archived=trackerData.statut==='archivé';
+  var canEdit=['super_admin','president','tresorerie','responsable_commercial','responsable_qualite','secretaire'].includes(currentRole)&&!archived;
+
+  // Header
+  var headHtml='<tr>';
+  columns.forEach(function(col,ci){
+    headHtml+='<th onclick="sortByCol('+ci+')" '+(colSortIdx===ci?'class="sorted"':'')+'>'
+      +col.name+' <span class="sort-icon">'+(colSortIdx===ci?(sortDir===1?'↑':'↓'):'↕')+'</span></th>';
+  });
+  headHtml+='<th style="width:40px;text-align:center"></th></tr>';
+  document.getElementById('thead').innerHTML=headHtml;
+
+  var filtered=rows.map(function(r,i){return{r:r,i:i};}).filter(function(item){
+    if(!search)return true;
+    return columns.some(function(col,ci){
+      return(item.r['col_'+ci]||'').toString().toLowerCase().indexOf(search)>=0;
+    });
+  });
+
+  if(colSortIdx>=0){
+    filtered.sort(function(a,b){
+      var va=a.r['col_'+colSortIdx]||'',vb=b.r['col_'+colSortIdx]||'';
+      var col=columns[colSortIdx];
+      if(col&&col.type==='nombre'){va=parseFloat(va)||0;vb=parseFloat(vb)||0;}
+      if(va<vb)return-1*sortDir;if(va>vb)return 1*sortDir;return 0;
+    });
+  }
+
+  document.getElementById('filter-note').innerText=filtered.length<rows.length?'Affichage de '+filtered.length+' ligne(s) sur '+rows.length+' au total':'';
+
+  var html='';
+  if(filtered.length===0){
+    html='<tr><td colspan="'+(columns.length+1)+'" style="text-align:center;padding:2rem;color:var(--text-tertiary)">Aucune ligne. Clique sur "+ Ajouter une ligne".</td></tr>';
+  } else {
+    filtered.forEach(function(item){
+      var r=item.r,ri=item.i;
+      html+='<tr>';
+      columns.forEach(function(col,ci){
+        var key='col_'+ci;
+        var val=r[key]||'';
+        if(!canEdit){
+          html+='<td style="font-size:13px">'+val+'</td>';
+          return;
+        }
+        if(col.type==='texte'){
+          html+='<td contenteditable="true" onblur="saveCell('+ri+',\''+key+'\',this.innerText.trim())" style="min-width:100px">'+val+'</td>';
+        } else if(col.type==='nombre'){
+          html+='<td><input class="cell-input" type="number" value="'+val+'" onchange="saveCell('+ri+',\''+key+'\',this.value)" style="max-width:110px"/></td>';
+        } else if(col.type==='date'){
+          html+='<td><input class="date-input" type="date" value="'+val+'" onchange="saveCell('+ri+',\''+key+'\',this.value)"/></td>';
+        } else if(col.type==='liste'){
+          var opts=(col.options||[]).map(function(o){return'<option'+(val===o?' selected':'')+'>'+o+'</option>';}).join('');
+          html+='<td><select class="cell-sel" onchange="saveCell('+ri+',\''+key+'\',this.value)"><option value=""></option>'+opts+'</select></td>';
+        } else if(col.type==='case'){
+          html+='<td><div class="check-cell"><input type="checkbox"'+(val==='true'?' checked':'')+' onchange="saveCell('+ri+',\''+key+'\',this.checked.toString())"/></div></td>';
+        } else {
+          html+='<td>'+val+'</td>';
+        }
+      });
+      html+='<td style="text-align:center;width:40px">'+(canEdit?'<button class="del-btn" onclick="deleteRow('+ri+')">✕</button>':'')+'</td>';
+      html+='</tr>';
+    });
+  }
+  document.getElementById('tbody').innerHTML=html;
+}
+
+function sortByCol(ci){
+  if(colSortIdx===ci) sortDir*=-1; else{colSortIdx=ci;sortDir=1;}
+  render();
+}
+
+function saveCell(ri,key,val){
+  rows[ri][key]=val;
+  var id=rowIds[ri];
+  var update={};update[key]=val;
+  if(id) rowsCol.doc(id).update(update).catch(function(e){console.error(e);});
+  updateStats();
+}
+function deleteRow(ri){
+  if(!confirm('Supprimer cette ligne ?'))return;
+  var id=rowIds[ri];
+  if(id) rowsCol.doc(id).delete();
+}
+
+// ── Ajout ligne ───────────────────────────────────────────────
+function openAddRowModal(){
+  var html='';
+  columns.forEach(function(col,ci){
+    var isRequired=ci===0;
+    html+='<div class="form-field"><label class="input-label">'+col.name+(isRequired?' <span style="color:var(--danger)">*</span>':'')+'</label>';
+    if(col.type==='texte'){
+      html+='<input class="input" type="text" id="new-col-'+ci+'" placeholder="'+col.name+'"/>';
+    } else if(col.type==='nombre'){
+      html+='<input class="input" type="number" id="new-col-'+ci+'" placeholder="0"/>';
+    } else if(col.type==='date'){
+      html+='<input class="input" type="date" id="new-col-'+ci+'"/>';
+    } else if(col.type==='liste'){
+      var opts=(col.options||[]).map(function(o){return'<option>'+o+'</option>';}).join('');
+      html+='<select class="select-field" id="new-col-'+ci+'"><option value=""></option>'+opts+'</select>';
+    } else if(col.type==='case'){
+      html+='<div style="display:flex;align-items:center;gap:8px;margin-top:4px"><input type="checkbox" id="new-col-'+ci+'" style="accent-color:var(--bordeaux)"/> <label style="font-size:13px">Coché</label></div>';
+    }
+    if(isRequired) html+='<div class="field-required-note" id="err-col-0">Champ obligatoire</div>';
+    html+='</div>';
+  });
+  document.getElementById('add-row-fields').innerHTML=html;
+  document.getElementById('modal-add-row').classList.add('open');
+}
+function closeAddRowModal(){document.getElementById('modal-add-row').classList.remove('open');}
+
+function confirmAddRow(){
+  var firstEl=document.getElementById('new-col-0');
+  if(firstEl&&!firstEl.value.trim()&&columns[0]&&columns[0].type!=='case'){
+    firstEl.classList.add('input-error');
+    var err=document.getElementById('err-col-0');
+    if(err) err.style.display='block';
+    return;
+  }
+  var data={order:Date.now()};
+  columns.forEach(function(col,ci){
+    var el=document.getElementById('new-col-'+ci);
+    if(!el)return;
+    if(col.type==='case') data['col_'+ci]=el.checked.toString();
+    else data['col_'+ci]=el.value||'';
+  });
+  rowsCol.add(data).then(function(){closeAddRowModal();});
+}
+
+// ── Setup colonnes ────────────────────────────────────────────
+var setupCols=[];
+
+function addColRow(name,type,options){
+  if(setupCols.length>=12){alert('Maximum 12 colonnes.');return;}
+  var idx=setupCols.length;
+  setupCols.push({name:name||'',type:type||'texte',options:options||[]});
+  var container=document.getElementById('cols-config');
+  var div=document.createElement('div');
+  div.id='col-row-'+idx;
+  div.innerHTML='<div class="col-row">'+
+    '<input type="text" placeholder="Nom de la colonne" value="'+(name||'')+'" oninput="setupCols['+idx+'].name=this.value" class="col-name-input"/>'+
+    '<select onchange="setupCols['+idx+'].type=this.value;toggleOptionsInput('+idx+',this.value)">'+
+      '<option value="texte"'+(type==='texte'?' selected':'')+'>Texte</option>'+
+      '<option value="nombre"'+(type==='nombre'?' selected':'')+'>Nombre</option>'+
+      '<option value="date"'+(type==='date'?' selected':'')+'>Date</option>'+
+      '<option value="liste"'+(type==='liste'?' selected':'')+'>Liste déroulante</option>'+
+      '<option value="case"'+(type==='case'?' selected':'')+'>Case à cocher</option>'+
+    '</select>'+
+    '<button class="remove-col-btn" onclick="removeColRow('+idx+')">✕</button>'+
+  '</div>'+
+  '<div class="options-input" id="opts-'+idx+'" style="display:'+(type==='liste'?'block':'none')+'">'+
+    '<input type="text" placeholder="Options séparées par des virgules : Ex: Oui,Non,En attente" value="'+(options?options.join(','):'')+'" oninput="setupCols['+idx+'].options=this.value.split(\',\').map(function(s){return s.trim();}).filter(Boolean)"/>'+
+  '</div>';
+  container.appendChild(div);
+  // Update button
+  document.getElementById('btn-add-col').style.display=setupCols.length>=12?'none':'block';
+}
+
+function removeColRow(idx){
+  setupCols[idx]=null;
+  var el=document.getElementById('col-row-'+idx);
+  if(el) el.remove();
+}
+
+function toggleOptionsInput(idx,type){
+  var el=document.getElementById('opts-'+idx);
+  if(el) el.style.display=type==='liste'?'block':'none';
+}
+
+function saveColumns(){
+  var cols=setupCols.filter(Boolean).filter(function(c){return c.name.trim();});
+  if(cols.length===0){alert('Ajoute au moins une colonne.');return;}
+  trackerRef.update({columns:cols}).then(function(){
+    columns=cols;
+    trackerData.columns=cols;
+    showTableView();
+  });
+}
+
+// ── Edit colonnes ─────────────────────────────────────────────
+var editCols=[];
+
+function openEditCols(){
+  editCols=JSON.parse(JSON.stringify(columns));
+  var container=document.getElementById('edit-cols-config');
+  container.innerHTML='';
+  editCols.forEach(function(col,idx){
+    addEditColRowAt(idx,col.name,col.type,col.options);
+  });
+  document.getElementById('modal-edit-cols').classList.add('open');
+}
+function closeEditCols(){document.getElementById('modal-edit-cols').classList.remove('open');}
+
+function addEditColRow(){
+  var idx=editCols.length;
+  if(idx>=12){alert('Maximum 12 colonnes.');return;}
+  editCols.push({name:'',type:'texte',options:[]});
+  addEditColRowAt(idx,'','texte',[]);
+}
+
+function addEditColRowAt(idx,name,type,options){
+  var container=document.getElementById('edit-cols-config');
+  var div=document.createElement('div');
+  div.id='edit-col-row-'+idx;
+  div.innerHTML='<div class="col-row">'+
+    '<input type="text" placeholder="Nom de la colonne" value="'+(name||'')+'" oninput="editCols['+idx+'].name=this.value"/>'+
+    '<select onchange="editCols['+idx+'].type=this.value;toggleEditOpts('+idx+',this.value)">'+
+      '<option value="texte"'+(type==='texte'?' selected':'')+'>Texte</option>'+
+      '<option value="nombre"'+(type==='nombre'?' selected':'')+'>Nombre</option>'+
+      '<option value="date"'+(type==='date'?' selected':'')+'>Date</option>'+
+      '<option value="liste"'+(type==='liste'?' selected':'')+'>Liste déroulante</option>'+
+      '<option value="case"'+(type==='case'?' selected':'')+'>Case à cocher</option>'+
+    '</select>'+
+    '<button class="remove-col-btn" onclick="removeEditCol('+idx+')">✕</button>'+
+  '</div>'+
+  '<div class="options-input" id="edit-opts-'+idx+'" style="display:'+(type==='liste'?'block':'none')+'">'+
+    '<input type="text" placeholder="Options séparées par des virgules" value="'+(options?options.join(','):'')+'" oninput="editCols['+idx+'].options=this.value.split(\',\').map(function(s){return s.trim();}).filter(Boolean)"/>'+
+  '</div>';
+  container.appendChild(div);
+}
+
+function removeEditCol(idx){
+  editCols[idx]=null;
+  var el=document.getElementById('edit-col-row-'+idx);
+  if(el) el.remove();
+}
+function toggleEditOpts(idx,type){
+  var el=document.getElementById('edit-opts-'+idx);
+  if(el) el.style.display=type==='liste'?'block':'none';
+}
+
+function saveEditColumns(){
+  var cols=editCols.filter(Boolean).filter(function(c){return c.name.trim();});
+  if(cols.length===0){alert('Ajoute au moins une colonne.');return;}
+  trackerRef.update({columns:cols}).then(function(){
+    columns=cols;
+    trackerData.columns=cols;
+    closeEditCols();
+    render();
+  });
+}
+
+// ── Archive ───────────────────────────────────────────────────
+function archiveTracker(){
+  if(!confirm('Archiver ce tableau ?'))return;
+  trackerRef.update({statut:'archivé'}).then(function(){
+    trackerData.statut='archivé';
+    document.getElementById('btn-archive').style.display='none';
+    document.getElementById('btn-add-row').style.display='none';
+    document.getElementById('btn-edit-cols').style.display='none';
+    document.getElementById('btn-unarchive').style.display='flex';
+    document.getElementById('archived-banner').style.display='block';
+    render();
+  });
+}
+function unarchiveTracker(){
+  if(!confirm('Désarchiver ce tableau ?'))return;
+  trackerRef.update({statut:'actif'}).then(function(){
+    trackerData.statut='actif';
+    document.getElementById('btn-unarchive').style.display='none';
+    document.getElementById('btn-archive').style.display='flex';
+    document.getElementById('archived-banner').style.display='none';
+    document.getElementById('btn-add-row').style.display='flex';
+    document.getElementById('btn-edit-cols').style.display='flex';
+    render();
+  });
+}
+
+// ── Export Excel ──────────────────────────────────────────────
+function exportXLSX(){
+  var header=columns.map(function(c){return c.name;});
+  var data=[header];
+  rows.forEach(function(r){
+    data.push(columns.map(function(col,ci){
+      var v=r['col_'+ci];
+      return v===undefined||v===''?'Non renseigné':v;
+    }));
+  });
+  var ws=XLSX.utils.aoa_to_sheet(data);
+  ws['!cols']=columns.map(function(){return{wch:20};});
+  var wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'Tableau');
+  XLSX.writeFile(wb,(trackerData.name||'tableau')+'.xlsx');
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,639 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Relances clients — My-ICN-JC</title>
+<link rel="stylesheet" href="../assets/css/global.css"/>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+<script src="../assets/js/firebase.js"></script>
+<script src="../assets/js/auth.js"></script>
+<script src="../assets/js/sidebar.js"></script>
+<style>
+.back-link{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--text-secondary);text-decoration:none;margin-bottom:4px;}
+.back-link:hover{color:var(--bordeaux);}
+.stats-bar{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:20px;}
+.stat-card{background:var(--bg-card);padding:12px 18px;border-radius:var(--radius-lg);box-shadow:var(--shadow-sm);border:1px solid var(--border);min-width:100px;text-align:center;}
+.stat-card .s-label{font-size:10px;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:.07em;margin-bottom:4px;}
+.stat-card .s-val{font-size:20px;font-weight:700;color:var(--navy);}
+.stat-card.s-red .s-val{color:var(--danger);}
+.stat-card.s-orange .s-val{color:var(--warning);}
+.stat-card.s-green .s-val{color:var(--success);}
+.toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px;}
+.toolbar select,.toolbar input[type=text]{padding:7px 10px;border-radius:var(--radius-md);border:1.5px solid var(--border-strong);font-family:'Sora',sans-serif;font-size:12px;background:var(--white);color:var(--text-primary);}
+.toolbar select:focus,.toolbar input:focus{outline:none;border-color:var(--bordeaux);}
+.table-wrap{background:var(--bg-card);border-radius:var(--radius-lg);box-shadow:var(--shadow-md);overflow-x:auto;border:1px solid var(--border);}
+table{width:100%;border-collapse:collapse;font-size:13px;min-width:900px;}
+th{background:#f8f7f5;font-weight:600;font-size:10px;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:.08em;padding:10px 12px;text-align:left;border-bottom:1px solid var(--border);white-space:nowrap;cursor:pointer;user-select:none;}
+th:hover{background:#f0eeeb;color:var(--bordeaux);}
+th .sort-icon{margin-left:4px;opacity:.4;font-size:10px;}
+th.sorted .sort-icon{opacity:1;color:var(--bordeaux);}
+td{padding:9px 12px;border-bottom:1px solid var(--border);vertical-align:middle;color:var(--text-primary);}
+tr:last-child td{border-bottom:none;}
+tr:hover td{background:rgba(27,42,74,0.02);}
+select.cell-sel{border:1px solid var(--border);background:var(--white);font-family:'Sora',sans-serif;font-size:12px;cursor:pointer;border-radius:var(--radius-sm);padding:3px 6px;color:var(--text-primary);min-width:100px;}
+select.cell-sel:focus{outline:none;border-color:var(--bordeaux);}
+input.cell-input{border:1px solid var(--border);background:var(--white);font-family:'Sora',sans-serif;font-size:12px;border-radius:var(--radius-sm);padding:3px 6px;color:var(--text-primary);width:100%;}
+input.cell-input:focus{outline:none;border-color:var(--bordeaux);}
+input.date-input{font-size:12px;border:1px solid var(--border);border-radius:var(--radius-sm);padding:3px 6px;font-family:'Sora',sans-serif;background:var(--white);}
+input.date-input:focus{outline:none;border-color:var(--bordeaux);}
+.days-red{color:var(--danger);font-weight:700;font-size:12px;}
+.days-orange{color:var(--warning);font-weight:700;font-size:12px;}
+.days-green{color:var(--success);font-weight:600;font-size:12px;}
+/* Statut badges */
+.st-arelancer{background:#EBF5FB;color:#1a5276;padding:2px 8px;border-radius:99px;font-size:11px;font-weight:600;}
+.st-relance{background:#FEF9E7;color:#7d6608;padding:2px 8px;border-radius:99px;font-size:11px;font-weight:600;}
+.st-paye{background:#EAFAF1;color:#1e8449;padding:2px 8px;border-radius:99px;font-size:11px;font-weight:600;}
+.st-litigieux{background:#fee2e2;color:#991b1b;padding:2px 8px;border-radius:99px;font-size:11px;font-weight:600;}
+/* Niveau relance */
+.niv-1{background:#e0f2fe;color:#0c4a6e;padding:2px 8px;border-radius:99px;font-size:11px;font-weight:600;}
+.niv-2{background:#fef3c7;color:#92400e;padding:2px 8px;border-radius:99px;font-size:11px;font-weight:600;}
+.niv-3{background:#fee2e2;color:#991b1b;padding:2px 8px;border-radius:99px;font-size:11px;font-weight:600;}
+.niv-c{background:#f3e8ff;color:#6b21a8;padding:2px 8px;border-radius:99px;font-size:11px;font-weight:600;}
+/* Bouton historique */
+.hist-btn{background:var(--bordeaux-bg);color:var(--bordeaux);border:1px solid rgba(163,33,95,0.2);border-radius:var(--radius-sm);padding:3px 8px;font-size:11px;font-weight:600;cursor:pointer;white-space:nowrap;}
+.hist-btn:hover{background:rgba(163,33,95,0.15);}
+.del-btn{background:var(--danger-bg);color:var(--danger);padding:4px 8px;border-radius:var(--radius-sm);font-size:12px;border:none;cursor:pointer;font-weight:600;}
+.del-btn:hover{background:#fecaca;}
+/* Sync */
+.sync-pill{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-tertiary);}
+.sync-dot{width:8px;height:8px;border-radius:50%;background:#b2bec3;}
+.sync-dot.ok{background:var(--success);}
+.sync-dot.syncing{background:var(--warning);animation:blink .8s infinite;}
+.sync-dot.error{background:var(--danger);}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.4}}
+/* ── Panneau historique ── */
+.hist-panel{position:fixed;right:0;top:0;bottom:0;width:400px;max-width:95vw;background:var(--white);box-shadow:-8px 0 40px rgba(27,42,74,0.15);z-index:400;display:flex;flex-direction:column;transform:translateX(100%);transition:transform .25s ease;}
+.hist-panel.open{transform:translateX(0);}
+.hist-panel-header{padding:20px 24px;border-bottom:1px solid var(--border);display:flex;align-items:flex-start;justify-content:space-between;gap:12px;}
+.hist-panel-title{font-family:'Playfair Display',serif;font-size:16px;color:var(--navy);}
+.hist-panel-sub{font-size:12px;color:var(--text-tertiary);margin-top:2px;}
+.hist-close{background:none;border:none;font-size:20px;cursor:pointer;color:var(--text-tertiary);padding:0;line-height:1;}
+.hist-close:hover{color:var(--navy);}
+.hist-body{flex:1;overflow-y:auto;padding:20px 24px;}
+.hist-add-form{padding:16px 24px;border-top:1px solid var(--border);background:#fafafa;}
+.hist-add-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--bordeaux);margin-bottom:10px;}
+.hist-add-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;}
+.hist-add-full{margin-bottom:8px;}
+.hist-entry{background:var(--bg);border-radius:var(--radius-md);padding:12px 14px;margin-bottom:10px;border-left:3px solid var(--bordeaux);}
+.hist-entry-date{font-size:11px;font-weight:600;color:var(--bordeaux);margin-bottom:4px;}
+.hist-entry-canal{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:600;padding:2px 7px;border-radius:99px;background:rgba(163,33,95,0.1);color:var(--bordeaux);margin-bottom:6px;}
+.hist-entry-note{font-size:12px;color:var(--text-secondary);line-height:1.5;}
+.hist-empty{font-size:13px;color:var(--text-tertiary);text-align:center;padding:24px 0;}
+.overlay-bg{position:fixed;inset:0;background:rgba(15,25,35,0.3);z-index:399;display:none;}
+.overlay-bg.open{display:block;}
+/* Modal ajout ligne */
+.field-required-note{font-size:11px;color:var(--danger);margin-top:3px;display:none;}
+.input-error{border-color:var(--danger)!important;}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div class="login-page" id="login-page">
+  <div class="login-box">
+    <div class="login-logo"><img src="../assets/images/ICN-Junior-Conseil_logo.png" style="height:54px;object-fit:contain"/></div>
+    <div class="login-title">Connexion</div>
+    <div class="login-sub">Accès réservé aux membres ICN Junior Conseil.</div>
+    <button class="google-btn" onclick="doGoogleLogin()">
+      <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google"/>
+      Se connecter avec Google
+    </button>
+    <div class="denied-box" id="denied-box"><strong>Accès refusé</strong><p id="denied-msg"></p></div>
+    <div class="login-error" id="login-error"></div>
+  </div>
+</div>
+
+<!-- APP -->
+<div class="app-page" id="app-page">
+  <div id="sidebar-container"></div>
+  <div class="app-content">
+    <div class="page-header">
+      <a class="back-link" href="tracker_treso.html">← Tous les tableaux</a>
+      <div class="flex justify-between items-center" style="flex-wrap:wrap;gap:10px;">
+        <div>
+          <div class="page-title" id="tracker-title">Chargement…</div>
+          <div class="flex items-center gap-3 mt-2">
+            <div class="sync-pill"><div class="sync-dot" id="sync-dot"></div><span id="sync-label">Connexion…</span></div>
+            <span style="font-size:12px;color:var(--text-tertiary)" id="today-label"></span>
+          </div>
+        </div>
+        <div class="flex gap-2 items-center">
+          <button class="btn btn-secondary btn-sm" id="btn-unarchive" onclick="unarchiveTracker()" style="display:none">↩ Désarchiver</button>
+          <button class="btn btn-secondary btn-sm" id="btn-archive" onclick="archiveTracker()" style="display:none">📁 Archiver</button>
+          <button class="btn btn-primary btn-sm" id="btn-add" onclick="openAddModal()" style="display:none">+ Ajouter une ligne</button>
+          <button class="btn btn-secondary btn-sm" onclick="exportXLSX()">⬇ Excel</button>
+        </div>
+      </div>
+    </div>
+    <div class="page-body">
+      <div id="archived-banner" style="display:none;background:#fef9c3;border:1px solid #fde68a;border-radius:var(--radius-md);padding:10px 16px;font-size:13px;color:#854d0e;margin-bottom:16px;">
+        📁 Ce tableau est archivé — consultation et export disponibles, aucune modification possible.
+      </div>
+      <div class="stats-bar" id="stats-bar"></div>
+      <div class="toolbar">
+        <input type="text" id="search" placeholder="🔍 Rechercher…" oninput="render()"/>
+        <select id="filterStatut" onchange="render()">
+          <option value="">Statut</option>
+          <option>À relancer</option><option>Relancé</option><option>Payé</option><option>Litigieux</option>
+        </select>
+        <select id="filterNiveau" onchange="render()">
+          <option value="">Niveau relance</option>
+          <option>1ère relance</option><option>2ème relance</option><option>3ème relance</option><option>Contentieux</option>
+        </select>
+        <select id="filterRetard" onchange="render()">
+          <option value="">Retard</option>
+          <option value="0">En retard</option>
+          <option value="30">≥ 30 jours</option>
+          <option value="60">≥ 60 jours</option>
+          <option value="90">≥ 90 jours</option>
+        </select>
+        <button class="btn btn-secondary btn-sm" onclick="clearFilters()">Réinitialiser</button>
+        <span style="font-size:11px;color:var(--text-tertiary);font-style:italic" id="filter-note"></span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th onclick="sortBy('client')">Client <span class="sort-icon" id="sort-client">↕</span></th>
+              <th onclick="sortBy('facture')">N° Facture <span class="sort-icon" id="sort-facture">↕</span></th>
+              <th onclick="sortBy('montant')">Montant HT <span class="sort-icon" id="sort-montant">↕</span></th>
+              <th onclick="sortBy('echeance')">Échéance <span class="sort-icon" id="sort-echeance">↕</span></th>
+              <th onclick="sortBy('retard')">Jours retard <span class="sort-icon" id="sort-retard">↕</span></th>
+              <th>Niveau relance</th>
+              <th>Statut</th>
+              <th>Contact</th>
+              <th>Notes</th>
+              <th style="text-align:center">Historique</th>
+              <th style="text-align:center;width:40px"></th>
+            </tr>
+          </thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- PANNEAU HISTORIQUE -->
+<div class="overlay-bg" id="overlay-bg" onclick="closeHist()"></div>
+<div class="hist-panel" id="hist-panel">
+  <div class="hist-panel-header">
+    <div>
+      <div class="hist-panel-title" id="hist-client-name">Historique</div>
+      <div class="hist-panel-sub" id="hist-client-sub"></div>
+    </div>
+    <button class="hist-close" onclick="closeHist()">×</button>
+  </div>
+  <div class="hist-body" id="hist-body">
+    <div class="hist-empty">Aucune relance enregistrée.</div>
+  </div>
+  <div class="hist-add-form" id="hist-add-form">
+    <div class="hist-add-title">+ Enregistrer une relance</div>
+    <div class="hist-add-row">
+      <div>
+        <label class="input-label">Canal</label>
+        <select class="select-field" id="hist-canal" style="font-size:12px;padding:7px 10px;">
+          <option value="Mail">📧 Mail</option>
+          <option value="Téléphone">📞 Téléphone</option>
+          <option value="Courrier">📬 Courrier</option>
+          <option value="En personne">🤝 En personne</option>
+        </select>
+      </div>
+      <div>
+        <label class="input-label">Date</label>
+        <input class="input" type="date" id="hist-date" style="font-size:12px;padding:7px 10px;"/>
+      </div>
+    </div>
+    <div class="hist-add-full">
+      <label class="input-label">Note (optionnel)</label>
+      <input class="input" type="text" id="hist-note" placeholder="Ex : Pas de réponse, relancé par téléphone…" style="font-size:12px;"/>
+    </div>
+    <button class="btn btn-primary w-full" onclick="addRelance()" style="font-size:13px;">Enregistrer la relance</button>
+  </div>
+</div>
+
+<!-- MODAL AJOUT LIGNE -->
+<div class="modal-overlay" id="modal-add" onclick="if(event.target===this)closeAddModal()">
+  <div class="modal-box">
+    <div class="modal-header">
+      <div class="modal-title">Ajouter une ligne</div>
+      <button class="modal-close" onclick="closeAddModal()">×</button>
+    </div>
+    <div class="form-grid">
+      <div class="form-field full">
+        <label class="input-label">Client <span style="color:var(--danger)">*</span></label>
+        <input class="input" type="text" id="add-client" placeholder="Nom du client"/>
+        <div class="field-required-note" id="err-client">Champ obligatoire</div>
+      </div>
+      <div class="form-field">
+        <label class="input-label">N° Facture <span style="color:var(--danger)">*</span></label>
+        <input class="input" type="text" id="add-facture" placeholder="Ex : FA-2026-001"/>
+        <div class="field-required-note" id="err-facture">Champ obligatoire</div>
+      </div>
+      <div class="form-field">
+        <label class="input-label">Montant HT (€) <span style="color:var(--danger)">*</span></label>
+        <input class="input" type="number" id="add-montant" placeholder="0"/>
+        <div class="field-required-note" id="err-montant">Champ obligatoire</div>
+      </div>
+      <div class="form-field">
+        <label class="input-label">Date d'échéance <span style="color:var(--danger)">*</span></label>
+        <input class="input" type="date" id="add-echeance"/>
+        <div class="field-required-note" id="err-echeance">Champ obligatoire</div>
+      </div>
+      <div class="form-field">
+        <label class="input-label">Niveau de relance <span style="color:var(--danger)">*</span></label>
+        <select class="select-field" id="add-niveau">
+          <option value="">— Choisir —</option>
+          <option>1ère relance</option><option>2ème relance</option>
+          <option>3ème relance</option><option>Contentieux</option>
+        </select>
+        <div class="field-required-note" id="err-niveau">Champ obligatoire</div>
+      </div>
+      <div class="form-field">
+        <label class="input-label">Statut <span style="color:var(--danger)">*</span></label>
+        <select class="select-field" id="add-statut">
+          <option value="">— Choisir —</option>
+          <option>À relancer</option><option>Relancé</option>
+          <option>Payé</option><option>Litigieux</option>
+        </select>
+        <div class="field-required-note" id="err-statut">Champ obligatoire</div>
+      </div>
+      <div class="form-field full">
+        <label class="input-label">Contact</label>
+        <input class="input" type="text" id="add-contact" placeholder="Nom, email ou téléphone du contact"/>
+      </div>
+      <div class="form-field full">
+        <label class="input-label">Notes</label>
+        <textarea class="input" id="add-notes" rows="2" placeholder="Remarques…" style="resize:vertical"></textarea>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeAddModal()">Annuler</button>
+      <button class="btn btn-primary" onclick="confirmAdd()">Ajouter →</button>
+    </div>
+  </div>
+</div>
+
+<script>
+var trackerId=new URLSearchParams(window.location.search).get('id');
+if(!trackerId) window.location.href='tracker_treso.html';
+
+var rowsCol=db.collection('tracker_tasks').doc(trackerId).collection('tasks');
+var rows=[],rowIds=[],trackerData={},currentRole;
+var sortField='',sortDir=1;
+
+var JOURS=['Dimanche','Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi'];
+var MOIS=['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
+var now=new Date();
+document.getElementById('today-label').innerText=JOURS[now.getDay()]+' '+now.getDate()+' '+MOIS[now.getMonth()]+' '+now.getFullYear();
+// Set today as default for hist-date
+document.getElementById('hist-date').value=now.toISOString().split('T')[0];
+
+initAuth('tracker_treso',function(user,role,profile){
+  currentRole=role;
+  renderSidebar(role,profile,user,'tracker_treso');
+  showAppPage(user,role,profile);
+  loadTracker();
+  updateHealthIndicator();
+});
+
+function loadTracker(){
+  db.collection('trackers').doc(trackerId).get().then(function(doc){
+    if(!doc.exists){window.location.href='tracker_treso.html';return;}
+    trackerData=doc.data();
+    document.getElementById('tracker-title').innerText=trackerData.name;
+    document.title=trackerData.name+' — My-ICN-JC';
+    var isArchived=trackerData.statut==='archivé';
+    var isSuperAdmin=currentRole==='super_admin';
+    var canEdit=['super_admin','president','tresorerie'].includes(currentRole);
+    if(isSuperAdmin){
+      if(isArchived) document.getElementById('btn-unarchive').style.display='flex';
+      else document.getElementById('btn-archive').style.display='flex';
+    }
+    if(!isArchived&&canEdit) document.getElementById('btn-add').style.display='flex';
+    if(isArchived) document.getElementById('archived-banner').style.display='block';
+    startRows();
+  });
+}
+
+function startRows(){
+  setSyncStatus('syncing','Chargement…');
+  rowsCol.orderBy('order').onSnapshot(function(snap){
+    rows=[];rowIds=[];
+    snap.forEach(function(doc){rows.push(doc.data());rowIds.push(doc.id);});
+    setSyncStatus('ok','Synchronisé · '+rows.length+' lignes');
+    updateStats();
+    render();
+  },function(err){setSyncStatus('error','Erreur — '+err.message);});
+}
+
+function setSyncStatus(s,m){
+  document.getElementById('sync-dot').className='sync-dot '+s;
+  document.getElementById('sync-label').innerText=m;
+}
+
+function updateStats(){
+  var total=rows.length;
+  var aRelancer=rows.filter(function(r){return r.statut==='À relancer';}).length;
+  var litigieux=rows.filter(function(r){return r.statut==='Litigieux';}).length;
+  var payes=rows.filter(function(r){return r.statut==='Payé';}).length;
+  var totalMontant=rows.reduce(function(s,r){return s+(parseFloat(r.montant)||0);},0);
+  var enRetard=rows.filter(function(r){
+    return r.statut!=='Payé'&&r.echeance&&daysRetard(r.echeance)>0;
+  }).length;
+  document.getElementById('stats-bar').innerHTML=
+    '<div class="stat-card"><div class="s-label">Total lignes</div><div class="s-val">'+total+'</div></div>'+
+    '<div class="stat-card s-red"><div class="s-label">En retard</div><div class="s-val">'+enRetard+'</div></div>'+
+    '<div class="stat-card s-orange"><div class="s-label">À relancer</div><div class="s-val">'+aRelancer+'</div></div>'+
+    '<div class="stat-card s-red"><div class="s-label">Litigieux</div><div class="s-val">'+litigieux+'</div></div>'+
+    '<div class="stat-card s-green"><div class="s-label">Payés</div><div class="s-val">'+payes+'</div></div>'+
+    '<div class="stat-card"><div class="s-label">Montant total</div><div class="s-val" style="font-size:16px">'+fmtMoney(totalMontant)+'</div></div>';
+}
+
+function daysRetard(date){
+  if(!date)return 0;
+  var today=new Date();today.setHours(0,0,0,0);
+  return Math.ceil((today-new Date(date))/86400000);
+}
+function fmtMoney(n){return Number(n||0).toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';}
+
+// ── Sort ──────────────────────────────────────────────────────
+function sortBy(field){
+  if(sortField===field) sortDir*=-1; else{sortField=field;sortDir=1;}
+  document.querySelectorAll('.sort-icon').forEach(function(el){el.textContent='↕';});
+  var icon=document.getElementById('sort-'+field);
+  if(icon) icon.textContent=sortDir===1?'↑':'↓';
+  document.querySelectorAll('th.sorted').forEach(function(el){el.classList.remove('sorted');});
+  var th=document.querySelector('th[onclick="sortBy(\''+field+'\')"]');
+  if(th) th.classList.add('sorted');
+  render();
+}
+
+// ── Render ────────────────────────────────────────────────────
+function render(){
+  var search=document.getElementById('search').value.toLowerCase();
+  var fStat=document.getElementById('filterStatut').value;
+  var fNiv=document.getElementById('filterNiveau').value;
+  var fRet=document.getElementById('filterRetard').value;
+  var archived=trackerData.statut==='archivé';
+  var canEdit=['super_admin','president','tresorerie'].includes(currentRole)&&!archived;
+
+  var filtered=rows.map(function(r,i){return{r:r,i:i};}).filter(function(item){
+    var r=item.r;
+    var ret=daysRetard(r.echeance);
+    var retOk=true;
+    if(fRet!==''){var n=parseInt(fRet);retOk=r.statut!=='Payé'&&ret>=n;}
+    return(!search||(r.client||'').toLowerCase().indexOf(search)>=0||(r.facture||'').toLowerCase().indexOf(search)>=0)&&
+      (!fStat||r.statut===fStat)&&(!fNiv||r.niveau===fNiv)&&retOk;
+  });
+
+  // Sort
+  if(sortField){
+    filtered.sort(function(a,b){
+      var va=a.r[sortField]||'',vb=b.r[sortField]||'';
+      if(sortField==='montant'){va=parseFloat(va)||0;vb=parseFloat(vb)||0;}
+      else if(sortField==='retard'){va=daysRetard(a.r.echeance);vb=daysRetard(b.r.echeance);}
+      if(va<vb)return-1*sortDir;if(va>vb)return 1*sortDir;return 0;
+    });
+  }
+
+  document.getElementById('filter-note').innerText=filtered.length<rows.length?'Affichage de '+filtered.length+' ligne(s) sur '+rows.length+' au total':'';
+
+  var html='';
+  if(filtered.length===0){
+    html='<tr><td colspan="11" style="text-align:center;padding:2rem;color:var(--text-tertiary)">Aucune ligne pour ces filtres.</td></tr>';
+  } else {
+    filtered.forEach(function(item){
+      var r=item.r,ri=item.i;
+      var ret=daysRetard(r.echeance);
+      var retLabel=r.statut==='Payé'?'':(ret>0?ret+'j retard':ret===0?'Auj.':'');
+      var retCls=r.statut==='Payé'?'':(ret>0?'days-red':ret===0?'days-orange':'days-green');
+      var statCls={' À relancer':'st-arelancer','Relancé':'st-relance','Payé':'st-paye','Litigieux':'st-litigieux'}[r.statut]||'';
+      var nivCls={'1ère relance':'niv-1','2ème relance':'niv-2','3ème relance':'niv-3','Contentieux':'niv-c'}[r.niveau]||'';
+      var nivOpts=['1ère relance','2ème relance','3ème relance','Contentieux'].map(function(v){return'<option'+(r.niveau===v?' selected':'')+'>'+v+'</option>';}).join('');
+      var statOpts=['À relancer','Relancé','Payé','Litigieux'].map(function(v){return'<option'+(r.statut===v?' selected':'')+'>'+v+'</option>';}).join('');
+
+      html+='<tr>'+
+        (canEdit
+          ?'<td><input class="cell-input" value="'+(r.client||'')+'" onchange="save('+ri+',\'client\',this.value)"/></td>'
+          :'<td style="font-weight:500">'+(r.client||'')+'</td>')+
+        (canEdit
+          ?'<td><input class="cell-input" value="'+(r.facture||'')+'" onchange="save('+ri+',\'facture\',this.value)"/></td>'
+          :'<td>'+(r.facture||'')+'</td>')+
+        (canEdit
+          ?'<td><input class="cell-input" type="number" value="'+(r.montant||'')+'" onchange="save('+ri+',\'montant\',this.value)" style="max-width:100px"/></td>'
+          :'<td>'+fmtMoney(r.montant)+'</td>')+
+        (canEdit
+          ?'<td><input class="date-input" type="date" value="'+(r.echeance||'')+'" onchange="save('+ri+',\'echeance\',this.value)"/></td>'
+          :'<td>'+(r.echeance||'—')+'</td>')+
+        '<td class="'+retCls+'" style="white-space:nowrap">'+retLabel+'</td>'+
+        (canEdit
+          ?'<td><select class="cell-sel" onchange="save('+ri+',\'niveau\',this.value)">'+nivOpts+'</select></td>'
+          :'<td><span class="'+nivCls+'">'+(r.niveau||'')+'</span></td>')+
+        (canEdit
+          ?'<td><select class="cell-sel" onchange="save('+ri+',\'statut\',this.value)">'+statOpts+'</select></td>'
+          :'<td><span class="'+statCls+'">'+(r.statut||'')+'</span></td>')+
+        (canEdit
+          ?'<td><input class="cell-input" value="'+(r.contact||'')+'" onchange="save('+ri+',\'contact\',this.value)"/></td>'
+          :'<td>'+(r.contact||'')+'</td>')+
+        (canEdit
+          ?'<td style="max-width:150px;min-width:80px" contenteditable="true" onblur="save('+ri+',\'notes\',this.innerText.trim())">'+(r.notes||'')+'</td>'
+          :'<td style="font-size:12px;color:var(--text-secondary)">'+(r.notes||'')+'</td>')+
+        '<td style="text-align:center"><button class="hist-btn" onclick="openHist(\''+rowIds[ri]+'\',\''+encodeURIComponent(r.client||'Client')+'\',\''+encodeURIComponent(r.facture||'')+'\')">📋 Voir</button></td>'+
+        '<td style="text-align:center;width:40px">'+(canEdit?'<button class="del-btn" onclick="deleteRow('+ri+')">✕</button>':'')+'</td>'+
+      '</tr>';
+    });
+  }
+  document.getElementById('tbody').innerHTML=html;
+}
+
+function save(ri,field,val){
+  rows[ri][field]=val;
+  var id=rowIds[ri];
+  if(id) rowsCol.doc(id).update({[field]:val}).catch(function(e){console.error(e);});
+}
+function deleteRow(ri){
+  if(!confirm('Supprimer cette ligne ?'))return;
+  var id=rowIds[ri];
+  if(id) rowsCol.doc(id).delete();
+}
+
+// ── Ajout ligne ───────────────────────────────────────────────
+function openAddModal(){
+  ['add-client','add-facture','add-montant','add-echeance','add-contact','add-notes'].forEach(function(id){
+    document.getElementById(id).value='';
+    document.getElementById(id).classList&&document.getElementById(id).classList.remove('input-error');
+  });
+  document.getElementById('add-niveau').value='';
+  document.getElementById('add-statut').value='';
+  ['err-client','err-facture','err-montant','err-echeance','err-niveau','err-statut'].forEach(function(id){
+    document.getElementById(id).style.display='none';
+  });
+  document.getElementById('modal-add').classList.add('open');
+}
+function closeAddModal(){document.getElementById('modal-add').classList.remove('open');}
+
+function confirmAdd(){
+  var required=[
+    {id:'add-client',err:'err-client'},
+    {id:'add-facture',err:'err-facture'},
+    {id:'add-montant',err:'err-montant'},
+    {id:'add-echeance',err:'err-echeance'},
+    {id:'add-niveau',err:'err-niveau'},
+    {id:'add-statut',err:'err-statut'},
+  ];
+  var valid=true;
+  required.forEach(function(f){
+    var el=document.getElementById(f.id);
+    if(!el.value.trim()){
+      el.classList.add('input-error');
+      document.getElementById(f.err).style.display='block';
+      valid=false;
+    } else {
+      el.classList.remove('input-error');
+      document.getElementById(f.err).style.display='none';
+    }
+  });
+  if(!valid)return;
+  rowsCol.add({
+    client:document.getElementById('add-client').value.trim(),
+    facture:document.getElementById('add-facture').value.trim(),
+    montant:parseFloat(document.getElementById('add-montant').value)||0,
+    echeance:document.getElementById('add-echeance').value,
+    niveau:document.getElementById('add-niveau').value,
+    statut:document.getElementById('add-statut').value,
+    contact:document.getElementById('add-contact').value.trim(),
+    notes:document.getElementById('add-notes').value.trim(),
+    order:Date.now()
+  }).then(function(){closeAddModal();});
+}
+
+// ── Historique ────────────────────────────────────────────────
+var currentHistRowId=null;
+
+function openHist(rowId,clientEnc,factureEnc){
+  currentHistRowId=rowId;
+  var client=decodeURIComponent(clientEnc);
+  var facture=decodeURIComponent(factureEnc);
+  document.getElementById('hist-client-name').innerText=client;
+  document.getElementById('hist-client-sub').innerText=facture?'Facture : '+facture:'';
+  document.getElementById('hist-date').value=new Date().toISOString().split('T')[0];
+  document.getElementById('hist-note').value='';
+  // Masquer form si archivé ou pas droits
+  var canEdit=['super_admin','president','tresorerie'].includes(currentRole)&&trackerData.statut!=='archivé';
+  document.getElementById('hist-add-form').style.display=canEdit?'block':'none';
+  loadHistEntries(rowId);
+  document.getElementById('hist-panel').classList.add('open');
+  document.getElementById('overlay-bg').classList.add('open');
+}
+
+function closeHist(){
+  document.getElementById('hist-panel').classList.remove('open');
+  document.getElementById('overlay-bg').classList.remove('open');
+  currentHistRowId=null;
+}
+
+function loadHistEntries(rowId){
+  var histCol=db.collection('tracker_tasks').doc(trackerId).collection('tasks').doc(rowId).collection('historique');
+  histCol.orderBy('date','desc').get().then(function(snap){
+    if(snap.empty){
+      document.getElementById('hist-body').innerHTML='<div class="hist-empty">Aucune relance enregistrée pour ce client.</div>';
+      return;
+    }
+    var html='';
+    snap.forEach(function(doc){
+      var h=doc.data();
+      var dateLabel=h.date?formatDate(h.date):'Date inconnue';
+      var canalIcons={'Mail':'📧','Téléphone':'📞','Courrier':'📬','En personne':'🤝'};
+      var icon=canalIcons[h.canal]||'📌';
+      html+='<div class="hist-entry">'+
+        '<div class="hist-entry-date">'+dateLabel+'</div>'+
+        '<span class="hist-entry-canal">'+icon+' '+h.canal+'</span>'+
+        (h.note?'<div class="hist-entry-note">'+h.note+'</div>':'')+'</div>';
+    });
+    document.getElementById('hist-body').innerHTML=html;
+  });
+}
+
+function addRelance(){
+  if(!currentHistRowId)return;
+  var canal=document.getElementById('hist-canal').value;
+  var date=document.getElementById('hist-date').value;
+  var note=document.getElementById('hist-note').value.trim();
+  if(!date){alert('Merci de renseigner une date.');return;}
+  var histCol=db.collection('tracker_tasks').doc(trackerId).collection('tasks').doc(currentHistRowId).collection('historique');
+  histCol.add({canal:canal,date:date,note:note,createdAt:firebase.firestore.FieldValue.serverTimestamp()}).then(function(){
+    document.getElementById('hist-note').value='';
+    loadHistEntries(currentHistRowId);
+    // Mettre à jour le niveau sur la ligne
+    var rowIdx=rowIds.indexOf(currentHistRowId);
+    if(rowIdx>=0){
+      var niveauxMap={1:'2ème relance',2:'3ème relance',3:'Contentieux'};
+      // Compter les relances
+      histCol.get().then(function(snap){
+        var count=snap.size;
+        var newNiveau=count===1?'1ère relance':count===2?'2ème relance':count===3?'3ème relance':'Contentieux';
+        save(rowIdx,'niveau',newNiveau);
+        save(rowIdx,'statut','Relancé');
+        render();
+      });
+    }
+  });
+}
+
+function formatDate(d){
+  if(!d)return'';
+  var p=d.split('-');
+  return p.length===3?p[2]+'/'+p[1]+'/'+p[0]:d;
+}
+
+// ── Archive ───────────────────────────────────────────────────
+function archiveTracker(){
+  if(!confirm('Archiver ce tableau ?'))return;
+  db.collection('trackers').doc(trackerId).update({statut:'archivé'}).then(function(){
+    trackerData.statut='archivé';
+    document.getElementById('btn-archive').style.display='none';
+    document.getElementById('btn-add').style.display='none';
+    document.getElementById('btn-unarchive').style.display='flex';
+    document.getElementById('archived-banner').style.display='block';
+    render();
+  });
+}
+function unarchiveTracker(){
+  if(!confirm('Désarchiver ce tableau ?'))return;
+  db.collection('trackers').doc(trackerId).update({statut:'actif'}).then(function(){
+    trackerData.statut='actif';
+    document.getElementById('btn-unarchive').style.display='none';
+    document.getElementById('btn-archive').style.display='flex';
+    document.getElementById('archived-banner').style.display='none';
+    if(['super_admin','president','tresorerie'].includes(currentRole)) document.getElementById('btn-add').style.display='flex';
+    render();
+  });
+}
+
+// ── Filtres ───────────────────────────────────────────────────
+function clearFilters(){
+  ['search','filterStatut','filterNiveau','filterRetard'].forEach(function(id){document.getElementById(id).value='';});
+  render();
+}
+
+// ── Export Excel ──────────────────────────────────────────────
+function exportXLSX(){
+  var data=[['Client','N° Facture','Montant HT (€)','Échéance','Jours retard','Niveau relance','Statut','Contact','Notes']];
+  rows.forEach(function(r){
+    var ret=daysRetard(r.echeance);
+    data.push([r.client||'',r.facture||'',r.montant||0,r.echeance||'Non renseigné',r.statut==='Payé'?'—':ret,r.niveau||'',r.statut||'',r.contact||'',r.notes||'']);
+  });
+  var ws=XLSX.utils.aoa_to_sheet(data);
+  ws['!cols']=[{wch:20},{wch:14},{wch:14},{wch:14},{wch:12},{wch:16},{wch:12},{wch:20},{wch:30}];
+  var wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'Relances');
+  XLSX.writeFile(wb,(trackerData.name||'relances')+'.xlsx');
+}
+</script>
+</body>
+</html>
