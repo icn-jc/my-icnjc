@@ -643,271 +643,63 @@ var ROLE_LABELS_MAP={super_admin:'Super Admin',president:'Président',vice_presi
   tresorerie:'Trésorerie',auditeur:'Auditeur',marketing:'Marketing',commercial:'Commercial'};
 
 function statCard(label,val,cls){
-  return '<div class="stat-card '+(cls||'')+'"><div class="s-label">'+label+'</div><div class="s-val">'+val+'</div></div>';
+  return '<div class="stat-card '+(cls||'')+'">'+
+    '<div class="s-label">'+label+'</div>'+
+    '<div class="s-val">'+val+'</div>'+
+  '</div>';
 }
 
 function renderEvolutionChart(prospectors){
-  var ctx=document.getElementById('chart-evolution');
-  if(!ctx)return;
-  var weeks=[];
-  for(var w=3;w>=0;w--){
-    var ws=getWeekStart(new Date());
-    ws.setDate(ws.getDate()-w*7);
-    var we=new Date(ws); we.setDate(we.getDate()+7);
-    weeks.push({start:ws,end:we,label:'S-'+w===0?'Cette sem.':'S-'+w});
+  var ctx = document.getElementById('chart-evolution');
+  if(!ctx) return;
+
+  var weeks = [];
+  for(var w = 3; w >= 0; w--){
+    var ws = getWeekStart(new Date());
+    ws.setDate(ws.getDate() - w * 7);
+    var we = new Date(ws);
+    we.setDate(we.getDate() + 7);
+    weeks.push({
+      start: ws,
+      end: we,
+      label: (w === 0 ? 'Cette sem.' : 'S-' + w)
+    });
   }
-  weeks[weeks.length-1].label='Cette sem.';
-  var datasets=prospectors.slice(0,5).map(function(u,i){
-    var colors=['#A3215F','#1B2A4A','#3b82f6','#10b981','#f59e0b'];
+
+  var datasets = prospectors.slice(0,5).map(function(u,i){
+    var colors = ['#A3215F','#1B2A4A','#3b82f6','#10b981','#f59e0b'];
     return {
-      label:(u.prenom||u.email),
-      data:weeks.map(function(w){
+      label: (u.prenom || u.email),
+      data: weeks.map(function(wk){
         return allProspects.filter(function(p){
-          if(p.owner_email!==u.email||!p.last_action_date)return false;
-          var d=new Date(p.last_action_date);
-          return d>=w.start&&d<w.end;
+          if(p.owner_email !== u.email || !p.last_action_date) return false;
+          var d = new Date(p.last_action_date);
+          return d >= wk.start && d < wk.end;
         }).length;
       }),
-      borderColor:colors[i],backgroundColor:colors[i]+'33',tension:.4,fill:false
+      borderColor: colors[i],
+      backgroundColor: colors[i] + '33',
+      tension: 0.4,
+      fill: false
     };
   });
+
   if(evolutionChart) evolutionChart.destroy();
-  evolutionChart=new Chart(ctx,{
-    type:'line',
-    data:{labels:weeks.map(function(w){return w.label;}),datasets:datasets},
-    options:{responsive:true,plugins:{legend:{labels:{font:{family:'Sora',size:11}}}},
-      scales:{y:{beginAtZero:true,ticks:{font:{family:'Sora',size:10}},grid:{color:'rgba(0,0,0,0.05)'}},
-              x:{ticks:{font:{family:'Sora',size:10}},grid:{display:false}}}}
-  });
-}
 
-// ── Render Mine (Kanban) ──────────────────────────────────────
-function renderMine(){
-  var mine=allProspects.filter(function(p){ return p.owner_email===currentUserEmail; });
-  var weekCount=mine.filter(function(p){ return p.last_action_date&&isThisWeek(p.last_action_date); }).length;
-  var pct=Math.min(100,Math.round(weekCount/goalWeek*100));
-  var badgeCls=weekCount>=goalWeek?'ok':weekCount>=goalWeek*0.5?'warn':'late';
-  var badgeTxt=weekCount>=goalWeek?'🎯 Objectif atteint !':weekCount>=goalWeek*0.5?'⚡ Bon rythme':'🔴 Accélère !';
-
-  document.getElementById('week-goal-bar').innerHTML=
-    '<div class="week-goal">'+
-      '<div class="week-goal-text">'+
-        '<div class="week-goal-title">Objectif semaine</div>'+
-        '<div class="week-goal-count">'+weekCount+' <span style="font-size:16px;opacity:.7">/ '+goalWeek+'</span></div>'+
-        '<div class="week-goal-sub">contacts actifs cette semaine</div>'+
-      '</div>'+
-      '<div class="week-goal-bar-wrap">'+
-        '<div style="font-size:11px;opacity:.7;text-align:right">'+pct+'%</div>'+
-        '<div class="week-goal-bar-bg"><div class="week-goal-bar" style="width:'+pct+'%"></div></div>'+
-      '</div>'+
-      '<div class="week-goal-badge '+badgeCls+'">'+badgeTxt+'</div>'+
-    '</div>';
-
-  var kanban=document.getElementById('kanban-mine');
-  kanban.innerHTML=STATUTS.map(function(s){
-    var cards=mine.filter(function(p){return p.statut===s;});
-    var col=STATUT_COL_BG[s]||{bg:'#f4f3f1',color:'#1B2A4A'};
-    return '<div class="kanban-col">'+
-      '<div class="kanban-col-header" style="background:'+col.bg+';color:'+col.color+'">'+
-        '<span>'+s+'</span><span>'+cards.length+'</span>'+
-      '</div>'+
-      '<div class="kanban-col-body">'+
-        (cards.length===0?'<div class="kanban-empty">—</div>':
-        cards.map(function(p){
-          return '<div class="kanban-card" onclick="openHist(\''+p.id+'\',\''+encodeURIComponent(p.entreprise||'')+'\',\''+encodeURIComponent(p.contact||'')+'\')">'+
-            '<div class="kanban-card-company">'+(p.entreprise||'')+'</div>'+
-            '<div class="kanban-card-contact">'+(p.contact||'—')+' '+(p.poste?'· '+p.poste:'')+'</div>'+
-            '<div class="kanban-card-meta">'+
-              '<span class="kanban-card-amount">'+(p.montant?fmtMoney(p.montant):'')+'</span>'+
-              '<span class="kanban-card-date">'+(p.last_action_date?fmtDate(p.last_action_date):'')+'</span>'+
-            '</div>'+
-          '</div>';
-        }).join(''))+
-      '</div>'+
-    '</div>';
-  }).join('');
-}
-
-// ── Render All (table) ────────────────────────────────────────
-function renderAll(){
-  var search=(document.getElementById('search-all').value||'').toLowerCase();
-  var fMember=document.getElementById('filter-member').value;
-  var fStatut=document.getElementById('filter-statut').value;
-  var fSecteur=document.getElementById('filter-secteur').value;
-
-  var data=allProspects.filter(function(p){
-    var visible=isCA||(p.owner_email===currentUserEmail);
-    if(!visible)return false;
-    if(search&&!(p.entreprise||'').toLowerCase().includes(search)&&!(p.contact||'').toLowerCase().includes(search))return false;
-    if(fMember&&p.owner_email!==fMember)return false;
-    if(fStatut&&p.statut!==fStatut)return false;
-    if(fSecteur&&p.secteur!==fSecteur)return false;
-    return true;
-  });
-
-  document.getElementById('filter-note-all').innerText=
-    data.length<allProspects.length?'Affichage de '+data.length+' / '+allProspects.length:'';
-
-  var isOwner=function(p){return p.owner_email===currentUserEmail;};
-  var html=data.length===0
-    ?'<tr><td colspan="12" style="text-align:center;padding:2rem;color:var(--text-tertiary)">Aucun prospect.</td></tr>'
-    :data.map(function(p){
-      var own=isOwner(p)||isCA;
-      var statCls=STATUT_COLORS[p.statut]||'';
-      var statOpts=STATUTS.map(function(s){return'<option'+(p.statut===s?' selected':'')+'>'+s+'</option>';}).join('');
-      return '<tr class="'+(isOwner(p)?'':'readonly-row')+'">'+
-        (own?'<td contenteditable="true" onblur="saveField(\''+p.id+'\',\'entreprise\',this.innerText.trim())">'+(p.entreprise||'')+'</td>':'<td>'+(p.entreprise||'')+'</td>')+
-        (own?'<td contenteditable="true" onblur="saveField(\''+p.id+'\',\'contact\',this.innerText.trim())">'+(p.contact||'')+'</td>':'<td>'+(p.contact||'')+'</td>')+
-        '<td style="font-size:11px;color:var(--text-tertiary)">'+(p.poste||'')+'</td>'+
-        '<td style="font-size:11px">'+(p.tel||'')+'</td>'+
-        '<td style="font-size:11px">'+(p.secteur||'')+'</td>'+
-        '<td style="font-size:11px">'+(p.source||'')+'</td>'+
-        '<td style="font-size:12px;font-weight:500;color:var(--bordeaux)">'+(p.montant?fmtMoney(p.montant):'—')+'</td>'+
-        (own?'<td><select class="cell-sel '+statCls+'" onchange="saveField(\''+p.id+'\',\'statut\',this.value)">'+statOpts+'</select></td>'
-            :'<td><span class="badge '+statCls+'">'+(p.statut||'')+'</span></td>')+
-        '<td><span class="'+(isOwner(p)?'owner-me':'owner-other')+'">'+(p.owner_name||p.owner_email||'')+'</span></td>'+
-        '<td style="font-size:11px;color:var(--text-tertiary)">'+(p.last_action_date?fmtDate(p.last_action_date):'—')+'</td>'+
-        '<td style="text-align:center"><button class="hist-btn" onclick="openHist(\''+p.id+'\',\''+encodeURIComponent(p.entreprise||'')+'\',\''+encodeURIComponent(p.contact||'')+'\')">📋</button></td>'+
-        '<td style="text-align:center">'+(isOwner(p)?'<button class="del-btn" onclick="deleteProspect(\''+p.id+'\')">✕</button>':'')+'</td>'+
-      '</tr>';
-    }).join('');
-  document.getElementById('tbody-all').innerHTML=html;
-}
-
-// ── Render RDV ────────────────────────────────────────────────
-function renderRdv(){
-  var data=isCA?allRdvs:allRdvs.filter(function(r){return r.owner_email===currentUserEmail;});
-  var html=data.length===0
-    ?'<div style="color:var(--text-tertiary);font-size:13px">Aucun compte-rendu RDV.</div>'
-    :data.map(function(r){
-      var signeCls=r.signe==='Signé'?'rdv-signed':r.signe==='Non signé'?'rdv-notsigned':'';
-      return '<div class="rdv-card">'+
-        '<div class="rdv-card-company">'+(r.entreprise||'Entreprise')+'</div>'+
-        '<div class="rdv-card-date">RDV du '+(r.date?fmtDate(r.date):'—')+'</div>'+
-        '<div class="rdv-field"><div class="rdv-field-label">État signature</div>'+
-          '<div class="rdv-field-val '+signeCls+'">'+(r.signe||'—')+'</div></div>'+
-        (r.raison?'<div class="rdv-field"><div class="rdv-field-label">Pourquoi pas signé ?</div><div class="rdv-field-val">'+(r.raison||'')+'</div></div>':'')+
-        (r.demande?'<div class="rdv-field"><div class="rdv-field-label">Demande client</div><div class="rdv-field-val">'+(r.demande||'')+'</div></div>':'')+
-        (r.suite?'<div class="rdv-field"><div class="rdv-field-label">Suite donnée</div><div class="rdv-field-val">'+(r.suite||'')+'</div></div>':'')+
-        '<div class="rdv-owner">👤 '+(r.owner_name||r.owner_email||'')+'</div>'+
-      '</div>';
-    }).join('');
-  document.getElementById('rdv-grid').innerHTML=html;
-}
-
-// ── Prospect CRUD ─────────────────────────────────────────────
-function saveField(id, field, val){
-  var update={}; update[field]=val;
-  db.collection('prospects').doc(id).update(update);
-}
-function deleteProspect(id){
-  if(!confirm('Supprimer ce prospect ?'))return;
-  db.collection('prospects').doc(id).delete();
-}
-
-function openAddProspect(){ document.getElementById('modal-add-prospect').classList.add('open'); }
-function closeAddProspect(){ document.getElementById('modal-add-prospect').classList.remove('open'); }
-
-function confirmAddProspect(){
-  var company=document.getElementById('ap-company').value.trim();
-  var statut=document.getElementById('ap-statut').value;
-  if(!company){alert('Merci de renseigner l\'entreprise.');return;}
-  if(!statut){alert('Merci de choisir un statut.');return;}
-  db.collection('prospects').add({
-    entreprise:company,
-    contact:document.getElementById('ap-contact').value.trim(),
-    poste:document.getElementById('ap-poste').value.trim(),
-    email:document.getElementById('ap-email').value.trim(),
-    tel:document.getElementById('ap-tel').value.trim(),
-    secteur:document.getElementById('ap-secteur').value,
-    source:document.getElementById('ap-source').value,
-    montant:parseFloat(document.getElementById('ap-montant').value)||0,
-    statut:statut,
-    notes:document.getElementById('ap-notes').value.trim(),
-    owner_email:currentUserEmail,
-    owner_name:currentUserName.trim(),
-    last_action_date:new Date().toISOString().split('T')[0],
-    createdAt:firebase.firestore.FieldValue.serverTimestamp()
-  }).then(function(){ closeAddProspect(); });
-}
-
-// ── RDV CRUD ──────────────────────────────────────────────────
-function openAddRdv(){ document.getElementById('rdv-date').value=new Date().toISOString().split('T')[0]; document.getElementById('modal-add-rdv').classList.add('open'); }
-function closeAddRdv(){ document.getElementById('modal-add-rdv').classList.remove('open'); }
-
-function confirmAddRdv(){
-  var company=document.getElementById('rdv-company').value.trim();
-  if(!company){alert('Merci de renseigner l\'entreprise.');return;}
-  db.collection('prospects_rdv').add({
-    entreprise:company,
-    date:document.getElementById('rdv-date').value,
-    signe:document.getElementById('rdv-signe').value,
-    raison:document.getElementById('rdv-raison').value.trim(),
-    demande:document.getElementById('rdv-demande').value.trim(),
-    suite:document.getElementById('rdv-suite').value.trim(),
-    owner_email:currentUserEmail,
-    owner_name:currentUserName.trim(),
-    createdAt:firebase.firestore.FieldValue.serverTimestamp()
-  }).then(function(){ closeAddRdv(); });
-}
-
-// ── Historique ────────────────────────────────────────────────
-function openHist(id, companyEnc, contactEnc){
-  currentHistId=id;
-  document.getElementById('hist-company').innerText=decodeURIComponent(companyEnc);
-  document.getElementById('hist-contact').innerText=decodeURIComponent(contactEnc);
-  document.getElementById('hist-date').value=new Date().toISOString().split('T')[0];
-  var p=allProspects.find(function(p){return p.id===id;});
-  var canEdit=p&&(p.owner_email===currentUserEmail||isCA);
-  document.getElementById('hist-add-form').style.display=canEdit?'block':'none';
-  loadHistEntries(id);
-  document.getElementById('hist-panel').classList.add('open');
-  document.getElementById('overlay-bg').classList.add('open');
-}
-function closeHist(){
-  document.getElementById('hist-panel').classList.remove('open');
-  document.getElementById('overlay-bg').classList.remove('open');
-  currentHistId=null;
-}
-
-function loadHistEntries(id){
-  db.collection('prospects').doc(id).collection('historique')
-    .orderBy('createdAt','desc').get().then(function(snap){
-      if(snap.empty){ document.getElementById('hist-body').innerHTML='<div class="hist-empty">Aucune action enregistrée.</div>'; return; }
-      var canalIcons={Appel:'📞',Mail:'📧',RDV:'🤝',LinkedIn:'💼',Autre:'💬'};
-      document.getElementById('hist-body').innerHTML=snap.docs.map(function(doc){
-        var h=doc.data();
-        return '<div class="hist-entry">'+
-          '<div class="hist-entry-top">'+
-            '<span class="hist-entry-date">'+(h.date?fmtDate(h.date):'')+'</span>'+
-            '<span class="hist-entry-canal">'+(canalIcons[h.canal]||'💬')+' '+h.canal+'</span>'+
-          '</div>'+
-          (h.resultat?'<div class="hist-entry-result" style="color:var(--bordeaux)">→ '+h.resultat+'</div>':'')+
-          (h.note?'<div class="hist-entry-note">'+h.note+'</div>':'')+
-        '</div>';
-      }).join('');
-    });
-}
-
-function saveHist(){
-  if(!currentHistId)return;
-  var canal=document.getElementById('hist-canal').value;
-  var date=document.getElementById('hist-date').value;
-  var result=document.getElementById('hist-result').value;
-  var note=document.getElementById('hist-note').value.trim();
-  if(!date){alert('Merci de renseigner une date.');return;}
-  db.collection('prospects').doc(currentHistId).collection('historique').add({
-    canal:canal, date:date, resultat:result, note:note,
-    createdAt:firebase.firestore.FieldValue.serverTimestamp()
-  }).then(function(){
-    // Update last_action_date + statut si pertinent
-    var update={last_action_date:date};
-    var statutMap={'RDV fixé':'RDV planifié','Proposition envoyée':'Proposition envoyée','Signé':'Signé'};
-    if(statutMap[result]) update.statut=statutMap[result];
-    db.collection('prospects').doc(currentHistId).update(update);
-    document.getElementById('hist-note').value='';
-    document.getElementById('hist-result').value='';
-    loadHistEntries(currentHistId);
+  evolutionChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: weeks.map(function(wk){ return wk.label; }),
+      datasets: datasets
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { labels: { font: { family:'Sora', size:11 } } } },
+      scales: {
+        y: { beginAtZero:true, ticks:{ font:{family:'Sora',size:10} }, grid:{color:'rgba(0,0,0,0.05)'} },
+        x: { ticks:{ font:{family:'Sora',size:10} }, grid:{display:false} }
+      }
+    }
   });
 }
 
