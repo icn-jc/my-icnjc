@@ -55,6 +55,19 @@ const PAGE_ACCESS = {
   'admin':               ['super_admin','president'],
 };
 
+
+// ── Hiérarchie des rôles ──────────────────────────────────────
+var ROLE_HIERARCHY_AUTH = [
+  'super_admin','president','secretaire','responsable_commercial',
+  'responsable_qualite','tresorerie','marketing','auditeur','membre'
+];
+function getHighestRoleAuth(roles) {
+  for (var i = 0; i < ROLE_HIERARCHY_AUTH.length; i++) {
+    if (roles.indexOf(ROLE_HIERARCHY_AUTH[i]) !== -1) return ROLE_HIERARCHY_AUTH[i];
+  }
+  return 'membre';
+}
+
 // ── Initialisation Auth ───────────────────────────────────────
 function initAuth(pageKey, onReady) {
   auth.onAuthStateChanged(async function(user) {
@@ -86,7 +99,11 @@ function initAuth(pageKey, onReady) {
 
       CURRENT_USER    = user;
       CURRENT_PROFILE = doc.data();
-      CURRENT_ROLE    = CURRENT_PROFILE.role;
+      // Support multi-rôles : prendre le plus élevé
+      var profileRoles = Array.isArray(CURRENT_PROFILE.roles)
+        ? CURRENT_PROFILE.roles
+        : (CURRENT_PROFILE.role ? [CURRENT_PROFILE.role] : ['membre']);
+      CURRENT_ROLE = getHighestRoleAuth(profileRoles);
 
       // Vérifier l'accès à cette page
       const allowed = PAGE_ACCESS[pageKey] || [];
