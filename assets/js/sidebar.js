@@ -1,60 +1,89 @@
 // ── My-ICN-JC — Sidebar ───────────────────────────────────────
 
 const SIDEBAR_CSS = `
-  .sidebar{position:fixed;left:0;top:0;bottom:0;width:220px;background:#0f1923;display:flex;flex-direction:column;z-index:100;border-right:1px solid rgba(255,255,255,0.06);}
-  .sidebar-logo{padding:20px 20px 16px;border-bottom:1px solid rgba(255,255,255,0.06);display:flex;align-items:center;gap:10px;text-decoration:none;}
+  /* ── Sidebar base ── */
+  .sidebar{position:fixed;left:0;top:0;bottom:0;width:220px;background:#0f1923;display:flex;flex-direction:column;z-index:100;border-right:1px solid rgba(255,255,255,0.06);transition:width .25s cubic-bezier(.4,0,.2,1),transform .25s;}
+  .sidebar.collapsed{width:52px;}
+  .sidebar-logo{padding:14px 14px 12px;border-bottom:1px solid rgba(255,255,255,0.06);display:flex;align-items:center;gap:10px;text-decoration:none;overflow:hidden;min-height:56px;}
   .sidebar-logo svg{width:28px;height:28px;flex-shrink:0;}
-  .sidebar-logo-text{font-family:'Playfair Display',serif;font-size:14px;font-weight:700;color:#fff;line-height:1.2;}
-  .sidebar-logo-sub{font-size:9px;color:rgba(255,255,255,0.35);text-transform:uppercase;letter-spacing:.12em;}
-  .sidebar-nav{flex:1;overflow-y:auto;padding:12px 0;}
-  .sidebar-section{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.14em;color:rgba(255,255,255,0.25);padding:14px 20px 6px;}
-  .sidebar-item{display:flex;align-items:center;gap:10px;padding:8px 20px;font-size:13px;color:rgba(255,255,255,0.55);text-decoration:none;transition:all .15s;cursor:pointer;border-left:2px solid transparent;}
+  .sidebar-logo-text{font-family:'Playfair Display',serif;font-size:14px;font-weight:700;color:#fff;line-height:1.2;white-space:nowrap;transition:opacity .2s;}
+  .sidebar-logo-sub{font-size:9px;color:rgba(255,255,255,0.35);text-transform:uppercase;letter-spacing:.12em;white-space:nowrap;transition:opacity .2s;}
+  .sidebar.collapsed .sidebar-logo-text,.sidebar.collapsed .sidebar-logo-sub{opacity:0;pointer-events:none;}
+  /* ── Toggle button ── */
+  .sidebar-toggle{position:absolute;top:14px;right:-12px;width:24px;height:24px;background:#0f1923;border:1px solid rgba(255,255,255,0.15);border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:101;transition:all .2s;color:rgba(255,255,255,0.5);font-size:11px;}
+  .sidebar-toggle:hover{background:#A3215F;border-color:#A3215F;color:#fff;}
+  /* ── Nav ── */
+  .sidebar-nav{flex:1;overflow-y:auto;overflow-x:hidden;padding:12px 0;}
+  .sidebar-section{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.14em;color:rgba(255,255,255,0.25);padding:14px 16px 6px;white-space:nowrap;overflow:hidden;transition:opacity .2s;}
+  .sidebar.collapsed .sidebar-section{opacity:0;}
+  .sidebar-item{display:flex;align-items:center;gap:10px;padding:8px 16px;font-size:13px;color:rgba(255,255,255,0.55);text-decoration:none;transition:all .15s;cursor:pointer;border-left:2px solid transparent;white-space:nowrap;overflow:hidden;}
   .sidebar-item:hover{color:#fff;background:rgba(255,255,255,0.05);}
   .sidebar-item.active{color:#fff;background:rgba(163,33,95,0.15);border-left-color:#A3215F;}
-  .sidebar-item .icon{width:16px;height:16px;flex-shrink:0;opacity:.7;}
+  .sidebar-item .icon{width:16px;height:16px;flex-shrink:0;opacity:.7;min-width:16px;}
   .sidebar-item.active .icon{opacity:1;}
-  .sidebar-footer{padding:14px 20px;border-top:1px solid rgba(255,255,255,0.06);}
-  .sidebar-health{display:flex;align-items:center;gap:8px;margin-bottom:12px;font-size:11px;color:rgba(255,255,255,0.4);}
+  .sidebar-item span{transition:opacity .2s;white-space:nowrap;}
+  .sidebar.collapsed .sidebar-item span{opacity:0;pointer-events:none;}
+  .sidebar.collapsed .sidebar-item{justify-content:center;padding:8px 0;}
+  /* ── Tooltip sur icône quand collapsed ── */
+  .sidebar.collapsed .sidebar-item{position:relative;}
+  .sidebar.collapsed .sidebar-item:hover::after{content:attr(data-label);position:absolute;left:54px;background:#1B2A4A;color:#fff;font-size:12px;padding:4px 10px;border-radius:6px;white-space:nowrap;pointer-events:none;z-index:200;border:1px solid rgba(255,255,255,0.1);}
+  /* ── Footer ── */
+  .sidebar-footer{padding:12px 14px;border-top:1px solid rgba(255,255,255,0.06);overflow:hidden;}
+  .sidebar-health{display:flex;align-items:center;gap:8px;margin-bottom:10px;font-size:11px;color:rgba(255,255,255,0.4);white-space:nowrap;}
+  .sidebar-health span{transition:opacity .2s;}
+  .sidebar.collapsed .sidebar-health span{opacity:0;}
   .health-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
   .health-dot.green{background:#22c55e;box-shadow:0 0 6px #22c55e;}
   .health-dot.orange{background:#f59e0b;box-shadow:0 0 6px #f59e0b;}
   .health-dot.red{background:#ef4444;box-shadow:0 0 6px #ef4444;}
-  .sidebar-user{display:flex;align-items:center;gap:8px;margin-bottom:10px;}
-  .sidebar-avatar{width:28px;height:28px;border-radius:50%;object-fit:cover;display:none;flex-shrink:0;}
-  .sidebar-avatar-placeholder{width:28px;height:28px;border-radius:50%;background:rgba(163,33,95,0.4);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:#fff;flex-shrink:0;}
-  .sidebar-username{font-size:12px;color:rgba(255,255,255,0.6);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-  .sidebar-logout{width:100%;padding:7px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);border-radius:7px;color:rgba(255,255,255,0.45);font-size:11px;cursor:pointer;font-family:inherit;transition:all .15s;}
+  .sidebar-user{display:flex;align-items:center;gap:8px;margin-bottom:8px;overflow:hidden;}
+  .sidebar-avatar{width:26px;height:26px;border-radius:50%;object-fit:cover;display:none;flex-shrink:0;}
+  .sidebar-avatar-placeholder{width:26px;height:26px;border-radius:50%;background:rgba(163,33,95,0.4);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:#fff;flex-shrink:0;}
+  .sidebar-username{font-size:12px;color:rgba(255,255,255,0.6);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;transition:opacity .2s;}
+  .sidebar.collapsed .sidebar-username{opacity:0;}
+  .sidebar-logout{width:100%;padding:6px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);border-radius:7px;color:rgba(255,255,255,0.45);font-size:11px;cursor:pointer;font-family:inherit;transition:all .15s;white-space:nowrap;overflow:hidden;}
+  .sidebar.collapsed .sidebar-logout{font-size:0;padding:6px 0;}
+  .sidebar.collapsed .sidebar-logout::before{content:'⏻';font-size:13px;}
   .sidebar-logout:hover{background:rgba(239,68,68,0.15);border-color:rgba(239,68,68,0.3);color:#ef4444;}
-  .app-content{margin-left:220px;min-height:100vh;}
-  @media(max-width:768px){.sidebar{transform:translateX(-100%);transition:transform .25s;}.sidebar.open{transform:none;}.app-content{margin-left:0;}.mobile-menu-btn{display:flex;}}
-  .mobile-menu-btn{display:none;position:fixed;top:12px;left:12px;z-index:200;width:38px;height:38px;background:#0f1923;border:1px solid rgba(255,255,255,0.1);border-radius:8px;align-items:center;justify-content:center;cursor:pointer;}
+  /* ── Content margin ── */
+  .app-content{margin-left:220px;min-height:100vh;transition:margin-left .25s cubic-bezier(.4,0,.2,1);}
+  .app-content.sidebar-collapsed{margin-left:52px;}
+  /* ── Mobile ── */
+  @media(max-width:768px){
+    .sidebar{transform:translateX(-100%);width:220px !important;}
+    .sidebar.mobile-open{transform:none;}
+    .app-content{margin-left:0 !important;}
+    .mobile-menu-btn{display:flex;}
+    .sidebar-toggle{display:none;}
+  }
+  .mobile-menu-btn{display:none;position:fixed;top:12px;left:12px;z-index:200;width:38px;height:38px;background:#0f1923;border:1px solid rgba(255,255,255,0.1);border-radius:8px;align-items:center;justify-content:center;cursor:pointer;color:white;font-size:18px;}
 `;
 
 // Structure de navigation par rôle
 function buildNavItems(role, basePath) {
-  const ALL = ['super_admin','president','vice_president','tresorerie','secretaire',
+  const ALL = ['super_admin','president','vice_president','tresorier','secretaire',
                'responsable_commercial','responsable_qualite','responsable_marketing',
-               'marketing','auditeur','commercial'];
+               'tresorerie','auditeur','marketing','commercial'];
   const all = [
     { section: null, key:'home', label:'Accueil', icon:'home',
       href: basePath + 'index.html', roles: ALL },
 
     { section:'AUDIT', key:'tracker_treso', label:'Tracker Tréso', icon:'clipboard',
       href: basePath + 'audit/tracker_treso.html',
-      roles:['super_admin','vice_president','tresorerie','responsable_qualite'] },
+      roles:['super_admin','vice_president','tresorier','tresorerie','responsable_qualite'] },
 
     { section:null, key:'tracker_orga', label:'Tracker Orga', icon:'check-square',
       href: basePath + 'audit/tracker_orga.html',
-      roles:['super_admin','president','vice_president','responsable_qualite','auditeur'] },
+      roles:['super_admin','president','vice_president','tresorier','responsable_qualite','auditeur'] },
 
     { section:'DASHBOARD', key:'kpi_treso', label:'KPI Trésorerie', icon:'trending-up',
       href: basePath + 'dashboard/kpi_treso.html',
-      roles:['super_admin','president','vice_president','tresorerie','secretaire',
-             'responsable_marketing','responsable_commercial','responsable_qualite'] },
+      roles:['super_admin','president','vice_president','tresorier','tresorerie',
+             'secretaire','responsable_marketing','responsable_commercial','responsable_qualite'] },
 
     { section:null, key:'kpi_commercial', label:'KPI Commercial', icon:'bar-chart',
       href: basePath + 'dashboard/kpi_commercial.html',
-      roles:['super_admin','president','vice_president','responsable_commercial',
+      roles:['super_admin','president','vice_president','tresorier','responsable_commercial',
              'secretaire','marketing','responsable_marketing','auditeur','commercial'] },
 
     { section:'CRM', key:'crm_prospection', label:'Prospection', icon:'target',
@@ -121,27 +150,31 @@ function renderSidebar(role, profile, user, activeKey) {
     document.head.appendChild(style);
   }
 
-  // Construire le HTML
+  // Construire le HTML nav
   let navHTML = '';
   let lastSection = null;
   items.forEach(item => {
     if (item.section && item.section !== lastSection) {
       navHTML += `<div class="sidebar-section">${item.section}</div>`;
       lastSection = item.section;
-    } else if (!item.section && lastSection !== '__none__') {
-      // Pas de séparateur pour les sous-items sans section
     }
     const isActive = item.key === activeKey ? ' active' : '';
-    navHTML += `<a class="sidebar-item${isActive}" href="${item.href}">${getIcon(item.icon)}<span>${item.label}</span></a>`;
+    navHTML += `<a class="sidebar-item${isActive}" href="${item.href}" data-label="${item.label}">${getIcon(item.icon)}<span>${item.label}</span></a>`;
   });
 
   const initials = (profile.prenom || '?')[0].toUpperCase();
   const photoURL  = user.photoURL || '';
 
+  // Lire la préférence sauvegardée
+  const isCollapsed = localStorage.getItem('sidebar-collapsed') === 'true';
+
   const sidebarHTML = `
-    <nav class="sidebar" id="sidebar">
+    <nav class="sidebar${isCollapsed ? ' collapsed' : ''}" id="sidebar">
+      <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Réduire/Agrandir">
+        <span id="sidebar-toggle-icon">${isCollapsed ? '›' : '‹'}</span>
+      </button>
       <a class="sidebar-logo" href="${basePath}index.html">
-        <img src="${basePath}assets/images/logo_sans_texte.png" style="width:32px;height:32px;object-fit:contain"/>
+        <img src="${basePath}assets/images/logo_sans_texte.png" style="width:28px;height:28px;object-fit:contain;flex-shrink:0"/>
         <div>
           <div class="sidebar-logo-text">My-ICN-JC</div>
           <div class="sidebar-logo-sub">Intranet</div>
@@ -167,6 +200,21 @@ function renderSidebar(role, profile, user, activeKey) {
   // Injecter dans le DOM
   const container = document.getElementById('sidebar-container');
   if (container) container.innerHTML = sidebarHTML;
+
+  // Appliquer l'état au contenu principal
+  const appContent = document.querySelector('.app-content');
+  if (appContent && isCollapsed) appContent.classList.add('sidebar-collapsed');
+}
+
+function toggleSidebar() {
+  const sidebar    = document.getElementById('sidebar');
+  const appContent = document.querySelector('.app-content');
+  const icon       = document.getElementById('sidebar-toggle-icon');
+  if (!sidebar) return;
+  const collapsed = sidebar.classList.toggle('collapsed');
+  if (appContent) appContent.classList.toggle('sidebar-collapsed', collapsed);
+  if (icon) icon.textContent = collapsed ? '›' : '‹';
+  localStorage.setItem('sidebar-collapsed', collapsed);
 }
 
 // ── Calcul indicateur santé JE ─────────────────────────────────
