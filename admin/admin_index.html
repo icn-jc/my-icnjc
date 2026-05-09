@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Administration — My-ICN-JC</title>
+<link rel="stylesheet" href="../assets/css/global.css"/>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script src="../assets/js/firebase.js"></script>
+<script src="../assets/js/auth.js"></script>
+<script src="../assets/js/sidebar.js"></script>
+<style>
+.role-badge { font-size:11px; font-weight:600; padding:2px 9px; border-radius:99px; }
+.role-super_admin { background:#f3e8ff; color:#6b21a8; }
+.role-president { background:#dbeafe; color:#1e40af; }
+.role-tresorerie { background:#fef9c3; color:#854d0e; }
+.role-responsable_commercial { background:#dcfce7; color:#166534; }
+.role-responsable_qualite { background:#e0f2fe; color:#0c4a6e; }
+.role-secretaire { background:#f1f5f9; color:#334155; }
+.role-marketing { background:#fce7f3; color:#831843; }
+.role-auditeur { background:#fff7ed; color:#9a3412; }
+.role-membre { background:#f8fafc; color:#64748b; }
+.user-row { display:flex; align-items:center; gap:12px; padding:14px 0; border-bottom:1px solid var(--border); }
+.user-row:last-child { border-bottom:none; }
+.user-avatar-sm { width:36px; height:36px; border-radius:50%; background:var(--bordeaux-bg); display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:600; color:var(--bordeaux); flex-shrink:0; }
+.user-info { flex:1; }
+.user-name { font-size:13px; font-weight:500; color:var(--text-primary); }
+.user-email { font-size:11px; color:var(--text-tertiary); margin-top:1px; }
+.user-actions { display:flex; align-items:center; gap:8px; }
+select.role-select { padding:5px 8px; border:1.5px solid var(--border-strong); border-radius:var(--radius-sm); font-family:'Sora',sans-serif; font-size:12px; color:var(--text-primary); background:white; cursor:pointer; }
+select.role-select:focus { outline:none; border-color:var(--bordeaux); }
+.save-btn { padding:5px 12px; background:var(--bordeaux); color:white; border:none; border-radius:var(--radius-sm); font-size:12px; font-weight:500; cursor:pointer; font-family:'Sora',sans-serif; transition:background .2s; }
+.save-btn:hover { background:var(--bordeaux-dark); }
+.del-btn { padding:5px 10px; background:var(--danger-bg); color:var(--danger); border:none; border-radius:var(--radius-sm); font-size:12px; font-weight:600; cursor:pointer; }
+.del-btn:hover { background:#fecaca; }
+.prosp-toggle { display:flex; align-items:center; gap:6px; font-size:12px; color:var(--text-secondary); }
+.prosp-toggle input { cursor:pointer; accent-color:var(--bordeaux); }
+.toast { position:fixed; bottom:24px; right:24px; background:var(--navy); color:white; padding:12px 20px; border-radius:var(--radius-md); font-size:13px; z-index:999; display:none; animation:fadeUp .3s ease; }
+.section-sep { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.1em; color:var(--bordeaux); padding:16px 0 8px; border-bottom:1px solid rgba(163,33,95,0.15); margin-bottom:4px; }
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div class="login-page" id="login-page">
+  <div class="login-box">
+    <div class="login-logo">
+      <img src="../assets/images/ICN-Junior-Conseil_logo.png" style="height:54px;object-fit:contain"/>
+    </div>
+    <div class="login-title">Accès restreint</div>
+    <div class="login-sub">Cette page est réservée à Stella et Antoine.</div>
+    <button class="google-btn" onclick="doGoogleLogin()">
+      <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google"/>
+      Se connecter avec Google
+    </button>
+    <div class="denied-box" id="denied-box">
+      <strong>Accès refusé</strong>
+      <p id="denied-msg">Tu n'as pas accès à cette page.</p>
+    </div>
+    <div class="login-error" id="login-error"></div>
+  </div>
+</div>
+
+<!-- APP -->
+<div class="app-page" id="app-page">
+  <div id="sidebar-container"></div>
+  <div class="app-content">
+    <div class="page-header flex justify-between items-center">
+      <div>
+        <div class="page-title">Administration</div>
+        <div class="page-subtitle">Gestion des membres et des rôles — accès Stella & Antoine uniquement</div>
+      </div>
+      <button class="btn btn-primary" onclick="openAddModal()">+ Ajouter un membre</button>
+    </div>
+    <div class="page-body">
+
+      <!-- Membres actifs -->
+      <div class="card">
+        <div class="section-sep">Membres enregistrés</div>
+        <div id="users-list"><div style="color:var(--text-tertiary);font-size:13px;padding:20px 0">Chargement…</div></div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- MODAL AJOUT -->
+<div class="modal-overlay" id="modal-add" onclick="if(event.target===this)closeAddModal()">
+  <div class="modal-box">
+    <div class="modal-header">
+      <div class="modal-title">Ajouter un membre</div>
+      <button class="modal-close" onclick="closeAddModal()">×</button>
+    </div>
+    <div class="form-grid">
+      <div class="form-field">
+        <label class="input-label">Prénom</label>
+        <input class="input" type="text" id="add-prenom" placeholder="Prénom"/>
+      </div>
+      <div class="form-field">
+        <label class="input-label">Nom</label>
+        <input class="input" type="text" id="add-nom" placeholder="Nom"/>
+      </div>
+      <div class="form-field full">
+        <label class="input-label">Email (@icnjuniorconseil.com)</label>
+        <input class="input" type="email" id="add-email" placeholder="prenom.nom@icnjuniorconseil.com"/>
+      </div>
+      <div class="form-field">
+        <label class="input-label">Rôle</label>
+        <select class="select-field" id="add-role">
+          <option value="super_admin">Super Admin</option>
+          <option value="president">Président</option>
+          <option value="tresorerie">Trésorerie</option>
+          <option value="responsable_commercial">Resp. Commercial</option>
+          <option value="responsable_qualite">Resp. Qualité</option>
+          <option value="secretaire">Secrétaire Général</option>
+          <option value="marketing">Marketing</option>
+          <option value="auditeur">Auditeur</option>
+          <option value="membre" selected>Membre</option>
+        </select>
+      </div>
+      <div class="form-field">
+        <label class="input-label">Prospecte ?</label>
+        <select class="select-field" id="add-prospecte">
+          <option value="true">Oui</option>
+          <option value="false">Non</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeAddModal()">Annuler</button>
+      <button class="btn btn-primary" onclick="addMember()">Ajouter</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const ROLE_LABELS = {
+  super_admin:'Super Admin', president:'Président', tresorerie:'Trésorerie',
+  responsable_commercial:'Resp. Commercial', responsable_qualite:'Resp. Qualité',
+  secretaire:'Secrétaire Gén.', marketing:'Marketing', auditeur:'Auditeur', membre:'Membre'
+};
+
+initAuth('admin', function(user, role, profile) {
+  renderSidebar(role, profile, user, 'admin');
+  showAppPage(user, role, profile);
+  loadUsers();
+  updateHealthIndicator();
+});
+
+function loadUsers() {
+  COLLECTIONS.users.orderBy('nom').onSnapshot(function(snap) {
+    if (snap.empty) {
+      document.getElementById('users-list').innerHTML = '<div style="color:var(--text-tertiary);font-size:13px;padding:20px 0">Aucun membre enregistré. Clique sur "Ajouter un membre" pour commencer.</div>';
+      return;
+    }
+    let html = '';
+    snap.forEach(function(doc) {
+      const d = doc.data();
+      const initials = ((d.prenom||'?')[0] + (d.nom||'?')[0]).toUpperCase();
+      html += `
+        <div class="user-row">
+          <div class="user-avatar-sm">${initials}</div>
+          <div class="user-info">
+            <div class="user-name">${d.prenom||''} ${d.nom||''}</div>
+            <div class="user-email">${doc.id}</div>
+          </div>
+          <div class="prosp-toggle">
+            <input type="checkbox" id="prosp-${doc.id}" ${d.prospecte?'checked':''} onchange="toggleProspecte('${doc.id}', this.checked)"/>
+            <label for="prosp-${doc.id}">Prospecte</label>
+          </div>
+          <div class="user-actions">
+            <select class="role-select" id="role-${doc.id}" onchange="updateRole('${doc.id}', this.value)">
+              ${Object.keys(ROLE_LABELS).map(r => `<option value="${r}"${d.role===r?' selected':''}>${ROLE_LABELS[r]}</option>`).join('')}
+            </select>
+            <button class="del-btn" onclick="deleteMember('${doc.id}')">✕</button>
+          </div>
+        </div>`;
+    });
+    document.getElementById('users-list').innerHTML = html;
+  });
+}
+
+function updateRole(email, role) {
+  COLLECTIONS.users.doc(email).update({ role: role })
+    .then(function() { showToast('Rôle mis à jour pour ' + email); })
+    .catch(function(e) { showToast('Erreur : ' + e.message); });
+}
+
+function toggleProspecte(email, val) {
+  COLLECTIONS.users.doc(email).update({ prospecte: val })
+    .then(function() { showToast('Mis à jour'); })
+    .catch(function(e) { showToast('Erreur : ' + e.message); });
+}
+
+function deleteMember(email) {
+  if (!confirm('Supprimer ' + email + ' ?')) return;
+  COLLECTIONS.users.doc(email).delete()
+    .then(function() { showToast('Membre supprimé'); })
+    .catch(function(e) { showToast('Erreur : ' + e.message); });
+}
+
+function openAddModal()  { document.getElementById('modal-add').classList.add('open'); }
+function closeAddModal() { document.getElementById('modal-add').classList.remove('open'); }
+
+function addMember() {
+  const prenom    = document.getElementById('add-prenom').value.trim();
+  const nom       = document.getElementById('add-nom').value.trim();
+  const email     = document.getElementById('add-email').value.trim().toLowerCase();
+  const role      = document.getElementById('add-role').value;
+  const prospecte = document.getElementById('add-prospecte').value === 'true';
+
+  if (!prenom || !nom || !email) { alert('Merci de remplir tous les champs.'); return; }
+  if (!email.endsWith('@icnjuniorconseil.com')) { alert('L\'email doit être en @icnjuniorconseil.com'); return; }
+
+  COLLECTIONS.users.doc(email).set({
+    prenom, nom, role, prospecte,
+    email,
+    etudes_assignees: [],
+    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+  }).then(function() {
+    closeAddModal();
+    showToast(prenom + ' ' + nom + ' ajouté(e) !');
+    document.getElementById('add-prenom').value = '';
+    document.getElementById('add-nom').value = '';
+    document.getElementById('add-email').value = '';
+  }).catch(function(e) { alert('Erreur : ' + e.message); });
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.innerText = msg;
+  t.style.display = 'block';
+  setTimeout(function() { t.style.display = 'none'; }, 3000);
+}
+</script>
+</body>
+</html>
