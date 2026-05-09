@@ -4,17 +4,19 @@ const ALLOWED_DOMAIN = 'icnjuniorconseil.com';
 
 // ── Définition des rôles ──────────────────────────────────────
 const ROLES = {
-  super_admin:             'super_admin',
-  president:               'president',
-  vice_president:          'vice_president',
-  tresorerie:              'tresorerie',
-  secretaire:              'secretaire',
-  responsable_commercial:  'responsable_commercial',
-  responsable_qualite:     'responsable_qualite',
-  responsable_marketing:   'responsable_marketing',
-  marketing:               'marketing',
-  auditeur:                'auditeur',
-  commercial:              'commercial',
+  super_admin:            'super_admin',
+  president:              'president',
+  vice_president:         'vice_president',
+  tresorier:              'tresorier',
+  secretaire:             'secretaire',
+  responsable_commercial: 'responsable_commercial',
+  responsable_qualite:    'responsable_qualite',
+  responsable_marketing:  'responsable_marketing',
+  tresorerie:             'tresorerie',
+  auditeur:               'auditeur',
+  marketing:              'marketing',
+  commercial:             'commercial',
+  intervenant:            'intervenant',
 };
 
 // ── Hiérarchie (index 0 = le plus élevé) ─────────────────────
@@ -22,14 +24,16 @@ var ROLE_HIERARCHY_AUTH = [
   'super_admin',
   'president',
   'vice_president',
-  'tresorerie',
+  'tresorier',
   'secretaire',
   'responsable_commercial',
   'responsable_qualite',
   'responsable_marketing',
-  'marketing',
+  'tresorerie',
   'auditeur',
+  'marketing',
   'commercial',
+  'intervenant',
 ];
 
 function getHighestRoleAuth(roles) {
@@ -39,45 +43,58 @@ function getHighestRoleAuth(roles) {
   return 'commercial';
 }
 
-// ── Rôles CA (accès aux données financières / tréso) ──────────
+// ── Rôles CA (accès données financières / tréso) ──────────────
 const CA_ROLES = [
-  'super_admin','president','vice_president','tresorerie',
-  'responsable_commercial','responsable_qualite',
-  'secretaire','responsable_marketing','marketing'
+  'super_admin','president','vice_president','tresorier',
+  'secretaire','responsable_commercial','responsable_qualite',
+  'responsable_marketing','tresorerie','auditeur','marketing'
 ];
 
 // ── Permissions par page ──────────────────────────────────────
 const PAGE_ACCESS = {
-  // Tout le monde
-  'index': ROLE_HIERARCHY_AUTH,
+  // Tout le monde (sauf intervenants)
+  'index': ['super_admin','president','vice_president','tresorier','secretaire',
+            'responsable_commercial','responsable_qualite','responsable_marketing',
+            'tresorerie','auditeur','marketing','commercial'],
 
   // Tracker trésorerie
-  'tracker_treso': ['super_admin','vice_president','tresorerie','responsable_qualite'],
+  'tracker_treso': ['super_admin','vice_president','tresorier','tresorerie','responsable_qualite'],
 
   // Tracker orga
-  'tracker_orga': ['super_admin','president','vice_president','responsable_qualite','auditeur'],
+  'tracker_orga': ['super_admin','president','vice_president','tresorier','responsable_qualite','auditeur'],
 
-  // KPI
-  'kpi_treso':     ['super_admin','president','vice_president','tresorerie','secretaire',
-                    'responsable_marketing','responsable_commercial','responsable_qualite'],
-  'kpi_commercial':['super_admin','president','vice_president','responsable_commercial',
-                    'secretaire','marketing','responsable_marketing','auditeur','commercial'],
+  // KPI trésorerie
+  'kpi_treso': ['super_admin','president','vice_president','tresorier','tresorerie',
+                'secretaire','responsable_marketing','responsable_commercial','responsable_qualite'],
+
+  // KPI commercial
+  'kpi_commercial': ['super_admin','president','vice_president','tresorier','responsable_commercial',
+                     'secretaire','marketing','responsable_marketing','auditeur','commercial'],
 
   // CRM
-  'crm_prospection': ROLE_HIERARCHY_AUTH,
-  'crm_clients':     ['super_admin','president','vice_president','responsable_commercial',
+  'crm_prospection': ['super_admin','president','vice_president','tresorier','secretaire',
+                      'responsable_commercial','responsable_qualite','responsable_marketing',
+                      'tresorerie','auditeur','marketing','commercial'],
+  'crm_clients':     ['super_admin','president','vice_president','tresorier','responsable_commercial',
                       'responsable_marketing','responsable_qualite','secretaire','tresorerie','commercial'],
-  'crm_intervenants':['super_admin','president','vice_president','responsable_commercial',
+  'crm_intervenants':['super_admin','president','vice_president','tresorier','responsable_commercial',
                       'responsable_marketing','responsable_qualite','secretaire','tresorerie'],
-  'crm_partenariats':['super_admin','president','vice_president','responsable_commercial',
+  'crm_partenariats':['super_admin','president','vice_president','tresorier','responsable_commercial',
                       'responsable_marketing','responsable_qualite','secretaire','tresorerie','commercial'],
 
   // Études
-  'etudes': ['super_admin','president','vice_president','responsable_commercial',
+  'etudes': ['super_admin','president','vice_president','tresorier','responsable_commercial',
              'responsable_qualite','secretaire','tresorerie','responsable_marketing'],
 
   // Événements
-  'evenements': ROLE_HIERARCHY_AUTH,
+  'evenements': ['super_admin','president','vice_president','tresorier','secretaire',
+                 'responsable_commercial','responsable_qualite','responsable_marketing',
+                 'tresorerie','auditeur','marketing','commercial'],
+
+  // Mes missions (intervenants + tous)
+  'mes_missions': ['super_admin','president','vice_president','tresorier','secretaire',
+                   'responsable_commercial','responsable_qualite','responsable_marketing',
+                   'tresorerie','auditeur','marketing','commercial','intervenant'],
 
   // Admin
   'admin': ['super_admin','president'],
@@ -85,15 +102,17 @@ const PAGE_ACCESS = {
 
 // ── Droits de modification par page ──────────────────────────
 const EDIT_ROLES = {
-  'kpi_treso':         ['super_admin','tresorerie'],
-  'tracker_treso':     ['super_admin','tresorerie'],
+  'kpi_treso':         ['super_admin','tresorier'],
+  'tracker_treso':     ['super_admin','tresorier'],
   'tracker_orga':      ['super_admin','president','vice_president','responsable_qualite','auditeur'],
   'crm_clients':       ['super_admin','president','vice_president','responsable_commercial'],
   'crm_intervenants':  ['super_admin','president','vice_president','responsable_commercial','secretaire'],
   'crm_partenariats':  ['super_admin','president','vice_president','responsable_commercial'],
-  'crm_prospection':   ROLE_HIERARCHY_AUTH, // chacun modifie ses propres lignes
+  'crm_prospection':   ['super_admin','president','vice_president','tresorier','secretaire',
+                        'responsable_commercial','responsable_qualite','responsable_marketing',
+                        'tresorerie','auditeur','marketing','commercial'],
   'etudes':            ['super_admin','president','vice_president','responsable_commercial','responsable_qualite'],
-  'evenements':        ROLE_HIERARCHY_AUTH, // à affiner au codage
+  'evenements':        ['super_admin','president','vice_president','secretaire'],
   'kpi_commercial':    ['super_admin','president','vice_president','responsable_commercial'],
   'admin':             ['super_admin','president'],
 };
@@ -153,9 +172,9 @@ function initAuth(pageKey, onReady) {
 }
 
 // ── Helpers rôles ─────────────────────────────────────────────
-function isAdmin()     { return ['super_admin','president'].includes(CURRENT_ROLE); }
-function isCA()        { return CA_ROLES.includes(CURRENT_ROLE); }
-function canEdit(page) { return (EDIT_ROLES[page] || []).includes(CURRENT_ROLE); }
+function isAdmin()        { return ['super_admin','president'].includes(CURRENT_ROLE); }
+function isCA()           { return CA_ROLES.includes(CURRENT_ROLE); }
+function canEdit(page)    { return (EDIT_ROLES[page] || []).includes(CURRENT_ROLE); }
 function canArchiveOrga() { return ARCHIVE_ORGA_ROLES.includes(CURRENT_ROLE); }
 
 // ── Connexion Google ──────────────────────────────────────────
