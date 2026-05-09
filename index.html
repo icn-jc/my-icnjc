@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>My-ICN-JC — Hub</title>
+<link rel="stylesheet" href="assets/css/global.css"/>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script src="assets/js/firebase.js"></script>
+<script src="assets/js/auth.js"></script>
+<script src="assets/js/sidebar.js"></script>
+<style>
+/* ── Bandeau alertes ── */
+.alert-band { margin-bottom: 24px; }
+.alert-band-title { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.1em; color:var(--text-tertiary); margin-bottom:8px; }
+.no-alerts { font-size:13px; color:var(--text-tertiary); padding:12px 0; }
+
+/* ── KPI snapshot ── */
+.kpi-snap { display:grid; grid-template-columns:repeat(auto-fill,minmax(180px,1fr)); gap:14px; margin-bottom:28px; }
+.kpi-tile { background:var(--bg-card); border-radius:var(--radius-lg); padding:18px 20px; box-shadow:var(--shadow-md); border:1px solid var(--border); position:relative; overflow:hidden; transition:box-shadow .2s,transform .2s; }
+.kpi-tile:hover { box-shadow:var(--shadow-lg); transform:translateY(-2px); }
+.kpi-tile::before { content:''; position:absolute; top:0; left:0; right:0; height:2px; background:var(--bordeaux); opacity:0; transition:opacity .2s; }
+.kpi-tile:hover::before { opacity:1; }
+.kpi-tile.accent::before { opacity:1; }
+.kpi-label { font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:.09em; color:var(--text-tertiary); margin-bottom:8px; }
+.kpi-val { font-family:'Playfair Display',serif; font-size:26px; font-weight:700; color:var(--navy); line-height:1; }
+.kpi-unit { font-family:'Sora',sans-serif; font-size:13px; color:var(--text-tertiary); font-weight:400; }
+.kpi-sub { font-size:11px; color:var(--text-tertiary); margin-top:5px; }
+
+/* ── Mes actions ── */
+.actions-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:28px; }
+.action-card { background:var(--bg-card); border-radius:var(--radius-lg); padding:18px 20px; box-shadow:var(--shadow-md); border:1px solid var(--border); }
+.action-card-title { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.08em; color:var(--bordeaux); margin-bottom:12px; display:flex; align-items:center; gap:6px; }
+.action-item { display:flex; align-items:center; justify-content:space-between; padding:8px 0; border-bottom:1px solid var(--border); font-size:12px; }
+.action-item:last-child { border-bottom:none; padding-bottom:0; }
+.action-item-label { color:var(--text-primary); font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:180px; }
+.action-item-meta { font-size:11px; color:var(--text-tertiary); flex-shrink:0; }
+.empty-state { font-size:12px; color:var(--text-tertiary); padding:8px 0; }
+
+/* ── Modules rapides ── */
+.modules-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(160px,1fr)); gap:12px; }
+.module-card { background:var(--bg-card); border-radius:var(--radius-lg); padding:16px 18px; box-shadow:var(--shadow-sm); border:1px solid var(--border); text-decoration:none; display:flex; flex-direction:column; gap:8px; transition:all .2s; }
+.module-card:hover { box-shadow:var(--shadow-md); transform:translateY(-2px); border-color:var(--bordeaux); }
+.module-icon { width:32px; height:32px; background:var(--bordeaux-bg); border-radius:var(--radius-sm); display:flex; align-items:center; justify-content:center; }
+.module-icon svg { width:16px; height:16px; color:var(--bordeaux); }
+.module-label { font-size:13px; font-weight:500; color:var(--text-primary); }
+.module-desc { font-size:11px; color:var(--text-tertiary); }
+
+/* ── Section headers ── */
+.hub-section-title { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.12em; color:var(--text-tertiary); margin-bottom:12px; display:flex; align-items:center; gap:8px; }
+.hub-section-title::after { content:''; flex:1; height:1px; background:var(--border); }
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div class="login-page" id="login-page">
+  <div class="login-box">
+    <div class="login-logo">
+      <img src="assets/images/ICN-Junior-Conseil_logo.png" style="height:54px;object-fit:contain"/>
+    </div>
+    <div class="login-title">Connexion</div>
+    <div class="login-sub">Accès réservé aux membres d'ICN Junior Conseil.</div>
+    <button class="google-btn" onclick="doGoogleLogin()">
+      <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google"/>
+      Se connecter avec Google
+    </button>
+    <div class="denied-box" id="denied-box">
+      <strong>Accès refusé</strong>
+      <p id="denied-msg">Ce compte n'est pas autorisé.</p>
+    </div>
+    <div class="login-error" id="login-error"></div>
+    <div class="login-footer">@icnjuniorconseil.com uniquement</div>
+  </div>
+</div>
+
+<!-- APP -->
+<div class="app-page" id="app-page">
+  <div id="sidebar-container"></div>
+  <div class="app-content">
+    <div class="page-header flex justify-between items-center">
+      <div>
+        <div class="page-title" id="welcome-title">Bonjour —</div>
+        <div class="page-subtitle" id="welcome-date"></div>
+      </div>
+      <div style="font-size:12px;color:var(--text-tertiary)" id="last-sync"></div>
+    </div>
+
+    <div class="page-body">
+
+      <!-- BANDEAU ALERTES -->
+      <div class="alert-band" id="alert-band" style="display:none">
+        <div class="hub-section-title">⚠ Alertes</div>
+        <div id="alerts-container"></div>
+      </div>
+
+      <!-- KPI SNAPSHOT -->
+      <div class="hub-section-title">Indicateurs clés</div>
+      <div class="kpi-snap" id="kpi-snap">
+        <div class="kpi-tile"><div class="kpi-label">Chargement…</div></div>
+      </div>
+
+      <!-- MES ACTIONS -->
+      <div class="hub-section-title">Mes actions</div>
+      <div class="actions-grid" id="actions-grid">
+        <div class="action-card"><div class="empty-state">Chargement…</div></div>
+      </div>
+
+      <!-- ACCÈS RAPIDES -->
+      <div class="hub-section-title">Modules</div>
+      <div class="modules-grid" id="modules-grid"></div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Date ──────────────────────────────────────────────────────
+const JOURS = ['Dimanche','Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi'];
+const MOIS  = ['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
+const now   = new Date();
+document.getElementById('welcome-date').innerText =
+  JOURS[now.getDay()] + ' ' + now.getDate() + ' ' + MOIS[now.getMonth()] + ' ' + now.getFullYear();
+
+// ── Auth ──────────────────────────────────────────────────────
+initAuth('index', function(user, role, profile) {
+  renderSidebar(role, profile, user, 'home');
+  showAppPage(user, role, profile);
+  document.getElementById('welcome-title').innerText = 'Bonjour, ' + (profile.prenom || user.displayName || 'vous') + ' 👋';
+  loadHub(role, profile, user);
+  updateHealthIndicator();
+});
+
+// ── Hub ───────────────────────────────────────────────────────
+async function loadHub(role, profile, user) {
+  await Promise.all([
+    loadAlerts(role),
+    loadKpiSnap(role),
+    loadMyActions(role, profile, user),
+    loadModules(role),
+  ]);
+  document.getElementById('last-sync').innerText = 'Mis à jour à ' + new Date().toLocaleTimeString('fr-FR', {hour:'2-digit',minute:'2-digit'});
+}
+
+// ── Alertes ───────────────────────────────────────────────────
+async function loadAlerts(role) {
+  const alerts = [];
+  const today  = new Date().toISOString().split('T')[0];
+
+  try {
+    // Tâches en retard (tréso uniquement)
+    if (['super_admin','president','tresorerie'].includes(role)) {
+      const late = await COLLECTIONS.tasks
+        .where('status','!=','Terminé')
+        .where('date','<', today)
+        .get();
+      if (!late.empty) {
+        alerts.push({ type:'danger', msg: late.size + ' tâche(s) audit en retard' });
+      }
+    }
+
+    // Études bloquées
+    if (['super_admin','president','responsable_commercial','responsable_qualite','secretaire'].includes(role)) {
+      const bloquees = await COLLECTIONS.etudes.where('statut','==','Bloquée').get();
+      if (!bloquees.empty) {
+        alerts.push({ type:'danger', msg: bloquees.size + ' étude(s) bloquée(s)' });
+      }
+    }
+  } catch(e) { /* silencieux */ }
+
+  const band = document.getElementById('alert-band');
+  const container = document.getElementById('alerts-container');
+
+  if (alerts.length === 0) {
+    band.style.display = 'none';
+    return;
+  }
+  band.style.display = 'block';
+  container.innerHTML = alerts.map(a =>
+    `<div class="alert alert-${a.type}">${a.msg}</div>`
+  ).join('');
+}
+
+// ── KPI Snapshot ──────────────────────────────────────────────
+async function loadKpiSnap(role) {
+  const el = document.getElementById('kpi-snap');
+  let html = '';
+
+  try {
+    // CA signé — depuis kpi/dashboard
+    const kpiDoc = await db.collection('kpi').doc('dashboard').get();
+    const kpi = kpiDoc.exists ? kpiDoc.data() : {};
+
+    html += kpiTile('CA Signé', fmt(kpi['ca-signe'] || 0), '€', '', true);
+    html += kpiTile("Nb d'études", kpi['nb-etudes'] || 0, '', '');
+
+    // Taux de conversion
+    const tx = kpi['ca-signe'] ? Math.round((kpi['ca-encaisse']||0) / kpi['ca-signe'] * 100) : 0;
+    html += kpiTile('Taux conversion', tx, '%', 'signé → encaissé');
+
+    // Cash — CA uniquement
+    if (isCA()) {
+      html += kpiTile('Cash disponible', fmt(kpi['cash'] || 0), '€', 'trésorerie');
+    }
+
+  } catch(e) {
+    html = '<div class="kpi-tile"><div class="kpi-label">Données indisponibles</div></div>';
+  }
+
+  el.innerHTML = html;
+}
+
+function kpiTile(label, val, unit, sub, accent) {
+  return `<div class="kpi-tile${accent?' accent':''}">
+    <div class="kpi-label">${label}</div>
+    <div class="kpi-val">${val} <span class="kpi-unit">${unit}</span></div>
+    ${sub ? `<div class="kpi-sub">${sub}</div>` : ''}
+  </div>`;
+}
+
+function fmt(n) { return Number(n||0).toLocaleString('fr-FR'); }
+
+// ── Mes actions ───────────────────────────────────────────────
+async function loadMyActions(role, profile, user) {
+  const el = document.getElementById('actions-grid');
+  let html = '';
+
+  // Bloc 1 : tâches en retard (si tréso/admin)
+  if (['super_admin','president','tresorerie'].includes(role)) {
+    const today = new Date().toISOString().split('T')[0];
+    try {
+      const late = await COLLECTIONS.tasks
+        .where('status','!=','Terminé')
+        .where('date','<', today)
+        .limit(5)
+        .get();
+      html += `<div class="action-card">
+        <div class="action-card-title">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/></svg>
+          Tâches en retard
+        </div>`;
+      if (late.empty) {
+        html += '<div class="empty-state">✓ Aucune tâche en retard</div>';
+      } else {
+        late.forEach(doc => {
+          const t = doc.data();
+          html += `<div class="action-item"><span class="action-item-label">${t.name}</span><span class="action-item-meta badge badge-danger">${t.resp}</span></div>`;
+        });
+      }
+      html += '</div>';
+    } catch(e) { html += '<div class="action-card"><div class="empty-state">Indisponible</div></div>'; }
+  }
+
+  // Bloc 2 : mes prospects à relancer
+  if (profile.prospecte) {
+    try {
+      const email = user.email;
+      const myProspects = await COLLECTIONS.prospects
+        .where('owner_email','==', email)
+        .where('statut','in',['À relancer','À contacter'])
+        .limit(5)
+        .get();
+      html += `<div class="action-card">
+        <div class="action-card-title">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
+          Mes prospects à relancer
+        </div>`;
+      if (myProspects.empty) {
+        html += '<div class="empty-state">Aucun prospect à relancer</div>';
+      } else {
+        myProspects.forEach(doc => {
+          const p = doc.data();
+          html += `<div class="action-item"><span class="action-item-label">${p.entreprise || p.contact}</span><span class="action-item-meta badge badge-warning">${p.statut}</span></div>`;
+        });
+      }
+      html += '</div>';
+    } catch(e) { html += '<div class="action-card"><div class="empty-state">Indisponible</div></div>'; }
+  }
+
+  // Bloc 3 : mes études (chargé d'étude)
+  if (['super_admin','president','responsable_commercial','responsable_qualite','secretaire'].includes(role)) {
+    try {
+      const etudes = await COLLECTIONS.etudes
+        .where('statut','in',['En cours','En négociation'])
+        .limit(5)
+        .get();
+      html += `<div class="action-card">
+        <div class="action-card-title">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
+          Études actives
+        </div>`;
+      if (etudes.empty) {
+        html += '<div class="empty-state">Aucune étude active</div>';
+      } else {
+        etudes.forEach(doc => {
+          const e = doc.data();
+          const badge = e.statut === 'Bloquée' ? 'danger' : e.statut === 'En cours' ? 'success' : 'warning';
+          html += `<div class="action-item"><span class="action-item-label">${e.titre||'Sans titre'}</span><span class="action-item-meta badge badge-${badge}">${e.statut}</span></div>`;
+        });
+      }
+      html += '</div>';
+    } catch(e) { html += ''; }
+  }
+
+  el.innerHTML = html || '<div class="action-card"><div class="empty-state">Aucune action pour toi pour l\'instant.</div></div>';
+}
+
+// ── Modules rapides ───────────────────────────────────────────
+function loadModules(role) {
+  const basePath = './';
+  const all = [
+    { key:'tracker_treso', label:'Tracker Audit Tréso', desc:'Préparation audit', icon:'clipboard', href: basePath+'audit/tracker_treso.html', roles:['super_admin','president','tresorerie'] },
+    { key:'tracker_orga',  label:'Tracker Audit Orga',  desc:'Préparation audit', icon:'check-square', href: basePath+'audit/tracker_orga.html', roles:['super_admin','president','responsable_qualite','auditeur'] },
+    { key:'kpi_treso',     label:'KPI Trésorerie',      desc:'Dashboard finances', icon:'trending-up', href: basePath+'dashboard/kpi_treso.html', roles:['super_admin','president','tresorerie','secretaire','marketing','responsable_commercial','responsable_qualite'] },
+    { key:'kpi_commercial',label:'KPI Commercial',      desc:'Dashboard ventes',   icon:'bar-chart',   href: basePath+'dashboard/kpi_commercial.html', roles:['super_admin','president','responsable_commercial','secretaire','marketing','auditeur','membre'] },
+    { key:'crm_prospection',label:'Prospection',        desc:'Mes contacts',       icon:'target',      href: basePath+'crm/crm_prospection.html', roles:['super_admin','president','tresorerie','responsable_commercial','responsable_qualite','secretaire','marketing','auditeur','membre'] },
+    { key:'crm_clients',   label:'Clients',             desc:'Gestion clients',    icon:'briefcase',   href: basePath+'crm/crm_clients.html', roles:['super_admin','president','responsable_commercial','secretaire'] },
+    { key:'crm_intervenants',label:'Intervenants',      desc:'Réseau intervenants',icon:'users',       href: basePath+'crm/crm_intervenants.html', roles:['super_admin','president','responsable_commercial','responsable_qualite','secretaire'] },
+    { key:'etudes',        label:'Suivi Études',        desc:'Pipeline études',    icon:'folder',      href: basePath+'etudes/etudes_index.html', roles:['super_admin','president','responsable_commercial','responsable_qualite','secretaire'] },
+    { key:'evenements',    label:'Événements',          desc:'Planning events',    icon:'calendar',    href: basePath+'evenements/evenements_index.html', roles:['super_admin','president','tresorerie','responsable_commercial','responsable_qualite','secretaire','marketing','auditeur','membre'] },
+    { key:'admin',         label:'Administration',      desc:'Rôles & accès',      icon:'settings',    href: basePath+'admin/admin_index.html', roles:['super_admin','president'] },
+  ];
+
+  const visible = all.filter(m => m.roles.includes(role));
+  const icons = {
+    clipboard:'<path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/>',
+    'check-square':'<polyline points="9,11 12,14 22,4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/>',
+    'trending-up':'<polyline points="23,6 13.5,15.5 8.5,10.5 1,18"/><polyline points="17,6 23,6 23,12"/>',
+    'bar-chart':'<line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>',
+    target:'<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>',
+    briefcase:'<rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v16"/>',
+    users:'<path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/>',
+    folder:'<path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/>',
+    calendar:'<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>',
+    settings:'<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/>',
+  };
+
+  document.getElementById('modules-grid').innerHTML = visible.map(m => `
+    <a class="module-card fade-up" href="${m.href}">
+      <div class="module-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">${icons[m.icon]||''}</svg>
+      </div>
+      <div class="module-label">${m.label}</div>
+      <div class="module-desc">${m.desc}</div>
+    </a>`).join('');
+}
+</script>
+</body>
+</html>
