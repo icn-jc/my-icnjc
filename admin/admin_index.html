@@ -1,399 +1,759 @@
+```html
 <!DOCTYPE html>
 <html lang="fr">
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
 <title>Administration — My-ICN-JC</title>
+
 <link rel="stylesheet" href="../assets/css/global.css"/>
+
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+
 <script src="../assets/js/firebase.js"></script>
 <script src="../assets/js/auth.js"></script>
 <script src="../assets/js/sidebar.js"></script>
+
 <style>
-/* ── Lignes membres ── */
-.user-row{display:flex;align-items:center;gap:12px;padding:14px 0;border-bottom:1px solid var(--border);}
-.user-row:last-child{border-bottom:none;}
-.user-avatar-sm{width:36px;height:36px;border-radius:50%;background:var(--bordeaux-bg);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;color:var(--bordeaux);flex-shrink:0;}
-.user-info{flex:1;min-width:0;}
-.user-name{font-size:13px;font-weight:500;color:var(--text-primary);}
-.user-email{font-size:11px;color:var(--text-tertiary);margin-top:1px;}
-.user-roles{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px;}
-.user-actions{display:flex;align-items:center;gap:6px;flex-shrink:0;}
-.prosp-label{font-size:11px;color:var(--text-secondary);white-space:nowrap;}
 
-/* ── Role tags ── */
-.role-tag{font-size:10px;font-weight:600;padding:2px 7px;border-radius:99px;}
+.admin-grid{
+  display:grid;
+  grid-template-columns:420px 1fr;
+  gap:24px;
+}
+
+.admin-card{
+  background:white;
+  border:1px solid var(--border);
+  border-radius:24px;
+  padding:24px;
+}
+
+.section-title{
+  font-size:18px;
+  font-weight:700;
+  margin-bottom:18px;
+}
+
+.users-list{
+  display:flex;
+  flex-direction:column;
+  gap:14px;
+}
+
+.user-row{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:14px;
+  border:1px solid var(--border);
+  border-radius:18px;
+  padding:16px;
+}
+
+.user-left{
+  display:flex;
+  gap:14px;
+  flex:1;
+}
+
+.user-avatar{
+  width:48px;
+  height:48px;
+  border-radius:50%;
+  background:var(--bordeaux-bg);
+  color:var(--bordeaux);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-weight:700;
+  flex-shrink:0;
+}
+
+.user-main{
+  flex:1;
+}
+
+.user-name{
+  font-size:15px;
+  font-weight:700;
+}
+
+.user-email{
+  font-size:12px;
+  color:var(--text-tertiary);
+  margin-top:2px;
+}
+
+.user-tags{
+  display:flex;
+  flex-wrap:wrap;
+  gap:6px;
+  margin-top:10px;
+}
+
+.role-tag{
+  padding:5px 10px;
+  border-radius:999px;
+  font-size:11px;
+  font-weight:700;
+}
+
 .role-super_admin{background:#f3e8ff;color:#6b21a8;}
-.role-president{background:#dbeafe;color:#1e40af;}
-.role-tresorerie{background:#fef9c3;color:#854d0e;}
+.role-president{background:#dbeafe;color:#1d4ed8;}
+.role-vice_president{background:#cffafe;color:#155e75;}
+.role-tresorier{background:#fef3c7;color:#92400e;}
 .role-responsable_commercial{background:#dcfce7;color:#166534;}
-.role-responsable_qualite{background:#e0f2fe;color:#0c4a6e;}
-.role-secretaire{background:#f1f5f9;color:#334155;}
-.role-marketing{background:#fce7f3;color:#831843;}
-.role-auditeur{background:#fff7ed;color:#9a3412;}
-.role-membre{background:#f8fafc;color:#64748b;}
+.role-commercial{background:#f1f5f9;color:#475569;}
+.role-marketing{background:#fce7f3;color:#9d174d;}
+.role-auditeur{background:#ffedd5;color:#9a3412;}
+.role-intervenant{background:#ede9fe;color:#5b21b6;}
 
-/* ── Boutons actions ── */
-.edit-btn-sm{padding:5px 10px;background:var(--bg);border:1px solid var(--border-strong);border-radius:var(--radius-sm);font-size:12px;cursor:pointer;color:var(--text-secondary);font-family:'Sora',sans-serif;}
-.edit-btn-sm:hover{border-color:var(--bordeaux);color:var(--bordeaux);}
-.del-btn{padding:5px 10px;background:var(--danger-bg);color:var(--danger);border:none;border-radius:var(--radius-sm);font-size:12px;font-weight:600;cursor:pointer;}
-.del-btn:hover{background:#fecaca;}
+.user-right{
+  display:flex;
+  flex-direction:column;
+  align-items:flex-end;
+  gap:8px;
+}
 
-/* ── Multi-select rôles ── */
-.roles-checkboxes{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:4px;}
-.role-checkbox{display:flex;align-items:center;gap:8px;padding:8px 10px;border:1.5px solid var(--border);border-radius:var(--radius-sm);cursor:pointer;transition:all .15s;font-size:13px;}
-.role-checkbox:hover{border-color:var(--bordeaux);background:var(--bordeaux-bg);}
-.role-checkbox input{accent-color:var(--bordeaux);cursor:pointer;}
-.role-checkbox.checked{border-color:var(--bordeaux);background:var(--bordeaux-bg);}
-.hierarchy-note{font-size:11px;color:var(--text-tertiary);margin-top:8px;font-style:italic;}
+.prospect-badge{
+  padding:5px 10px;
+  border-radius:999px;
+  font-size:11px;
+  font-weight:700;
+}
 
-/* ── Section ── */
-.section-sep{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--bordeaux);padding:16px 0 8px;border-bottom:1px solid rgba(163,33,95,0.15);margin-bottom:4px;}
+.prospect-yes{
+  background:#dcfce7;
+  color:#166534;
+}
 
-/* ── Toast ── */
-.toast{position:fixed;bottom:24px;right:24px;background:var(--navy);color:white;padding:12px 20px;border-radius:var(--radius-md);font-size:13px;z-index:999;display:none;animation:fadeUp .3s ease;}
+.prospect-no{
+  background:#f1f5f9;
+  color:#64748b;
+}
+
+.btn-row{
+  display:flex;
+  gap:8px;
+}
+
+.btn-sm{
+  border:none;
+  border-radius:10px;
+  padding:8px 12px;
+  font-size:12px;
+  font-weight:600;
+  cursor:pointer;
+}
+
+.btn-edit{
+  background:#eff6ff;
+  color:#1d4ed8;
+}
+
+.btn-delete{
+  background:#fef2f2;
+  color:#dc2626;
+}
+
+.form-grid{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:16px;
+}
+
+.full{
+  grid-column:1/-1;
+}
+
+.roles-grid{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+}
+
+.role-item{
+  border:1px solid var(--border);
+  border-radius:14px;
+  padding:10px;
+  display:flex;
+  align-items:center;
+  gap:10px;
+}
+
+.role-item input{
+  accent-color:#7c3aed;
+}
+
+.switch-row{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  border:1px solid var(--border);
+  border-radius:14px;
+  padding:14px;
+}
+
+.input,
+.select-field{
+  width:100%;
+}
+
+.modal-overlay{
+  position:fixed;
+  inset:0;
+  background:rgba(15,23,42,.45);
+  display:none;
+  align-items:center;
+  justify-content:center;
+  z-index:999;
+  padding:20px;
+}
+
+.modal-overlay.open{
+  display:flex;
+}
+
+.modal-box{
+  background:white;
+  width:100%;
+  max-width:760px;
+  border-radius:28px;
+  padding:28px;
+  max-height:92vh;
+  overflow:auto;
+}
+
+.modal-header{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  margin-bottom:24px;
+}
+
+.modal-title{
+  font-size:22px;
+  font-weight:700;
+}
+
+.modal-close{
+  border:none;
+  background:none;
+  font-size:28px;
+  cursor:pointer;
+}
+
+.modal-actions{
+  display:flex;
+  justify-content:flex-end;
+  gap:12px;
+  margin-top:24px;
+}
+
+@media(max-width:1100px){
+
+  .admin-grid{
+    grid-template-columns:1fr;
+  }
+
+}
+
 </style>
 </head>
 <body>
 
-<!-- LOGIN -->
 <div class="login-page" id="login-page">
+
   <div class="login-box">
+
     <div class="login-logo">
-      <img src="../assets/images/ICN-Junior-Conseil_logo.png" style="height:54px;object-fit:contain"/>
+      <img src="../assets/images/ICN-Junior-Conseil_logo.png" style="height:54px"/>
     </div>
-    <div class="login-title">Accès restreint</div>
-    <div class="login-sub">Cette page est réservée à Stella et Antoine.</div>
+
+    <div class="login-title">Administration</div>
+
+    <div class="login-sub">
+      Accès réservé aux administrateurs.
+    </div>
+
     <button class="google-btn" onclick="doGoogleLogin()">
-      <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google"/>
-      Se connecter avec Google
+      <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg"/>
+      Connexion Google
     </button>
+
     <div class="denied-box" id="denied-box">
       <strong>Accès refusé</strong>
-      <p id="denied-msg">Tu n'as pas accès à cette page.</p>
+      <p id="denied-msg"></p>
     </div>
-    <div class="login-error" id="login-error"></div>
+
   </div>
+
 </div>
 
-<!-- APP -->
 <div class="app-page" id="app-page">
+
   <div id="sidebar-container"></div>
+
   <div class="app-content">
+
     <div class="page-header flex justify-between items-center">
+
       <div>
         <div class="page-title">Administration</div>
-        <div class="page-subtitle">Gestion des membres et des rôles — Stella & Antoine uniquement</div>
+        <div class="page-subtitle">
+          Gestion des rôles, permissions et commerciaux.
+        </div>
       </div>
-      <button class="btn btn-primary" onclick="openAddModal()">+ Ajouter un membre</button>
+
+      <button class="btn btn-primary" onclick="openAddModal()">
+        + Ajouter un membre
+      </button>
+
     </div>
+
     <div class="page-body">
-      <div class="card">
-        <div class="section-sep">Membres enregistrés</div>
-        <div id="users-list"><div style="color:var(--text-tertiary);font-size:13px;padding:20px 0">Chargement…</div></div>
+
+      <div class="admin-grid">
+
+        <div class="admin-card">
+
+          <div class="section-title">Résumé</div>
+
+          <div style="display:flex;flex-direction:column;gap:16px">
+
+            <div class="stat-card">
+              <div class="stat-label">Membres</div>
+              <div class="stat-value" id="total-users">0</div>
+            </div>
+
+            <div class="stat-card">
+              <div class="stat-label">Prospecteurs actifs</div>
+              <div class="stat-value" id="total-prospectors">0</div>
+            </div>
+
+            <div class="stat-card">
+              <div class="stat-label">Responsables</div>
+              <div class="stat-value" id="total-managers">0</div>
+            </div>
+
+          </div>
+
+        </div>
+
+        <div class="admin-card">
+
+          <div class="section-title">Membres</div>
+
+          <div class="users-list" id="users-list"></div>
+
+        </div>
+
       </div>
+
     </div>
+
   </div>
+
 </div>
 
-<!-- MODAL AJOUTER -->
-<div class="modal-overlay" id="modal-add" onclick="if(event.target===this)closeAddModal()">
-  <div class="modal-box">
-    <div class="modal-header">
-      <div class="modal-title">Ajouter un membre</div>
-      <button class="modal-close" onclick="closeAddModal()">×</button>
-    </div>
-    <div class="form-grid">
-      <div class="form-field">
-        <label class="input-label">Prénom</label>
-        <input class="input" type="text" id="add-prenom" placeholder="Prénom"/>
-      </div>
-      <div class="form-field">
-        <label class="input-label">Nom</label>
-        <input class="input" type="text" id="add-nom" placeholder="Nom"/>
-      </div>
-      <div class="form-field full">
-        <label class="input-label">Email (@icnjuniorconseil.com)</label>
-        <input class="input" type="email" id="add-email" placeholder="prenom.nom@icnjuniorconseil.com"/>
-      </div>
-      <div class="form-field full">
-        <label class="input-label">Rôles (plusieurs possibles — le plus élevé définit les accès)</label>
-        <div class="roles-checkboxes" id="add-roles-checks"></div>
-        <div class="hierarchy-note">Hiérarchie : Super Admin > Président > VP > Trésorier > Secrétaire > Resp. Commercial > Resp. Qualité > Resp. Marketing > Trésorerie > Auditeur > Marketing > Commercial > Intervenant</div>
-      </div>
-      <div class="form-field">
-        <label class="input-label">Prospecte ?</label>
-        <select class="select-field" id="add-prospecte">
-          <option value="true">Oui</option>
-          <option value="false">Non</option>
-        </select>
-      </div>
-    </div>
-    <div class="modal-actions">
-      <button class="btn btn-secondary" onclick="closeAddModal()">Annuler</button>
-      <button class="btn btn-primary" onclick="addMember()">Ajouter</button>
-    </div>
-  </div>
-</div>
+<div class="modal-overlay" id="member-modal">
 
-<!-- MODAL MODIFIER -->
-<div class="modal-overlay" id="modal-edit" onclick="if(event.target===this)closeEditModal()">
   <div class="modal-box">
+
     <div class="modal-header">
-      <div class="modal-title">Modifier un membre</div>
-      <button class="modal-close" onclick="closeEditModal()">×</button>
+
+      <div class="modal-title" id="modal-title">
+        Ajouter un membre
+      </div>
+
+      <button class="modal-close" onclick="closeModal()">×</button>
+
     </div>
-    <input type="hidden" id="edit-email-original"/>
+
+    <input type="hidden" id="edit-id"/>
+
     <div class="form-grid">
-      <div class="form-field">
+
+      <div>
         <label class="input-label">Prénom</label>
-        <input class="input" type="text" id="edit-prenom"/>
+        <input class="input" id="prenom" type="text"/>
       </div>
-      <div class="form-field">
+
+      <div>
         <label class="input-label">Nom</label>
-        <input class="input" type="text" id="edit-nom"/>
+        <input class="input" id="nom" type="text"/>
       </div>
-      <div class="form-field full">
+
+      <div class="full">
         <label class="input-label">Email</label>
-        <input class="input" type="email" id="edit-email" placeholder="prenom.nom@icnjuniorconseil.com"/>
-        <div style="font-size:11px;color:var(--text-tertiary);margin-top:4px;">⚠ Modifier l'email crée un nouveau document et supprime l'ancien.</div>
+        <input class="input" id="email" type="email"/>
       </div>
-      <div class="form-field full">
-        <label class="input-label">Rôles</label>
-        <div class="roles-checkboxes" id="edit-roles-checks"></div>
-        <div class="hierarchy-note">Hiérarchie : Super Admin > Président > VP > Trésorier > Secrétaire > Resp. Commercial > Resp. Qualité > Resp. Marketing > Trésorerie > Auditeur > Marketing > Commercial > Intervenant</div>
-      </div>
-      <div class="form-field">
-        <label class="input-label">Prospecte ?</label>
-        <select class="select-field" id="edit-prospecte">
-          <option value="true">Oui</option>
-          <option value="false">Non</option>
-        </select>
-      </div>
-    </div>
-    <div class="modal-actions">
-      <button class="btn btn-secondary" onclick="closeEditModal()">Annuler</button>
-      <button class="btn btn-primary" onclick="saveMember()">Enregistrer</button>
-    </div>
-  </div>
-</div>
 
-<div class="toast" id="toast"></div>
+      <div class="full">
+
+        <label class="input-label">Rôles</label>
+
+        <div class="roles-grid" id="roles-grid"></div>
+
+      </div>
+
+      <div class="full">
+
+        <div class="switch-row">
+
+          <div>
+            <div style="font-weight:700">Actif prospection</div>
+            <div style="font-size:12px;color:var(--text-tertiary)">
+              Détermine si son pipeline compte comme fiable.
+            </div>
+          </div>
+
+          <select class="select-field" id="prospecte" style="width:120px">
+            <option value="true">Oui</option>
+            <option value="false">Non</option>
+          </select>
+
+        </div>
+
+      </div>
+
+      <div class="full">
+
+        <label class="input-label">Objectif hebdomadaire</label>
+
+        <input class="input" type="number" id="objectif-hebdo" value="10"/>
+
+      </div>
+
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal()">
+        Annuler
+      </button>
+
+      <button class="btn btn-primary" onclick="saveMember()">
+        Enregistrer
+      </button>
+    </div>
+
+  </div>
+
+</div>
 
 <script>
-// ── Rôles avec hiérarchie ─────────────────────────────────────
+
 const ROLE_LABELS = {
-  super_admin:           'Super Admin',
-  president:             'Président',
-  vice_president:        'Vice-Président',
-  tresorier:             'Trésorier',
-  secretaire:            'Secrétaire Gén.',
+  super_admin:'Super Admin',
+  president:'Président',
+  vice_president:'Vice-Président',
+  tresorier:'Trésorier',
+  secretaire:'Secrétaire',
   responsable_commercial:'Resp. Commercial',
-  responsable_qualite:   'Resp. Qualité',
-  responsable_marketing: 'Resp. Marketing',
-  tresorerie:            'Trésorerie (pôle)',
-  auditeur:              'Auditeur',
-  marketing:             'Marketing',
-  commercial:            'Commercial',
-  intervenant:           'Intervenant',
+  responsable_qualite:'Resp. Qualité',
+  responsable_marketing:'Resp. Marketing',
+  tresorerie:'Trésorerie',
+  auditeur:'Auditeur',
+  marketing:'Marketing',
+  commercial:'Commercial',
+  intervenant:'Intervenant'
 };
 
-// Ordre hiérarchique (index 0 = le plus élevé)
 const ROLE_HIERARCHY = [
-  'super_admin','president','vice_president','tresorier','secretaire',
-  'responsable_commercial','responsable_qualite','responsable_marketing',
-  'tresorerie','auditeur','marketing','commercial','intervenant'
+  'super_admin',
+  'president',
+  'vice_president',
+  'tresorier',
+  'secretaire',
+  'responsable_commercial',
+  'responsable_qualite',
+  'responsable_marketing',
+  'tresorerie',
+  'auditeur',
+  'marketing',
+  'commercial',
+  'intervenant'
 ];
 
-// Prend le rôle le plus élevé parmi un tableau de rôles
-function getHighestRole(roles) {
-  if (!roles || roles.length === 0) return 'membre';
-  for (var i = 0; i < ROLE_HIERARCHY.length; i++) {
-    if (roles.indexOf(ROLE_HIERARCHY[i]) !== -1) return ROLE_HIERARCHY[i];
-  }
-  return 'membre';
-}
+let USERS = [];
 
-// ── Auth ──────────────────────────────────────────────────────
-var currentUserRole = null;
+initAuth('admin', async function(user, role, profile){
 
-initAuth('admin', function(user, role, profile) {
-  currentUserRole = role;
   renderSidebar(role, profile, user, 'admin');
+
   showAppPage(user, role, profile);
-  buildRolesCheckboxes('add-roles-checks', []);
-  buildRolesCheckboxes('edit-roles-checks', []);
-  loadUsers();
-  updateHealthIndicator();
+
+  buildRoles();
+
+  await loadUsers();
+
 });
 
-// ── Checkboxes rôles ──────────────────────────────────────────
-function buildRolesCheckboxes(containerId, selectedRoles) {
-  var container = document.getElementById(containerId);
-  container.innerHTML = Object.keys(ROLE_LABELS).map(function(r) {
-    var checked = selectedRoles.indexOf(r) !== -1;
-    // Seul super_admin peut attribuer le rôle super_admin
-    var disabled = (r === 'super_admin' && currentUserRole !== 'super_admin');
-    var disabledAttr = disabled ? ' disabled title="Seule Stella peut attribuer ce rôle"' : '';
-    var disabledStyle = disabled ? ';opacity:.4;cursor:not-allowed' : '';
-    return '<label class="role-checkbox' + (checked?' checked':'') + '" id="lbl-' + containerId + '-' + r + '" style="' + disabledStyle + '">' +
-      '<input type="checkbox" value="' + r + '"' + (checked?' checked':'') + disabledAttr + ' onchange="toggleRoleLabel(this)">' +
-      ROLE_LABELS[r] + (disabled ? ' 🔒' : '') +
-      '</label>';
+function buildRoles(selected=[]){
+
+  document.getElementById('roles-grid').innerHTML =
+
+    Object.keys(ROLE_LABELS).map(function(role){
+
+      return `
+        <label class="role-item">
+          <input type="checkbox" value="${role}" ${selected.includes(role)?'checked':''}/>
+          <span>${ROLE_LABELS[role]}</span>
+        </label>
+      `;
+
+    }).join('');
+}
+
+async function loadUsers(){
+
+  const snap = await COLLECTIONS.users.orderBy('prenom').get();
+
+  USERS = snap.docs.map(doc => ({
+    id: doc.id,
+    ...doc.data()
+  }));
+
+  renderUsers();
+
+  renderStats();
+}
+
+function renderStats(){
+
+  document.getElementById('total-users').innerText = USERS.length;
+
+  document.getElementById('total-prospectors').innerText =
+    USERS.filter(u => u.actif_prospection).length;
+
+  document.getElementById('total-managers').innerText =
+    USERS.filter(u =>
+      (u.roles || []).includes('responsable_commercial') ||
+      (u.roles || []).includes('president') ||
+      (u.roles || []).includes('vice_president')
+    ).length;
+}
+
+function renderUsers(){
+
+  const container = document.getElementById('users-list');
+
+  container.innerHTML = USERS.map(function(user){
+
+    const initials =
+      ((user.prenom || '?')[0] + (user.nom || '?')[0]).toUpperCase();
+
+    const roles = Array.isArray(user.roles)
+      ? user.roles
+      : [];
+
+    return `
+
+      <div class="user-row">
+
+        <div class="user-left">
+
+          <div class="user-avatar">${initials}</div>
+
+          <div class="user-main">
+
+            <div class="user-name">
+              ${user.prenom || ''} ${user.nom || ''}
+            </div>
+
+            <div class="user-email">
+              ${user.email || user.id}
+            </div>
+
+            <div class="user-tags">
+
+              ${roles.map(function(role){
+
+                return `
+                  <div class="role-tag role-${role}">
+                    ${ROLE_LABELS[role] || role}
+                  </div>
+                `;
+
+              }).join('')}
+
+            </div>
+
+          </div>
+
+        </div>
+
+        <div class="user-right">
+
+          <div class="prospect-badge ${user.actif_prospection ? 'prospect-yes':'prospect-no'}">
+            ${user.actif_prospection ? 'Prospection active':'Prospection inactive'}
+          </div>
+
+          <div class="btn-row">
+
+            <button class="btn-sm btn-edit" onclick="editUser('${user.id}')">
+              Modifier
+            </button>
+
+            <button class="btn-sm btn-delete" onclick="deleteUser('${user.id}')">
+              Supprimer
+            </button>
+
+          </div>
+
+        </div>
+
+      </div>
+
+    `;
+
   }).join('');
 }
 
-function toggleRoleLabel(cb) {
-  var lbl = cb.closest('label');
-  if (cb.checked) lbl.classList.add('checked');
-  else lbl.classList.remove('checked');
+function openAddModal(){
+
+  document.getElementById('modal-title').innerText = 'Ajouter un membre';
+
+  document.getElementById('edit-id').value = '';
+
+  document.getElementById('prenom').value = '';
+  document.getElementById('nom').value = '';
+  document.getElementById('email').value = '';
+  document.getElementById('prospecte').value = 'false';
+  document.getElementById('objectif-hebdo').value = 10;
+
+  buildRoles();
+
+  document.getElementById('member-modal').classList.add('open');
 }
 
-function getSelectedRoles(containerId) {
-  var checks = document.querySelectorAll('#' + containerId + ' input[type=checkbox]:checked');
-  var roles = [];
-  checks.forEach(function(c) { roles.push(c.value); });
-  return roles.length > 0 ? roles : ['membre'];
+function closeModal(){
+  document.getElementById('member-modal').classList.remove('open');
 }
 
-// ── Chargement membres ────────────────────────────────────────
-function loadUsers() {
-  COLLECTIONS.users.orderBy('nom').onSnapshot(function(snap) {
-    if (snap.empty) {
-      document.getElementById('users-list').innerHTML = '<div style="color:var(--text-tertiary);font-size:13px;padding:20px 0">Aucun membre. Clique sur "+ Ajouter un membre".</div>';
-      return;
-    }
-    var html = '';
-    snap.forEach(function(doc) {
-      var d = doc.data();
-      var roles = Array.isArray(d.roles) ? d.roles : (d.role ? [d.role] : ['membre']);
-      var highestRole = getHighestRole(roles);
-      var initials = ((d.prenom||'?')[0] + (d.nom||'?')[0]).toUpperCase();
-      var roleTags = roles.map(function(r) {
-        return '<span class="role-tag role-' + r + '">' + (ROLE_LABELS[r]||r) + '</span>';
-      }).join('');
-      html += '<div class="user-row">' +
-        '<div class="user-avatar-sm">' + initials + '</div>' +
-        '<div class="user-info">' +
-          '<div class="user-name">' + (d.prenom||'') + ' ' + (d.nom||'') + '</div>' +
-          '<div class="user-email">' + doc.id + '</div>' +
-          '<div class="user-roles">' + roleTags + '</div>' +
-        '</div>' +
-        '<span class="prosp-label">' + (d.prospecte ? '✓ Prospecte' : '') + '</span>' +
-        '<div class="user-actions">' +
-          '<button class="edit-btn-sm" onclick="openEditModal(\'' + doc.id + '\')">✏ Modifier</button>' +
-          '<button class="del-btn" onclick="deleteMember(\'' + doc.id + '\')">✕</button>' +
-        '</div>' +
-      '</div>';
-    });
-    document.getElementById('users-list').innerHTML = html;
-  });
+function getSelectedRoles(){
+
+  return Array.from(
+    document.querySelectorAll('#roles-grid input:checked')
+  ).map(el => el.value);
 }
 
-// ── Ajouter ───────────────────────────────────────────────────
-function openAddModal() {
-  document.getElementById('add-prenom').value = '';
-  document.getElementById('add-nom').value = '';
-  document.getElementById('add-email').value = '';
-  document.getElementById('add-prospecte').value = 'false';
-  buildRolesCheckboxes('add-roles-checks', ['membre']);
-  document.getElementById('modal-add').classList.add('open');
-}
-function closeAddModal() { document.getElementById('modal-add').classList.remove('open'); }
+function getHighestRole(roles=[]){
 
-function addMember() {
-  var prenom    = document.getElementById('add-prenom').value.trim();
-  var nom       = document.getElementById('add-nom').value.trim();
-  var email     = document.getElementById('add-email').value.trim().toLowerCase();
-  var roles     = getSelectedRoles('add-roles-checks');
-  var prospecte = document.getElementById('add-prospecte').value === 'true';
-
-  if (!prenom || !nom || !email) { alert('Merci de remplir tous les champs.'); return; }
-  if (!email.endsWith('@icnjuniorconseil.com')) { alert('Email doit être en @icnjuniorconseil.com'); return; }
-
-  COLLECTIONS.users.doc(email).set({
-    prenom: prenom, nom: nom, email: email,
-    roles: roles,
-    role: getHighestRole(roles), // compatibilité avec auth.js
-    prospecte: prospecte,
-    etudes_assignees: [],
-    createdAt: firebase.firestore.FieldValue.serverTimestamp()
-  }).then(function() {
-    closeAddModal();
-    showToast(prenom + ' ' + nom + ' ajouté(e) !');
-  }).catch(function(e) { alert('Erreur : ' + e.message); });
-}
-
-// ── Modifier ──────────────────────────────────────────────────
-function openEditModal(email) {
-  COLLECTIONS.users.doc(email).get().then(function(doc) {
-    if (!doc.exists) return;
-    var d = doc.data();
-    var roles = Array.isArray(d.roles) ? d.roles : (d.role ? [d.role] : ['membre']);
-
-    document.getElementById('edit-email-original').value = email;
-    document.getElementById('edit-prenom').value = d.prenom || '';
-    document.getElementById('edit-nom').value = d.nom || '';
-    document.getElementById('edit-email').value = email;
-    document.getElementById('edit-prospecte').value = d.prospecte ? 'true' : 'false';
-    buildRolesCheckboxes('edit-roles-checks', roles);
-    document.getElementById('modal-edit').classList.add('open');
-  });
-}
-function closeEditModal() { document.getElementById('modal-edit').classList.remove('open'); }
-
-function saveMember() {
-  var originalEmail = document.getElementById('edit-email-original').value;
-  var newEmail      = document.getElementById('edit-email').value.trim().toLowerCase();
-  var prenom        = document.getElementById('edit-prenom').value.trim();
-  var nom           = document.getElementById('edit-nom').value.trim();
-  var roles         = getSelectedRoles('edit-roles-checks');
-  var prospecte     = document.getElementById('edit-prospecte').value === 'true';
-
-  if (!prenom || !nom || !newEmail) { alert('Merci de remplir tous les champs.'); return; }
-  if (!newEmail.endsWith('@icnjuniorconseil.com')) { alert('Email doit être en @icnjuniorconseil.com'); return; }
-
-  var data = {
-    prenom: prenom, nom: nom, email: newEmail,
-    roles: roles,
-    role: getHighestRole(roles),
-    prospecte: prospecte,
-    etudes_assignees: []
-  };
-
-  var batch = db.batch();
-
-  if (newEmail !== originalEmail) {
-    // Email changé → nouveau doc + suppression ancien
-    batch.set(COLLECTIONS.users.doc(newEmail), data);
-    batch.delete(COLLECTIONS.users.doc(originalEmail));
-  } else {
-    batch.update(COLLECTIONS.users.doc(originalEmail), data);
+  for(let role of ROLE_HIERARCHY){
+    if(roles.includes(role)) return role;
   }
 
-  batch.commit().then(function() {
-    closeEditModal();
-    showToast(prenom + ' ' + nom + ' mis à jour !');
-  }).catch(function(e) { alert('Erreur : ' + e.message); });
+  return 'commercial';
 }
 
-// ── Supprimer ─────────────────────────────────────────────────
-function deleteMember(email) {
-  if (!confirm('Supprimer ' + email + ' ?')) return;
-  COLLECTIONS.users.doc(email).delete()
-    .then(function() { showToast('Membre supprimé.'); })
-    .catch(function(e) { showToast('Erreur : ' + e.message); });
+async function saveMember(){
+
+  const editId = document.getElementById('edit-id').value;
+
+  const prenom = document.getElementById('prenom').value.trim();
+  const nom = document.getElementById('nom').value.trim();
+  const email = document.getElementById('email').value.trim().toLowerCase();
+
+  const roles = getSelectedRoles();
+
+  const actifProspection =
+    document.getElementById('prospecte').value === 'true';
+
+  const objectifHebdo = Number(
+    document.getElementById('objectif-hebdo').value || 10
+  );
+
+  if(!prenom || !nom || !email){
+    alert('Merci de remplir tous les champs.');
+    return;
+  }
+
+  if(!email.endsWith('@icnjuniorconseil.com')){
+    alert('Email invalide ICN Junior Conseil.');
+    return;
+  }
+
+  const data = {
+
+    prenom,
+    nom,
+    email,
+
+    roles,
+
+    role: getHighestRole(roles),
+
+    actif_prospection: actifProspection,
+
+    prospecte: actifProspection,
+
+    permissions:{
+      can_view_ca:true,
+      can_edit_all_prospects:false,
+      can_manage_pipeline:false,
+      can_export:true
+    },
+
+    objectifs:{
+      hebdo: objectifHebdo
+    },
+
+    updated_at: firebase.firestore.FieldValue.serverTimestamp()
+  };
+
+  if(editId){
+
+    await COLLECTIONS.users.doc(editId).update(data);
+
+  }else{
+
+    data.created_at = firebase.firestore.FieldValue.serverTimestamp();
+
+    await COLLECTIONS.users.doc(email).set(data);
+  }
+
+  closeModal();
+
+  await loadUsers();
 }
 
-// ── Toast ─────────────────────────────────────────────────────
-function showToast(msg) {
-  var t = document.getElementById('toast');
-  t.innerText = msg;
-  t.style.display = 'block';
-  setTimeout(function() { t.style.display = 'none'; }, 3000);
+function editUser(id){
+
+  const user = USERS.find(u => u.id === id);
+
+  if(!user) return;
+
+  document.getElementById('modal-title').innerText = 'Modifier membre';
+
+  document.getElementById('edit-id').value = id;
+
+  document.getElementById('prenom').value = user.prenom || '';
+  document.getElementById('nom').value = user.nom || '';
+  document.getElementById('email').value = user.email || '';
+
+  document.getElementById('prospecte').value =
+    user.actif_prospection ? 'true':'false';
+
+  document.getElementById('objectif-hebdo').value =
+    user.objectifs?.hebdo || 10;
+
+  buildRoles(user.roles || []);
+
+  document.getElementById('member-modal').classList.add('open');
 }
-</script>
-</body>
-</html>
+
+async function deleteUser(id){
+
+  if(!confirm('Supprimer ce membre ?')) return;
+
+  await COLLECTIONS.users.doc(id).delete();
+
+  await loadUsers();
+}
+
+</scri
+```
