@@ -3,169 +3,960 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<title>CRM Prospection — My-ICN-JC</title>
-
+<title>Prospection — My-ICN-JC</title>
 <link rel="stylesheet" href="../assets/css/global.css"/>
-<link rel="stylesheet" href="./css/crm.css"/>
-
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
-
+<script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
 <script src="../assets/js/firebase.js"></script>
 <script src="../assets/js/auth.js"></script>
 <script src="../assets/js/sidebar.js"></script>
-
-<script src="./js/crmConfig.js"></script>
-<script src="./js/crmStore.js"></script>
-<script src="./js/crmHelpers.js"></script>
-<script src="./js/crmFilters.js"></script>
-<script src="./js/crmAnalytics.js"></script>
-<script src="./js/crmTimeline.js"></script>
-<script src="./js/crmEngine.js"></script>
-<script src="./js/crmUI.js"></script>
+<style>
+.crm-tabs{display:flex;gap:4px;background:var(--bg);border-radius:var(--radius-lg);padding:4px;border:1px solid var(--border);width:fit-content;margin-bottom:20px;flex-wrap:wrap;}
+.crm-tab{padding:8px 16px;border-radius:var(--radius-md);font-size:13px;font-weight:500;cursor:pointer;border:none;background:transparent;color:var(--text-secondary);font-family:'Sora',sans-serif;transition:all .2s;white-space:nowrap;}
+.crm-tab.active{background:var(--white);color:var(--bordeaux);box-shadow:var(--shadow-sm);font-weight:600;}
+.crm-tab:hover:not(.active){color:var(--text-primary);}
+.crm-pane{display:none;}
+.crm-pane.active{display:block;}
+.week-nav{display:inline-flex;align-items:center;gap:10px;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);padding:8px 14px;margin-bottom:18px;}
+.week-nav-btn{background:none;border:1px solid var(--border);border-radius:6px;width:28px;height:28px;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;color:var(--text-secondary);transition:all .15s;}
+.week-nav-btn:hover{background:var(--bordeaux-bg);color:var(--bordeaux);}
+.week-nav-btn:disabled{opacity:.35;cursor:not-allowed;}
+.week-nav-label{font-size:13px;font-weight:600;color:var(--navy);min-width:200px;text-align:center;}
+.week-nav-sub{font-size:10px;color:var(--text-tertiary);text-align:center;}
+.week-today-btn{font-size:11px;color:var(--bordeaux);font-weight:600;cursor:pointer;padding:3px 9px;border-radius:99px;background:var(--bordeaux-bg);border:none;font-family:'Sora',sans-serif;}
+.stats-bar{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:18px;}
+.stat-card{background:var(--bg-card);padding:12px 16px;border-radius:var(--radius-lg);box-shadow:var(--shadow-sm);border:1px solid var(--border);min-width:100px;}
+.stat-card .s-label{font-size:10px;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:.07em;margin-bottom:4px;white-space:nowrap;}
+.stat-card .s-val{font-size:20px;font-weight:700;color:var(--navy);}
+.stat-card.danger .s-val{color:var(--danger);}
+.stat-card.success .s-val{color:var(--success);}
+.stat-card.warning .s-val{color:var(--warning);}
+.stat-card.bordeaux .s-val{color:var(--bordeaux);}
+.stat-card.uncertain{border:1.5px dashed #f59e0b;background:#fffbeb;}
+.stat-card.uncertain .s-val{color:#b45309;}
+.week-goal{background:linear-gradient(135deg,#1B2A4A 0%,#2d4a7a 100%);border-radius:var(--radius-lg);padding:16px 20px;color:white;margin-bottom:18px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;}
+.week-goal-text{flex:1;min-width:120px;}
+.week-goal-title{font-size:11px;text-transform:uppercase;letter-spacing:.1em;opacity:.7;margin-bottom:2px;}
+.week-goal-count{font-size:26px;font-weight:700;}
+.week-goal-sub{font-size:11px;opacity:.6;margin-top:1px;}
+.week-goal-bar-wrap{flex:1;min-width:140px;}
+.week-goal-bar-bg{background:rgba(255,255,255,0.15);border-radius:99px;height:7px;margin-top:5px;}
+.week-goal-bar{background:linear-gradient(90deg,#A3215F,#d4527f);border-radius:99px;height:100%;transition:width .5s;}
+.week-goal-badge{padding:5px 12px;border-radius:99px;font-size:12px;font-weight:700;flex-shrink:0;}
+.wgb-ok{background:rgba(34,197,94,0.3);color:#86efac;}
+.wgb-warn{background:rgba(245,158,11,0.3);color:#fcd34d;}
+.wgb-late{background:rgba(239,68,68,0.3);color:#fca5a5;}
+.wgb-past{background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.6);}
+.ranking-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;margin-bottom:20px;}
+.ranking-card{background:var(--bg-card);border-radius:var(--radius-lg);padding:14px 16px;border:1px solid var(--border);display:flex;align-items:center;gap:12px;}
+.ranking-card.gold{border-color:#f59e0b;background:linear-gradient(135deg,#fffbeb,#fef9e0);}
+.ranking-card.silver{border-color:#9ca3af;background:linear-gradient(135deg,#f9fafb,#f1f3f5);}
+.ranking-card.bronze{border-color:#cd7c2f;background:linear-gradient(135deg,#fdf6ec,#fef0dc);}
+.rank-medal{font-size:22px;width:30px;text-align:center;flex-shrink:0;}
+.rank-avatar{width:34px;height:34px;border-radius:50%;background:rgba(163,33,95,0.12);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:var(--bordeaux);flex-shrink:0;}
+.rank-info{flex:1;min-width:0;}
+.rank-name{font-weight:600;font-size:13px;color:var(--navy);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.rank-role{font-size:10px;color:var(--text-tertiary);}
+.rank-badge{font-size:10px;font-weight:700;padding:2px 7px;border-radius:99px;margin-top:3px;display:inline-block;}
+.rb-ok{background:#dcfce7;color:#166534;}
+.rb-warn{background:#fef9c3;color:#854d0e;}
+.rb-late{background:#fee2e2;color:#991b1b;}
+.rb-past{background:#f1f5f9;color:#64748b;}
+.rank-stats{text-align:right;flex-shrink:0;}
+.rank-count{font-size:18px;font-weight:700;color:var(--navy);}
+.rank-label{font-size:10px;color:var(--text-tertiary);}
+.rank-prog{height:3px;background:#eee;border-radius:99px;margin-top:5px;width:70px;}
+.rank-prog-fill{height:100%;border-radius:99px;background:linear-gradient(90deg,#A3215F,#d4527f);}
+.alert-box{background:#fff7ed;border:1px solid #fed7aa;border-radius:var(--radius-lg);padding:12px 16px;margin-bottom:16px;}
+.alert-title{font-size:11px;font-weight:700;color:#c2410c;text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px;}
+.alert-list{display:flex;flex-wrap:wrap;gap:7px;}
+.alert-item{background:white;border:1px solid #fed7aa;border-radius:var(--radius-md);padding:5px 11px;font-size:12px;color:#7c2d12;}
+.goal-bar{display:flex;align-items:center;gap:14px;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);padding:10px 16px;margin-bottom:16px;flex-wrap:wrap;}
+.goal-edit-btn{background:var(--bordeaux-bg);color:var(--bordeaux);border:1px solid rgba(163,33,95,0.2);border-radius:var(--radius-md);padding:5px 12px;font-size:12px;font-weight:600;cursor:pointer;font-family:'Sora',sans-serif;}
+.period-selector{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:12px;}
+.period-btn{padding:5px 12px;border-radius:var(--radius-md);font-size:11px;font-weight:600;cursor:pointer;border:1px solid var(--border);background:var(--white);color:var(--text-secondary);font-family:'Sora',sans-serif;transition:all .15s;}
+.period-btn.active{background:var(--navy);color:white;border-color:var(--navy);}
+.period-btn:hover:not(.active){border-color:var(--bordeaux);color:var(--bordeaux);}
+.period-daterange{display:none;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px;}
+.period-daterange.show{display:flex;}
+.chart-wrap{background:var(--bg-card);border-radius:var(--radius-lg);padding:16px 18px;border:1px solid var(--border);margin-bottom:16px;}
+.chart-bars{display:flex;height:160px;align-items:flex-end;gap:6px;padding:0 4px;overflow-x:auto;}
+.chart-col{min-width:40px;flex:1;display:flex;flex-direction:column;align-items:center;}
+.chart-col-bars{display:flex;align-items:flex-end;gap:2px;height:140px;}
+.chart-bar{width:13px;border-radius:3px 3px 0 0;opacity:.85;cursor:default;}
+.chart-label{font-size:9px;color:var(--text-tertiary);margin-top:4px;white-space:nowrap;}
+.chart-legend{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;}
+.chart-legend-item{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text-secondary);}
+.chart-legend-dot{width:10px;height:10px;border-radius:2px;flex-shrink:0;}
+.scroll-sync-bar{overflow-x:auto;overflow-y:hidden;height:10px;margin-bottom:2px;}
+.scroll-sync-inner{height:1px;}
+.kanban-wrap{overflow-x:auto;padding-bottom:8px;}
+.kanban{display:flex;gap:10px;min-width:max-content;}
+.kanban-col{width:225px;flex-shrink:0;}
+.kanban-col-header{padding:9px 12px;border-radius:var(--radius-md) var(--radius-md) 0 0;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;display:flex;align-items:center;justify-content:space-between;}
+.kanban-col-body{background:var(--bg);border:1px solid var(--border);border-top:none;border-radius:0 0 var(--radius-md) var(--radius-md);min-height:80px;padding:7px;display:flex;flex-direction:column;gap:7px;}
+.k-card{background:var(--white);border:1px solid var(--border);border-radius:var(--radius-md);padding:10px;cursor:pointer;transition:all .15s;}
+.k-card:hover{box-shadow:var(--shadow-md);border-color:var(--bordeaux);transform:translateY(-1px);}
+.k-card-company{font-weight:600;font-size:12px;color:var(--navy);margin-bottom:2px;}
+.k-card-contact{font-size:11px;color:var(--text-secondary);margin-bottom:5px;}
+.k-card-footer{display:flex;align-items:center;justify-content:space-between;}
+.k-card-amount{font-size:11px;font-weight:600;color:var(--bordeaux);}
+.k-card-date{font-size:10px;color:var(--text-tertiary);}
+.k-card-rdv{font-size:10px;font-weight:600;padding:2px 6px;border-radius:99px;background:#fef3c7;color:#78350f;margin-top:4px;display:inline-block;}
+.k-card-rdv.past{background:#fee2e2;color:#991b1b;}
+.kanban-empty{font-size:11px;color:var(--text-tertiary);text-align:center;padding:12px 0;font-style:italic;}
+.table-outer{background:var(--bg-card);border-radius:var(--radius-lg);box-shadow:var(--shadow-md);border:1px solid var(--border);}
+.table-wrap{overflow-x:auto;}
+table{width:100%;border-collapse:collapse;font-size:13px;min-width:1000px;}
+th{background:#f8f7f5;font-weight:600;font-size:10px;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:.07em;padding:9px 10px;text-align:left;border-bottom:1px solid var(--border);white-space:nowrap;}
+td{padding:8px 10px;border-bottom:1px solid var(--border);vertical-align:middle;}
+tr:last-child td{border-bottom:none;}
+tr:hover td{background:rgba(27,42,74,0.02);}
+.badge{padding:2px 8px;border-radius:99px;font-size:11px;font-weight:600;display:inline-block;white-space:nowrap;}
+.st-acontacter{background:#e0f2fe;color:#0c4a6e;}
+.st-contacte{background:#ede9fe;color:#4c1d95;}
+.st-rdv{background:#fef3c7;color:#78350f;}
+.st-proposition{background:#dbeafe;color:#1e3a5f;}
+.st-negociation{background:#fce7f3;color:#831843;}
+.st-signe{background:#dcfce7;color:#14532d;}
+.st-perdu{background:#fee2e2;color:#7f1d1d;}
+select.cell-sel{border:1px solid var(--border);background:var(--white);font-family:'Sora',sans-serif;font-size:11px;cursor:pointer;border-radius:var(--radius-sm);padding:2px 4px;}
+td[contenteditable=true]:hover{background:rgba(163,33,95,0.04);border-radius:3px;cursor:text;}
+.del-btn{background:var(--danger-bg);color:var(--danger);padding:3px 7px;border-radius:var(--radius-sm);font-size:11px;border:none;cursor:pointer;}
+.hist-btn{background:var(--bordeaux-bg);color:var(--bordeaux);border:1px solid rgba(163,33,95,0.2);border-radius:var(--radius-sm);padding:3px 8px;font-size:11px;font-weight:600;cursor:pointer;}
+.owner-me{font-weight:600;color:var(--bordeaux);}
+.owner-other{color:var(--text-tertiary);font-style:italic;}
+.rdv-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px;}
+.rdv-card{background:var(--bg-card);border-radius:var(--radius-lg);padding:16px;border:1px solid var(--border);cursor:pointer;transition:box-shadow .15s;}
+.rdv-card:hover{box-shadow:var(--shadow-md);}
+.rdv-card.upcoming{border-left:3px solid #f59e0b;}
+.rdv-card.past-ok{border-left:3px solid var(--success);}
+.rdv-card.past-pending{border-left:3px solid var(--danger);}
+.rdv-card-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:8px;gap:8px;}
+.rdv-card-company{font-weight:700;font-size:14px;color:var(--navy);}
+.rdv-badge{font-size:11px;font-weight:600;padding:3px 9px;border-radius:99px;flex-shrink:0;}
+.rdv-badge-upcoming{background:#fef3c7;color:#78350f;}
+.rdv-badge-past{background:#fee2e2;color:#991b1b;}
+.rdv-badge-done{background:#dcfce7;color:#14532d;}
+.rdv-field{margin-bottom:7px;}
+.rdv-field-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text-tertiary);margin-bottom:2px;}
+.rdv-field-val{font-size:12px;color:var(--text-primary);line-height:1.4;}
+.rdv-reminder{background:#fff7ed;border:1px solid #fed7aa;border-radius:var(--radius-md);padding:7px 11px;font-size:12px;color:#c2410c;margin-top:8px;}
+.rdv-owner{font-size:11px;color:var(--text-tertiary);margin-top:8px;padding-top:8px;border-top:1px solid var(--border);}
+.hist-panel{position:fixed;right:0;top:0;bottom:0;width:440px;max-width:95vw;background:var(--white);box-shadow:-8px 0 40px rgba(27,42,74,0.18);z-index:400;display:flex;flex-direction:column;transform:translateX(100%);transition:transform .25s ease;}
+.hist-panel.open{transform:translateX(0);}
+.hist-header{padding:16px 20px;border-bottom:1px solid var(--border);}
+.hist-company{font-family:'Playfair Display',serif;font-size:17px;color:var(--navy);}
+.hist-contact{font-size:12px;color:var(--text-tertiary);margin-top:2px;}
+.hist-status-row{display:flex;align-items:center;gap:8px;margin-top:8px;flex-wrap:wrap;}
+.hist-close{position:absolute;top:16px;right:16px;background:none;border:none;font-size:22px;cursor:pointer;color:var(--text-tertiary);}
+.hist-body{flex:1;overflow-y:auto;padding:14px 20px;}
+.hist-entry{background:var(--bg);border-radius:var(--radius-md);padding:11px 13px;margin-bottom:9px;border-left:3px solid var(--bordeaux);}
+.hist-entry-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:3px;}
+.hist-entry-date{font-size:11px;font-weight:600;color:var(--bordeaux);}
+.hist-entry-canal{font-size:10px;font-weight:600;padding:2px 7px;border-radius:99px;background:rgba(163,33,95,0.1);color:var(--bordeaux);}
+.hist-entry-result{font-size:11px;font-weight:600;color:var(--navy);margin-top:3px;}
+.hist-entry-note{font-size:12px;color:var(--text-secondary);line-height:1.4;margin-top:3px;}
+.hist-empty{font-size:13px;color:var(--text-tertiary);text-align:center;padding:20px 0;}
+.hist-add{padding:14px 20px;border-top:1px solid var(--border);background:#fafafa;}
+.hist-add-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--bordeaux);margin-bottom:10px;}
+.hg2{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;}
+.hf{margin-bottom:8px;}
+.overlay-bg{position:fixed;inset:0;background:rgba(15,25,35,0.35);z-index:399;display:none;}
+.overlay-bg.open{display:block;}
+.rdv-modal-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.rdv-modal-full{grid-column:1/-1;}
+.cap-link{display:inline-flex;align-items:center;gap:7px;background:var(--navy);color:white;padding:7px 14px;border-radius:var(--radius-md);font-size:12px;font-weight:600;text-decoration:none;margin-bottom:16px;transition:background .15s;}
+.cap-link:hover{background:var(--bordeaux);}
+.toolbar{display:flex;gap:7px;flex-wrap:wrap;align-items:center;margin-bottom:12px;}
+.toolbar select,.toolbar input[type=text]{padding:6px 10px;border-radius:var(--radius-md);border:1.5px solid var(--border-strong);font-family:'Sora',sans-serif;font-size:12px;background:var(--white);color:var(--text-primary);}
+.toolbar select:focus,.toolbar input:focus{outline:none;border-color:var(--bordeaux);}
+.sec-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--text-tertiary);margin-bottom:10px;display:flex;align-items:center;gap:8px;}
+.sec-title::after{content:'';flex:1;height:1px;background:var(--border);}
+</style>
 </head>
 <body>
-
-<div class="login-page" id="login-page"></div>
+<div class="login-page" id="login-page">
+  <div class="login-box">
+    <div class="login-logo"><img src="../assets/images/ICN-Junior-Conseil_logo.png" style="height:54px;object-fit:contain"/></div>
+    <div class="login-title">Connexion</div>
+    <div class="login-sub">Accès réservé aux membres ICN Junior Conseil.</div>
+    <button class="google-btn" onclick="doGoogleLogin()">
+      <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google"/>Se connecter avec Google
+    </button>
+    <div class="denied-box" id="denied-box"><strong>Accès refusé</strong><p id="denied-msg"></p></div>
+    <div class="login-error" id="login-error"></div>
+  </div>
+</div>
 
 <div class="app-page" id="app-page">
-
   <div id="sidebar-container"></div>
-
   <div class="app-content">
-
-    <div class="crm-topbar">
-
-      <div>
-        <div class="page-title">CRM Prospection</div>
-        <div class="page-subtitle">Gestion commerciale ICN Junior Conseil</div>
+    <div class="page-header">
+      <div class="flex justify-between items-center" style="flex-wrap:wrap;gap:10px;">
+        <div><div class="page-title">Prospection</div><div class="page-subtitle" id="page-subtitle"></div></div>
+        <div class="flex gap-2">
+          <button class="btn btn-primary btn-sm" onclick="openAddProspect()">+ Prospect</button>
+          <button class="btn btn-secondary btn-sm" onclick="exportXLSX()">⬇ Excel</button>
+        </div>
       </div>
-
-      <div class="week-switcher">
-        <button class="week-btn" onclick="previousWeek()">←</button>
-
-        <div id="week-display"></div>
-
-        <button class="week-btn" onclick="nextWeek()">→</button>
-      </div>
-
     </div>
-
-    <div class="stats-grid">
-
-      <div class="stat-card">
-        <div>Contactés</div>
-        <div class="stat-value" id="stat-contactes">0</div>
+    <div class="page-body">
+      <div class="crm-tabs">
+        <button class="crm-tab" onclick="switchTab('ca')" id="tab-ca" style="display:none">📊 Vue CA</button>
+        <button class="crm-tab active" onclick="switchTab('mine')" id="tab-mine">🎯 Mes prospects</button>
+        <button class="crm-tab" onclick="switchTab('all')" id="tab-all">📋 Tous</button>
+        <button class="crm-tab" onclick="switchTab('rdv')" id="tab-rdv">🤝 Après RDV</button>
       </div>
 
-      <div class="stat-card">
-        <div>RDV planifiés</div>
-        <div class="stat-value" id="stat-rdv">0</div>
+      <!-- VUE CA -->
+      <div class="crm-pane" id="pane-ca">
+        <div class="flex gap-3 flex-wrap items-start" style="margin-bottom:16px;">
+          <div id="week-nav-ca"></div>
+          <div class="goal-bar">
+            <div><div style="font-size:12px;color:var(--text-secondary)">Objectif / semaine</div><div style="font-size:11px;color:var(--text-tertiary)" id="goal-by">—</div></div>
+            <div style="text-align:center"><div style="font-size:22px;font-weight:700;color:var(--navy)" id="goal-display">10</div><div style="font-size:11px;color:var(--text-tertiary)">contacts valorisés</div></div>
+            <button class="goal-edit-btn" id="btn-edit-goal" onclick="openGoalModal()" style="display:none">✏ Modifier</button>
+          </div>
+        </div>
+        <div id="alert-box"></div>
+        <div class="sec-title">Semaine sélectionnée</div>
+        <div class="stats-bar" id="ca-stats-week"></div>
+        <div class="sec-title" style="margin-top:4px">Global</div>
+        <div class="stats-bar" id="ca-stats-global"></div>
+        <div class="sec-title" style="margin-top:4px">Classement</div>
+        <div class="ranking-grid" id="ranking-grid"></div>
+        <div class="sec-title">Évolution</div>
+        <div class="period-selector" id="period-ca"></div>
+        <div class="period-daterange" id="daterange-ca">
+          <input type="date" class="input" id="dr-ca-from" style="font-size:12px;padding:5px;"/>
+          <span style="font-size:12px;color:var(--text-tertiary)">→</span>
+          <input type="date" class="input" id="dr-ca-to" style="font-size:12px;padding:5px;"/>
+          <button class="btn btn-secondary btn-sm" onclick="renderCAChart()">Afficher</button>
+        </div>
+        <div class="chart-wrap" id="chart-ca"></div>
       </div>
 
-      <div class="stat-card">
-        <div>Propositions envoyées</div>
-        <div class="stat-value" id="stat-propositions">0</div>
+      <!-- MES PROSPECTS -->
+      <div class="crm-pane active" id="pane-mine">
+        <a class="cap-link" href="https://app-capfinancials-com.thebe.icn-nancy.fr/search?state=open&city%5B0%5D=Nancy&contact.exists=true&contact.email=true&hasPhone=true" target="_blank">🔍 Cap Financial — Nancy (625 contacts)</a>
+        <div id="week-nav-mine"></div>
+        <div id="week-goal-bar"></div>
+        <div class="sec-title" style="margin-top:16px">Mon évolution</div>
+        <div class="period-selector" id="period-mine"></div>
+        <div class="period-daterange" id="daterange-mine">
+          <input type="date" class="input" id="dr-mine-from" style="font-size:12px;padding:5px;"/>
+          <span style="font-size:12px;color:var(--text-tertiary)">→</span>
+          <input type="date" class="input" id="dr-mine-to" style="font-size:12px;padding:5px;"/>
+          <button class="btn btn-secondary btn-sm" onclick="renderMineChart()">Afficher</button>
+        </div>
+        <div class="chart-wrap" id="chart-mine" style="margin-bottom:20px"></div>
+        <div class="sec-title">Mon portefeuille</div>
+        <div class="scroll-sync-bar" id="ssb-mine"><div class="scroll-sync-inner" id="ssi-mine"></div></div>
+        <div class="kanban-wrap" id="kw-mine"><div class="kanban" id="kanban-mine"></div></div>
       </div>
 
-      <div class="stat-card">
-        <div>Négociations</div>
-        <div class="stat-value" id="stat-negociations">0</div>
+      <!-- TOUS LES PROSPECTS -->
+      <div class="crm-pane" id="pane-all">
+        <div class="toolbar">
+          <input type="text" id="search-all" placeholder="🔍 Rechercher…" oninput="renderAll()"/>
+          <select id="filter-member" onchange="renderAll()"><option value="">Tous les membres</option></select>
+          <select id="filter-statut" onchange="renderAll()">
+            <option value="">Statut</option>
+            <option>À contacter</option><option>Contacté</option><option>RDV planifié</option>
+            <option>Proposition envoyée</option><option>Négociation</option><option>Signé</option><option>Perdu</option>
+          </select>
+          <select id="filter-secteur" onchange="renderAll()">
+            <option value="">Secteur</option>
+            <option>Industrie</option><option>Services</option><option>Commerce</option>
+            <option>Tech</option><option>Santé</option><option>Éducation</option><option>Autre</option>
+          </select>
+          <button class="btn btn-secondary btn-sm" onclick="clearFilters()">Réinitialiser</button>
+          <span style="font-size:11px;color:var(--text-tertiary);font-style:italic" id="filter-note"></span>
+        </div>
+        <div class="table-outer">
+          <div class="scroll-sync-bar" id="ssb-all"><div class="scroll-sync-inner" id="ssi-all"></div></div>
+          <div class="table-wrap" id="tw-all">
+            <table><thead><tr>
+              <th>Entreprise</th><th>Contact</th><th>Poste</th><th>Tél</th><th>Secteur</th><th>Source</th>
+              <th>Montant est.</th><th>Statut</th><th>Priorité</th><th>Responsable</th>
+              <th>Dernière action</th><th>Prochaine relance</th>
+              <th style="text-align:center">Historique</th><th style="width:40px"></th>
+            </tr></thead>
+            <tbody id="tbody-all"></tbody></table>
+          </div>
+        </div>
       </div>
 
-      <div class="stat-card">
-        <div>Signés</div>
-        <div class="stat-value" id="stat-signes">0</div>
+      <!-- APRÈS RDV -->
+      <div class="crm-pane" id="pane-rdv">
+        <div class="flex justify-between items-center" style="margin-bottom:14px;flex-wrap:wrap;gap:8px;">
+          <div style="display:flex;gap:12px;align-items:center;font-size:12px;color:var(--text-tertiary);flex-wrap:wrap;">
+            <span>🟡 À venir</span><span>🔴 En attente MAJ</span><span>🟢 Mis à jour</span>
+          </div>
+          <button class="btn btn-primary btn-sm" onclick="openAddRdv()">+ Ajouter un RDV</button>
+        </div>
+        <div id="rdv-reminders" style="margin-bottom:14px"></div>
+        <div class="rdv-grid" id="rdv-grid"></div>
       </div>
-
-      <div class="stat-card">
-        <div>Perdus</div>
-        <div class="stat-value" id="stat-perdus">0</div>
-      </div>
-
     </div>
-
-    <div class="pipeline-grid">
-
-      <div class="stat-card">
-        <div>Pipeline fiable</div>
-        <div class="stat-value" id="pipeline-reliable">0€</div>
-      </div>
-
-      <div class="stat-card">
-        <div>Pipeline incertain</div>
-        <div class="stat-value" id="pipeline-uncertain">0€</div>
-      </div>
-
-      <div class="stat-card">
-        <div>Taux conversion</div>
-        <div class="stat-value" id="conversion-rate">0%</div>
-      </div>
-
-    </div>
-
-    <div class="card" style="margin-top:24px">
-
-      <div class="flex justify-between items-center" style="margin-bottom:18px">
-        <div class="section-title">Tous les prospects</div>
-
-        <button class="btn btn-primary" onclick="openCreateProspectModal()">
-          + Ajouter un prospect
-        </button>
-      </div>
-
-      <div class="crm-table-wrapper">
-
-        <table class="crm-table">
-
-          <thead>
-            <tr>
-              <th>Entreprise</th>
-              <th>Statut</th>
-              <th>Montant</th>
-              <th>Commercial</th>
-              <th>Dernière mise à jour</th>
-            </tr>
-          </thead>
-
-          <tbody id="prospects-table"></tbody>
-
-        </table>
-
-      </div>
-
-    </div>
-
   </div>
+</div>
 
+<div class="overlay-bg" id="overlay-bg" onclick="closeHist()"></div>
+
+<!-- PANNEAU HISTORIQUE -->
+<div class="hist-panel" id="hist-panel">
+  <div class="hist-header" style="position:relative">
+    <div class="hist-company" id="hist-co"></div>
+    <div class="hist-contact" id="hist-ct"></div>
+    <div class="hist-status-row" id="hist-sr"></div>
+    <button class="hist-close" onclick="closeHist()">×</button>
+  </div>
+  <div class="hist-body" id="hist-body"></div>
+  <div class="hist-add" id="hist-add-section">
+    <div class="hist-add-title">+ Enregistrer une action</div>
+    <div class="hg2">
+      <div><label class="input-label">Canal</label>
+        <select class="select-field" id="h-canal" style="font-size:12px;padding:6px;">
+          <option>Appel</option><option>Mail</option><option>RDV</option><option>LinkedIn</option><option>SMS</option><option>Autre</option>
+        </select></div>
+      <div><label class="input-label">Date action</label><input class="input" type="date" id="h-date" style="font-size:12px;padding:6px;"/></div>
+    </div>
+    <div class="hg2">
+      <div><label class="input-label">Résultat / Nouveau statut</label>
+        <select class="select-field" id="h-result" style="font-size:12px;padding:6px;" onchange="toggleRdvRow()">
+          <option value="">— Inchangé —</option>
+          <option value="Contacté">✅ Contacté</option>
+          <option value="RDV planifié">📅 RDV planifié</option>
+          <option value="Proposition envoyée">📄 Proposition envoyée</option>
+          <option value="Négociation">🤝 En négociation</option>
+          <option value="Signé">🎉 Signé !</option>
+          <option value="Perdu">❌ Perdu</option>
+          <option value="Pas de réponse">📵 Pas de réponse</option>
+          <option value="Rappel demandé">🔄 Rappel demandé</option>
+        </select></div>
+      <div><label class="input-label">Priorité</label>
+        <select class="select-field" id="h-priority" style="font-size:12px;padding:6px;">
+          <option value="">— Inchangée —</option>
+          <option value="Haute">🔴 Haute</option>
+          <option value="Normale">🟡 Normale</option>
+          <option value="Basse">🟢 Basse</option>
+        </select></div>
+    </div>
+    <div class="hg2" id="rdv-row" style="display:none">
+      <div><label class="input-label">📅 Date du RDV <span style="color:var(--danger)">*</span></label><input class="input" type="date" id="h-rdv-date" style="font-size:12px;padding:6px;"/></div>
+      <div><label class="input-label">Montant mis à jour (€)</label><input class="input" type="number" id="h-montant-rdv" placeholder="Laisser vide" style="font-size:12px;padding:6px;"/></div>
+    </div>
+    <div class="hg2" id="normal-row">
+      <div><label class="input-label">Prochaine relance</label><input class="input" type="date" id="h-next-date" style="font-size:12px;padding:6px;"/></div>
+      <div><label class="input-label">Montant mis à jour (€)</label><input class="input" type="number" id="h-montant" placeholder="Laisser vide" style="font-size:12px;padding:6px;"/></div>
+    </div>
+    <div class="hf"><label class="input-label">Note</label><input class="input" type="text" id="h-note" placeholder="Détails de l'échange…" style="font-size:12px;"/></div>
+    <button class="btn btn-primary w-full" onclick="saveHist()" style="font-size:13px;">Enregistrer</button>
+  </div>
+</div>
+
+<!-- MODAL AJOUT PROSPECT -->
+<div class="modal-overlay" id="modal-ap" onclick="if(event.target===this)closeAddProspect()">
+  <div class="modal-box" style="max-width:560px">
+    <div class="modal-header"><div class="modal-title">Ajouter un prospect</div><button class="modal-close" onclick="closeAddProspect()">×</button></div>
+    <div class="form-grid">
+      <div class="form-field full"><label class="input-label">Entreprise *</label><input class="input" id="ap-co"/></div>
+      <div class="form-field"><label class="input-label">Contact</label><input class="input" id="ap-ct" placeholder="Prénom Nom"/></div>
+      <div class="form-field"><label class="input-label">Poste</label><input class="input" id="ap-po" placeholder="Ex : DRH, Gérant"/></div>
+      <div class="form-field"><label class="input-label">Email</label><input class="input" type="email" id="ap-em"/></div>
+      <div class="form-field"><label class="input-label">Téléphone</label><input class="input" id="ap-te"/></div>
+      <div class="form-field"><label class="input-label">Secteur</label>
+        <select class="select-field" id="ap-se"><option value="">—</option>
+          <option>Industrie</option><option>Services</option><option>Commerce</option>
+          <option>Tech</option><option>Santé</option><option>Éducation</option><option>Autre</option>
+        </select></div>
+      <div class="form-field"><label class="input-label">Source</label>
+        <select class="select-field" id="ap-so"><option value="">—</option>
+          <option>Cap Financial</option><option>LinkedIn</option><option>Réseau</option>
+          <option>Événement</option><option>Recommandation</option><option>Autre</option>
+        </select></div>
+      <div class="form-field"><label class="input-label">Montant estimé (€)</label><input class="input" type="number" id="ap-mo" placeholder="0"/></div>
+      <div class="form-field"><label class="input-label">Statut *</label>
+        <select class="select-field" id="ap-st"><option value="">—</option>
+          <option>À contacter</option><option>Contacté</option>
+        </select></div>
+      <div class="form-field"><label class="input-label">Priorité</label>
+        <select class="select-field" id="ap-pr">
+          <option value="Normale">Normale</option><option value="Haute">Haute</option><option value="Basse">Basse</option>
+        </select></div>
+      <div class="form-field full"><label class="input-label">Notes</label><textarea class="input" id="ap-no" rows="2" style="resize:vertical"></textarea></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeAddProspect()">Annuler</button>
+      <button class="btn btn-primary" onclick="confirmAddProspect()">Ajouter →</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL OBJECTIF -->
+<div class="modal-overlay" id="modal-goal" onclick="if(event.target===this)closeGoalModal()">
+  <div class="modal-box" style="max-width:380px">
+    <div class="modal-header"><div class="modal-title">Modifier l'objectif</div><button class="modal-close" onclick="closeGoalModal()">×</button></div>
+    <div class="form-field" style="padding:8px 0">
+      <label class="input-label">Contacts valorisés / semaine (statut ≥ Contacté)</label>
+      <input class="input" type="number" id="goal-input" min="1" max="100" value="10"/>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeGoalModal()">Annuler</button>
+      <button class="btn btn-primary" onclick="saveGoal()">Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL RDV -->
+<div class="modal-overlay" id="modal-rdv" onclick="if(event.target===this)closeRdvModal()">
+  <div class="modal-box" style="max-width:560px">
+    <div class="modal-header"><div class="modal-title" id="rdv-modal-title">Compte-rendu RDV</div><button class="modal-close" onclick="closeRdvModal()">×</button></div>
+    <input type="hidden" id="rdv-edit-id"/>
+    <div class="rdv-modal-grid">
+      <div class="rdv-modal-full"><label class="input-label">Entreprise *</label><input class="input" id="rdv-co"/></div>
+      <div><label class="input-label">Date du RDV *</label><input class="input" type="date" id="rdv-date"/></div>
+      <div><label class="input-label">État de signature *</label>
+        <select class="select-field" id="rdv-signe"><option value="">—</option>
+          <option>Signé</option><option>En cours de négociation</option>
+          <option>Non signé</option><option>En attente retour client</option><option>RDV non effectué</option>
+        </select></div>
+      <div class="rdv-modal-full"><label class="input-label">Pourquoi pas signé ?</label><input class="input" id="rdv-raison" placeholder="Raison principale si non signé"/></div>
+      <div class="rdv-modal-full"><label class="input-label">Demande client *</label><textarea class="input" id="rdv-demande" rows="2" style="resize:vertical" placeholder="Besoins, attentes du client…"></textarea></div>
+      <div class="rdv-modal-full"><label class="input-label">Suite donnée *</label><textarea class="input" id="rdv-suite" rows="2" style="resize:vertical" placeholder="Prochaines étapes…"></textarea></div>
+      <div><label class="input-label">Interlocuteur rencontré</label><input class="input" id="rdv-inter" placeholder="Prénom Nom, poste"/></div>
+      <div><label class="input-label">Montant estimé (€)</label><input class="input" type="number" id="rdv-montant" placeholder="0"/></div>
+      <div class="rdv-modal-full"><label class="input-label">Prochaine étape</label><input class="input" id="rdv-next" placeholder="Ex : Envoyer proposition d'ici vendredi"/></div>
+      <div><label class="input-label">Date prochaine relance</label><input class="input" type="date" id="rdv-next-date"/></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeRdvModal()">Annuler</button>
+      <button class="btn btn-primary" onclick="confirmRdv()">Enregistrer →</button>
+    </div>
+  </div>
 </div>
 
 <script>
+var CA_ROLES=['super_admin','president','vice_president','tresorier','responsable_commercial','responsable_qualite','secretaire'];
+var STATUTS=['À contacter','Contacté','RDV planifié','Proposition envoyée','Négociation','Signé','Perdu'];
+var ST_CSS={'À contacter':'st-acontacter','Contacté':'st-contacte','RDV planifié':'st-rdv','Proposition envoyée':'st-proposition','Négociation':'st-negociation','Signé':'st-signe','Perdu':'st-perdu'};
+var ST_COL={'À contacter':{bg:'#e0f2fe',c:'#0c4a6e'},'Contacté':{bg:'#ede9fe',c:'#4c1d95'},'RDV planifié':{bg:'#fef3c7',c:'#78350f'},'Proposition envoyée':{bg:'#dbeafe',c:'#1e3a5f'},'Négociation':{bg:'#fce7f3',c:'#831843'},'Signé':{bg:'#dcfce7',c:'#14532d'},'Perdu':{bg:'#fee2e2',c:'#7f1d1d'}};
+var COLORS=['#A3215F','#1B2A4A','#3b82f6','#10b981','#f59e0b','#8b5cf6'];
+var PERIODS=['Semaine','Mois','Trimestre','Semestre','Année','Date à date'];
+var RLMAP={super_admin:'Super Admin',president:'Président',vice_president:'VP',tresorier:'Trésorier',secretaire:'Secrétaire',responsable_commercial:'RC',responsable_qualite:'RQ',responsable_marketing:'RM',tresorerie:'Trésorerie',auditeur:'Auditeur',marketing:'Marketing',commercial:'Commercial'};
 
-initAuth('crm_prospection', async function(user, role, profile){
+var me='',myName='',myRole='',isCA=false;
+var allP=[],allRdvs=[],allUsers=[],goalWeek=10;
+var curHistId=null,curHistP=null;
+var weekOffCA=0,weekOffMine=0;
+var periodCA='Semaine',periodMine='Semaine';
 
-  CRM_STORE.currentUser = user;
-  CRM_STORE.currentRole = role;
-  CRM_STORE.currentProfile = profile;
-
-  renderSidebar(role, profile, user, 'crm_prospection');
-
-  showAppPage(user, role, profile);
-
-  setCurrentWeek();
-
-  document.getElementById('week-display').innerText =
-    'Semaine ' + CRM_STORE.selectedWeek + ' — ' + CRM_STORE.selectedYear;
-
-  await loadUsers();
-
-  await loadProspects();
-
-  refreshCRM();
+initAuth('crm_prospection',function(user,role,profile){
+  me=user.email; myName=((profile.prenom||'')+' '+(profile.nom||'')).trim(); myRole=role; isCA=CA_ROLES.includes(role);
+  renderSidebar(role,profile,user,'crm_prospection');
+  showAppPage(user,role,profile);
+  updateHealthIndicator();
+  var now=new Date();
+  var J=['Dimanche','Lundi','Mardi','Mercredi','Jeudi','Vendredi','Samedi'];
+  var M=['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
+  document.getElementById('page-subtitle').innerText=J[now.getDay()]+' '+now.getDate()+' '+M[now.getMonth()]+' '+now.getFullYear();
+  if(isCA){document.getElementById('tab-ca').style.display='block';document.getElementById('btn-edit-goal').style.display='flex';switchTab('ca');}
+  initPeriods();
+  loadData();
 });
 
-</script>
+function loadData(){
+  db.collection('crm_config').doc('objectifs').get().then(function(d){
+    if(d.exists){goalWeek=d.data().objectif_semaine||10;document.getElementById('goal-display').innerText=goalWeek;document.getElementById('goal-input').value=goalWeek;document.getElementById('goal-by').innerText='Par '+(d.data().modifie_par||'—');}
+  });
+  db.collection('users').get().then(function(snap){
+    allUsers=[];snap.forEach(function(d){allUsers.push(Object.assign({email:d.id},d.data()));});
+    var sel=document.getElementById('filter-member');
+    allUsers.forEach(function(u){var o=document.createElement('option');o.value=u.email;o.text=(u.prenom||'')+' '+(u.nom||'');sel.appendChild(o);});
+  });
+  db.collection('prospects').onSnapshot(function(snap){allP=[];snap.forEach(function(d){allP.push(Object.assign({id:d.id},d.data()));});refreshAll();});
+  db.collection('prospects_rdv').onSnapshot(function(snap){allRdvs=[];snap.forEach(function(d){allRdvs.push(Object.assign({id:d.id},d.data()));});renderRdv();});
+}
 
+function refreshAll(){renderMine();renderAll();renderRdv();if(isCA)renderCA();}
+
+// ── Week helpers ──────────────────────────────────────────────
+function wkStart(off){var d=new Date();var dy=d.getDay();d.setDate(d.getDate()-dy+(dy===0?-6:1)+off*7);d.setHours(0,0,0,0);return d;}
+function wkEnd(off){var d=wkStart(off);d.setDate(d.getDate()+7);return d;}
+function isoWeek(d){var dt=new Date(d);dt.setHours(0,0,0,0);dt.setDate(dt.getDate()+3-(dt.getDay()+6)%7);var w1=new Date(dt.getFullYear(),0,4);return 1+Math.round(((dt-w1)/864e5-3+(w1.getDay()+6)%7)/7);}
+function inWk(ds,off){if(!ds)return false;var d=new Date(ds);return d>=wkStart(off)&&d<wkEnd(off);}
+function wkLabel(off){var ws=wkStart(off);var wn=isoWeek(ws);if(off===0)return'Semaine '+wn+' (cette semaine)';if(off===-1)return'Semaine '+wn+' (semaine dernière)';return'Semaine '+wn+' — '+ws.getFullYear();}
+function fmtD(s){if(!s)return'';var p=s.split('-');return p.length===3?p[2]+'/'+p[1]+'/'+p[0]:s;}
+function fmtM(n){return Number(n||0).toLocaleString('fr-FR',{minimumFractionDigits:0,maximumFractionDigits:0})+' €';}
+function encId(id){return(id||'').replace(/['"<>&]/g,'');}
+function countVal(email,off){return allP.filter(function(p){return p.owner_email===email&&p.statut!=='À contacter'&&inWk(p.last_action_date,off);}).length;}
+
+function buildWeekNav(cid,key){
+  var off=key==='ca'?weekOffCA:weekOffMine;
+  var ws=wkStart(off),we=new Date(wkEnd(off).getTime()-864e5);
+  document.getElementById(cid).innerHTML='<div class="week-nav">'+
+    '<button class="week-nav-btn" onclick="changeWeek(\''+key+'\',-1)">‹</button>'+
+    '<div><div class="week-nav-label">'+wkLabel(off)+'</div>'+
+    '<div class="week-nav-sub">'+fmtD(ws.toISOString().split('T')[0])+' → '+fmtD(we.toISOString().split('T')[0])+'</div></div>'+
+    '<button class="week-nav-btn" onclick="changeWeek(\''+key+'\',1)"'+(off>=0?' disabled':'')+'>›</button>'+
+    (off!==0?'<button class="week-today-btn" onclick="changeWeek(\''+key+'\','+(-off)+')">Aujourd\'hui</button>':'')+
+  '</div>';
+}
+function changeWeek(key,delta){
+  if(key==='ca'){weekOffCA=Math.min(0,weekOffCA+delta);buildWeekNav('week-nav-ca','ca');renderCA();}
+  else{weekOffMine=Math.min(0,weekOffMine+delta);buildWeekNav('week-nav-mine','mine');renderMine();}
+}
+
+function switchTab(key){
+  document.querySelectorAll('.crm-tab').forEach(function(t){t.classList.remove('active');});
+  document.querySelectorAll('.crm-pane').forEach(function(p){p.classList.remove('active');});
+  var tm={ca:'tab-ca',mine:'tab-mine',all:'tab-all',rdv:'tab-rdv'};
+  var pm={ca:'pane-ca',mine:'pane-mine',all:'pane-all',rdv:'pane-rdv'};
+  document.getElementById(tm[key]).classList.add('active');
+  document.getElementById(pm[key]).classList.add('active');
+  if(key==='all')setTimeout(syncScrollAll,100);
+}
+
+// ── Render CA ──────────────────────────────────────────────────
+function renderCA(){
+  buildWeekNav('week-nav-ca','ca');
+  var off=weekOffCA,isPast=off<0;
+  var prosp=allUsers.filter(function(u){return u.prospecte;});
+  var inactive=allUsers.filter(function(u){return !u.prospecte;});
+  // Stats semaine
+  var wkP=allP.filter(function(p){return inWk(p.last_action_date,off)&&p.statut!=='À contacter';});
+  var swHtml='';
+  STATUTS.filter(function(s){return s!=='À contacter';}).forEach(function(s){
+    var n=wkP.filter(function(p){return p.statut===s;}).length;
+    if(n>0) swHtml+=sc(s,n,s==='Signé'?'success':s==='Perdu'?'danger':'');
+  });
+  var pipW=wkP.filter(function(p){return p.statut!=='Perdu';}).reduce(function(a,p){return a+(parseFloat(p.montant)||0);},0);
+  var pipWU=wkP.filter(function(p){return p.statut!=='Perdu'&&inactive.find(function(u){return u.email===p.owner_email;});}).reduce(function(a,p){return a+(parseFloat(p.montant)||0);},0);
+  swHtml+=sc('Pipeline semaine',fmtM(pipW),'');
+  if(pipWU>0)swHtml+=sc('Pipeline incertain',fmtM(pipWU),'uncertain');
+  document.getElementById('ca-stats-week').innerHTML=swHtml||'<div style="font-size:13px;color:var(--text-tertiary)">Aucune activité cette semaine.</div>';
+  // Stats globales
+  var sgHtml='';
+  STATUTS.forEach(function(s){sgHtml+=sc(s,allP.filter(function(p){return p.statut===s;}).length,s==='Signé'?'success':s==='Perdu'?'danger':'');});
+  var pipG=allP.filter(function(p){return p.statut!=='Perdu';}).reduce(function(a,p){return a+(parseFloat(p.montant)||0);},0);
+  var pipGU=allP.filter(function(p){return p.statut!=='Perdu'&&inactive.find(function(u){return u.email===p.owner_email;});}).reduce(function(a,p){return a+(parseFloat(p.montant)||0);},0);
+  var totG=allP.length,sigG=allP.filter(function(p){return p.statut==='Signé';}).length;
+  sgHtml+=sc('Pipeline total',fmtM(pipG),'');
+  if(pipGU>0)sgHtml+=sc('Pipeline incertain',fmtM(pipGU),'uncertain');
+  sgHtml+=sc('Taux conversion',(totG>0?Math.round(sigG/totG*100):0)+'%',sigG/Math.max(totG,1)>=0.2?'success':sigG/Math.max(totG,1)>=0.1?'warning':'danger');
+  document.getElementById('ca-stats-global').innerHTML=sgHtml;
+  // Alertes
+  if(!isPast){
+    var late=prosp.filter(function(u){return countVal(u.email,0)<goalWeek;});
+    document.getElementById('alert-box').innerHTML=late.length>0?
+      '<div class="alert-box"><div class="alert-title">⚠ En retard cette semaine</div><div class="alert-list">'+late.map(function(u){return'<div class="alert-item">👤 '+(u.prenom||u.email)+' — <strong>'+countVal(u.email,0)+'/'+goalWeek+'</strong></div>';}).join('')+'</div></div>':'';
+  } else {document.getElementById('alert-box').innerHTML='';}
+  // Classement
+  var ranked=prosp.map(function(u){return{u:u,n:countVal(u.email,off),tot:allP.filter(function(p){return p.owner_email===u.email;}).length};}).sort(function(a,b){return b.n-a.n;});
+  var medals=['🥇','🥈','🥉'],golds=['gold','silver','bronze'];
+  document.getElementById('ranking-grid').innerHTML=ranked.map(function(r,i){
+    var pct=Math.min(100,goalWeek>0?Math.round(r.n/goalWeek*100):0);
+    var bc=isPast?(r.n>=goalWeek?'rb-ok':'rb-late'):(r.n>=goalWeek?'rb-ok':r.n>=goalWeek*0.5?'rb-warn':'rb-late');
+    var bt=isPast?(r.n>=goalWeek?'✅ Objectif atteint':'❌ Objectif manqué'):(r.n>=goalWeek?'✅ Atteint':r.n>=goalWeek*0.5?'⚡ En cours':'🔴 En retard');
+    var ini=((r.u.prenom||'?')[0]+(r.u.nom||'?')[0]).toUpperCase();
+    return'<div class="ranking-card '+(golds[i]||'')+'"><div class="rank-medal">'+(medals[i]||(i+1)+'.')+'</div>'+
+      '<div class="rank-avatar">'+ini+'</div>'+
+      '<div class="rank-info"><div class="rank-name">'+(r.u.prenom||'')+' '+(r.u.nom||'')+'</div>'+
+      '<div class="rank-role">'+(RLMAP[r.u.role]||r.u.role||'')+'</div>'+
+      '<span class="rank-badge '+bc+'">'+bt+'</span></div>'+
+      '<div class="rank-stats"><div class="rank-count">'+r.n+'</div><div class="rank-label">valorisés</div>'+
+      '<div class="rank-prog"><div class="rank-prog-fill" style="width:'+pct+'%"></div></div>'+
+      '<div style="font-size:10px;color:var(--text-tertiary)">'+r.tot+' total</div></div></div>';
+  }).join('');
+  renderCAChart();
+}
+
+function sc(label,val,cls){return'<div class="stat-card '+(cls||'')+'">'+'<div class="s-label">'+label+'</div><div class="s-val">'+val+'</div></div>';}
+
+// ── Render Mine ────────────────────────────────────────────────
+function renderMine(){
+  buildWeekNav('week-nav-mine','mine');
+  var off=weekOffMine,isPast=off<0;
+  var mine=allP.filter(function(p){return p.owner_email===me;});
+  var wkCnt=countVal(me,off);
+  var pct=Math.min(100,goalWeek>0?Math.round(wkCnt/goalWeek*100):0);
+  var bc=isPast?'wgb-past':(wkCnt>=goalWeek?'wgb-ok':wkCnt>=goalWeek*0.5?'wgb-warn':'wgb-late');
+  var bt=isPast?(wkCnt>=goalWeek?'✅ Objectif atteint':'❌ Objectif manqué'):(wkCnt>=goalWeek?'🎯 Objectif atteint !':wkCnt>=goalWeek*0.5?'⚡ Bon rythme':'🔴 Accélère !');
+  document.getElementById('week-goal-bar').innerHTML=
+    '<div class="week-goal"><div class="week-goal-text">'+
+      '<div class="week-goal-title">Objectif semaine</div>'+
+      '<div class="week-goal-count">'+wkCnt+' <span style="font-size:14px;opacity:.6">/ '+goalWeek+'</span></div>'+
+      '<div class="week-goal-sub">contacts valorisés (≥ Contacté)</div></div>'+
+    '<div class="week-goal-bar-wrap"><div style="font-size:10px;opacity:.6;text-align:right">'+pct+'%</div>'+
+      '<div class="week-goal-bar-bg"><div class="week-goal-bar" style="width:'+pct+'%"></div></div></div>'+
+    '<div class="week-goal-badge '+bc+'">'+bt+'</div></div>';
+  renderMineChart();
+  // Kanban
+  document.getElementById('kanban-mine').innerHTML=STATUTS.map(function(s){
+    var cards=mine.filter(function(p){return p.statut===s;});
+    var col=ST_COL[s]||{bg:'#f4f3f1',c:'#1B2A4A'};
+    return'<div class="kanban-col">'+
+      '<div class="kanban-col-header" style="background:'+col.bg+';color:'+col.c+'">'+
+        '<span>'+s+'</span>'+
+        '<span style="background:rgba(0,0,0,0.1);border-radius:99px;padding:1px 7px">'+cards.length+'</span>'+
+      '</div>'+
+      '<div class="kanban-col-body">'+
+      (cards.length===0?'<div class="kanban-empty">—</div>':cards.map(function(p){
+        var pid=encId(p.id);
+        var prioIcon=p.priority==='Haute'?'🔴':p.priority==='Basse'?'🟢':'';
+        var rdvHtml='';
+        if(p.rdv_date){var past=new Date(p.rdv_date)<new Date();rdvHtml='<div class="k-card-rdv'+(past?' past':'')+'">📅 RDV : '+fmtD(p.rdv_date)+'</div>';}
+        var relHtml='';
+        if(p.next_action_date&&new Date(p.next_action_date)<=new Date()){relHtml='<div class="k-card-rdv past">⏰ Relance : '+fmtD(p.next_action_date)+'</div>';}
+        return'<div class="k-card" onclick="openHist(\''+pid+'\')">'+
+          '<div class="k-card-company">'+(p.entreprise||'')+(prioIcon?' '+prioIcon:'')+'</div>'+
+          '<div class="k-card-contact">'+(p.contact||'—')+(p.poste?' · '+p.poste:'')+'</div>'+
+          rdvHtml+relHtml+
+          '<div class="k-card-footer"><span class="k-card-amount">'+(p.montant?fmtM(p.montant):'')+'</span>'+
+          '<span class="k-card-date">'+(p.last_action_date?fmtD(p.last_action_date):'')+'</span></div>'+
+        '</div>';
+      }).join(''))+
+      '</div></div>';
+  }).join('');
+  setTimeout(function(){
+    var kw=document.getElementById('kw-mine');
+    var sb=document.getElementById('ssb-mine');
+    var si=document.getElementById('ssi-mine');
+    if(si&&kw)si.style.width=kw.scrollWidth+'px';
+    if(sb&&kw){sb.onscroll=function(){kw.scrollLeft=sb.scrollLeft;};kw.onscroll=function(){sb.scrollLeft=kw.scrollLeft;};}
+  },100);
+}
+
+// ── Render All ──────────────────────────────────────────────────
+function renderAll(){
+  var srch=(document.getElementById('search-all').value||'').toLowerCase();
+  var fm=document.getElementById('filter-member').value;
+  var fs=document.getElementById('filter-statut').value;
+  var fse=document.getElementById('filter-secteur').value;
+  var isMe=function(p){return p.owner_email===me;};
+  var data=allP.filter(function(p){
+    if(!isCA&&!isMe(p))return false;
+    if(srch&&!(p.entreprise||'').toLowerCase().includes(srch)&&!(p.contact||'').toLowerCase().includes(srch))return false;
+    if(fm&&p.owner_email!==fm)return false;
+    if(fs&&p.statut!==fs)return false;
+    if(fse&&p.secteur!==fse)return false;
+    return true;
+  });
+  document.getElementById('filter-note').innerText=data.length<allP.length?'Affichage de '+data.length+' / '+allP.length:'';
+  var today=new Date();
+  var html=data.length===0?'<tr><td colspan="14" style="text-align:center;padding:2rem;color:var(--text-tertiary)">Aucun prospect.</td></tr>':data.map(function(p){
+    var can=isMe(p)||isCA;
+    var pid=encId(p.id);
+    var sc2=ST_CSS[p.statut]||'';
+    var sOpts=STATUTS.map(function(s){return'<option'+(p.statut===s?' selected':'')+'>'+s+'</option>';}).join('');
+    var prioHtml=p.priority?'<span style="font-size:11px">'+(p.priority==='Haute'?'🔴':p.priority==='Basse'?'🟢':'🟡')+' '+p.priority+'</span>':'—';
+    var relCls=p.next_action_date&&new Date(p.next_action_date)<=today?'color:var(--danger)':'color:var(--text-tertiary)';
+    return'<tr>'+
+      (can?'<td contenteditable="true" onblur="sF(\''+pid+'\',\'entreprise\',this.innerText.trim())">'+(p.entreprise||'')+'</td>':'<td>'+(p.entreprise||'')+'</td>')+
+      (can?'<td contenteditable="true" onblur="sF(\''+pid+'\',\'contact\',this.innerText.trim())">'+(p.contact||'')+'</td>':'<td>'+(p.contact||'')+'</td>')+
+      '<td style="font-size:11px;color:var(--text-tertiary)">'+(p.poste||'')+'</td>'+
+      '<td style="font-size:11px">'+(p.tel||'')+'</td>'+
+      '<td style="font-size:11px">'+(p.secteur||'')+'</td>'+
+      '<td style="font-size:11px">'+(p.source||'')+'</td>'+
+      '<td style="font-size:12px;font-weight:600;color:var(--bordeaux)">'+(p.montant?fmtM(p.montant):'—')+'</td>'+
+      (can?'<td><select class="cell-sel '+sc2+'" onchange="sF(\''+pid+'\',\'statut\',this.value)">'+sOpts+'</select></td>':'<td><span class="badge '+sc2+'">'+(p.statut||'')+'</span></td>')+
+      '<td>'+prioHtml+'</td>'+
+      '<td><span class="'+(isMe(p)?'owner-me':'owner-other')+'">'+(p.owner_name||p.owner_email||'')+'</span></td>'+
+      '<td style="font-size:11px;color:var(--text-tertiary)">'+(p.last_action_date?fmtD(p.last_action_date):'—')+'</td>'+
+      '<td style="font-size:11px;'+relCls+'">'+(p.next_action_date?fmtD(p.next_action_date):'—')+'</td>'+
+      '<td style="text-align:center"><button class="hist-btn" onclick="openHist(\''+pid+'\')">📋</button></td>'+
+      '<td>'+(isMe(p)?'<button class="del-btn" onclick="delP(\''+pid+'\')">✕</button>':'')+'</td>'+
+    '</tr>';
+  }).join('');
+  document.getElementById('tbody-all').innerHTML=html;
+  syncScrollAll();
+}
+
+function syncScrollAll(){
+  var tw=document.getElementById('tw-all');
+  var sb=document.getElementById('ssb-all');
+  var si=document.getElementById('ssi-all');
+  if(!tw||!sb||!si)return;
+  si.style.width=tw.scrollWidth+'px';
+  sb.onscroll=function(){tw.scrollLeft=sb.scrollLeft;};
+  tw.onscroll=function(){sb.scrollLeft=tw.scrollLeft;};
+}
+
+// ── Render RDV ──────────────────────────────────────────────────
+function renderRdv(){
+  var today=new Date();today.setHours(0,0,0,0);
+  var autoR=allP.filter(function(p){return p.rdv_date&&(isCA||p.owner_email===me);}).map(function(p){
+    return{id:'auto_'+encId(p.id),entreprise:p.entreprise,date:p.rdv_date,auto:true,prospect_id:p.id,
+      signe:'',owner_name:p.owner_name,owner_email:p.owner_email,rdv_status:p.rdv_status||''};
+  });
+  var manR=isCA?allRdvs:allRdvs.filter(function(r){return r.owner_email===me;});
+  var reminders=autoR.filter(function(r){var rd=new Date(r.date);rd.setHours(0,0,0,0);return rd<today&&!r.rdv_status;});
+  document.getElementById('rdv-reminders').innerHTML=reminders.length>0?
+    '<div class="alert-box"><div class="alert-title">🔔 RDV passés — en attente de mise à jour</div><div class="alert-list">'+
+    reminders.map(function(r){return'<div class="alert-item">📅 '+r.entreprise+' ('+fmtD(r.date)+')</div>';}).join('')+'</div></div>':'';
+  var all2=autoR.concat(manR.map(function(r){return Object.assign({},r,{auto:false});}));
+  all2.sort(function(a,b){return(a.date||'').localeCompare(b.date||'');});
+  if(all2.length===0){document.getElementById('rdv-grid').innerHTML='<div style="color:var(--text-tertiary);font-size:13px">Aucun RDV planifié.</div>';return;}
+  document.getElementById('rdv-grid').innerHTML=all2.map(function(r){
+    var rd=r.date?new Date(r.date):null;if(rd)rd.setHours(0,0,0,0);
+    var isPast=rd&&rd<today;
+    var isUp=r.signe&&r.signe!=='';
+    var cc=!isPast?'upcoming':isUp?'past-ok':'past-pending';
+    var bc2=!isPast?'rdv-badge-upcoming':isUp?'rdv-badge-done':'rdv-badge-past';
+    var bt2=!isPast?'📅 À venir — '+fmtD(r.date):isUp?'✅ Effectué':'⚠ Mise à jour requise';
+    var rdvId=encId(r.id);
+    return'<div class="rdv-card '+cc+'" onclick="openRdvModal(\''+rdvId+'\')">'+
+      '<div class="rdv-card-header"><div class="rdv-card-company">'+(r.entreprise||'')+'</div>'+
+      '<span class="rdv-badge '+bc2+'">'+bt2+'</span></div>'+
+      (isUp?'<div class="rdv-field"><div class="rdv-field-label">État signature</div>'+
+        '<div class="rdv-field-val" style="font-weight:600;color:'+(r.signe==='Signé'?'var(--success)':'var(--danger)')+'">'+r.signe+'</div></div>':'')+
+      (r.raison?'<div class="rdv-field"><div class="rdv-field-label">Pourquoi pas signé</div><div class="rdv-field-val">'+r.raison+'</div></div>':'')+
+      (r.demande?'<div class="rdv-field"><div class="rdv-field-label">Demande client</div><div class="rdv-field-val">'+r.demande+'</div></div>':'')+
+      (r.suite?'<div class="rdv-field"><div class="rdv-field-label">Suite donnée</div><div class="rdv-field-val">'+r.suite+'</div></div>':'')+
+      (r.next?'<div class="rdv-field"><div class="rdv-field-label">Prochaine étape</div><div class="rdv-field-val">'+r.next+'</div></div>':'')+
+      (!isPast&&rd?'<div class="rdv-reminder">🔔 RDV dans '+Math.ceil((rd-today)/864e5)+' jour(s)</div>':'')+
+      '<div class="rdv-owner">👤 '+(r.owner_name||r.owner_email||'')+'</div>'+
+    '</div>';
+  }).join('');
+}
+
+// ── Historique panel ────────────────────────────────────────────
+function openHist(id){
+  var p=allP.find(function(x){return x.id===id;});if(!p)return;
+  curHistId=id;curHistP=p;
+  document.getElementById('hist-co').innerText=p.entreprise||'';
+  document.getElementById('hist-ct').innerText=(p.contact||'')+(p.poste?' · '+p.poste:'');
+  var sc3=ST_CSS[p.statut]||'';
+  document.getElementById('hist-sr').innerHTML=
+    '<span class="badge '+sc3+'" style="font-size:11px">'+(p.statut||'')+'</span>'+
+    (p.priority?'<span style="font-size:11px">'+(p.priority==='Haute'?'🔴':p.priority==='Basse'?'🟢':'🟡')+' '+p.priority+'</span>':'')+
+    (p.montant?'<span style="font-size:11px;font-weight:600;color:var(--bordeaux)">'+fmtM(p.montant)+'</span>':'')+
+    (p.next_action_date?'<span style="font-size:10px;color:var(--text-tertiary)">Relance : '+fmtD(p.next_action_date)+'</span>':'');
+  document.getElementById('h-date').value=new Date().toISOString().split('T')[0];
+  ['h-result','h-priority','h-note','h-next-date','h-montant','h-montant-rdv','h-rdv-date'].forEach(function(id){document.getElementById(id).value='';});
+  toggleRdvRow();
+  document.getElementById('hist-add-section').style.display=(p.owner_email===me||isCA)?'block':'none';
+  loadHistEntries(id);
+  document.getElementById('hist-panel').classList.add('open');
+  document.getElementById('overlay-bg').classList.add('open');
+}
+function closeHist(){document.getElementById('hist-panel').classList.remove('open');document.getElementById('overlay-bg').classList.remove('open');curHistId=null;curHistP=null;}
+function toggleRdvRow(){
+  var v=document.getElementById('h-result').value==='RDV planifié';
+  document.getElementById('rdv-row').style.display=v?'grid':'none';
+  document.getElementById('normal-row').style.display=v?'none':'grid';
+}
+function loadHistEntries(id){
+  var icons={Appel:'📞',Mail:'📧',RDV:'🤝',LinkedIn:'💼',SMS:'💬',Autre:'💬'};
+  db.collection('prospects').doc(id).collection('historique').orderBy('createdAt','desc').get().then(function(snap){
+    if(snap.empty){document.getElementById('hist-body').innerHTML='<div class="hist-empty">Aucune action enregistrée.</div>';return;}
+    document.getElementById('hist-body').innerHTML=snap.docs.map(function(doc){
+      var h=doc.data();
+      return'<div class="hist-entry">'+
+        '<div class="hist-entry-top"><span class="hist-entry-date">'+(h.date?fmtD(h.date):'')+'</span>'+
+        '<span class="hist-entry-canal">'+(icons[h.canal]||'💬')+' '+h.canal+'</span></div>'+
+        (h.new_statut?'<div class="hist-entry-result">→ Statut : '+h.new_statut+'</div>':'')+
+        (h.new_priority?'<div class="hist-entry-result">→ Priorité : '+h.new_priority+'</div>':'')+
+        (h.rdv_date?'<div class="hist-entry-result">📅 RDV le '+fmtD(h.rdv_date)+'</div>':'')+
+        (h.next_date?'<div class="hist-entry-result">🔔 Relance le '+fmtD(h.next_date)+'</div>':'')+
+        (h.note?'<div class="hist-entry-note">'+h.note+'</div>':'')+
+      '</div>';
+    }).join('');
+  });
+}
+function saveHist(){
+  if(!curHistId)return;
+  var canal=document.getElementById('h-canal').value;
+  var date=document.getElementById('h-date').value;
+  var result=document.getElementById('h-result').value;
+  var priority=document.getElementById('h-priority').value;
+  var note=document.getElementById('h-note').value.trim();
+  var nextDate=document.getElementById('h-next-date').value;
+  var rdvDate=document.getElementById('h-rdv-date').value;
+  var montant=result==='RDV planifié'?document.getElementById('h-montant-rdv').value:document.getElementById('h-montant').value;
+  if(!date){alert('Merci de renseigner une date.');return;}
+  if(result==='RDV planifié'&&!rdvDate){alert('La date du RDV est obligatoire.');return;}
+  var entry={canal:canal,date:date,note:note,createdAt:firebase.firestore.FieldValue.serverTimestamp()};
+  if(result)entry.new_statut=result;
+  if(priority)entry.new_priority=priority;
+  if(rdvDate)entry.rdv_date=rdvDate;
+  if(nextDate)entry.next_date=nextDate;
+  db.collection('prospects').doc(curHistId).collection('historique').add(entry).then(function(){
+    var upd={last_action_date:date};
+    if(result)upd.statut=result;
+    if(priority)upd.priority=priority;
+    if(rdvDate)upd.rdv_date=rdvDate;
+    if(nextDate)upd.next_action_date=nextDate;
+    if(montant&&parseFloat(montant))upd.montant=parseFloat(montant);
+    if(result==='RDV planifié')upd.rdv_status='';
+    db.collection('prospects').doc(curHistId).update(upd).then(function(){
+      if(result==='RDV planifié'&&rdvDate&&curHistP){
+        var pid=curHistId;
+        db.collection('prospects_rdv').where('prospect_id','==',pid).get().then(function(snap){
+          var d2={entreprise:curHistP.entreprise||'',date:rdvDate,prospect_id:pid,owner_email:me,owner_name:myName,signe:'',rdv_status:'',auto_generated:true,updatedAt:firebase.firestore.FieldValue.serverTimestamp()};
+          if(snap.empty)db.collection('prospects_rdv').add(d2);
+          else db.collection('prospects_rdv').doc(snap.docs[0].id).update(d2);
+        });
+      }
+    });
+    ['h-note','h-next-date','h-rdv-date','h-montant','h-montant-rdv'].forEach(function(i){document.getElementById(i).value='';});
+    document.getElementById('h-result').value='';document.getElementById('h-priority').value='';
+    toggleRdvRow();loadHistEntries(curHistId);
+  });
+}
+
+// ── CRUD Prospects ──────────────────────────────────────────────
+function sF(id,f,v){var u={};u[f]=v;db.collection('prospects').doc(id).update(u);}
+function delP(id){if(!confirm('Supprimer ce prospect ?'))return;db.collection('prospects').doc(id).delete();}
+function openAddProspect(){document.getElementById('modal-ap').classList.add('open');}
+function closeAddProspect(){document.getElementById('modal-ap').classList.remove('open');}
+function confirmAddProspect(){
+  var co=document.getElementById('ap-co').value.trim();
+  var st=document.getElementById('ap-st').value;
+  if(!co){alert('Merci de renseigner l\'entreprise.');return;}
+  if(!st){alert('Merci de choisir un statut.');return;}
+  db.collection('prospects').add({entreprise:co,contact:document.getElementById('ap-ct').value.trim(),
+    poste:document.getElementById('ap-po').value.trim(),email:document.getElementById('ap-em').value.trim(),
+    tel:document.getElementById('ap-te').value.trim(),secteur:document.getElementById('ap-se').value,
+    source:document.getElementById('ap-so').value,montant:parseFloat(document.getElementById('ap-mo').value)||0,
+    statut:st,priority:document.getElementById('ap-pr').value||'Normale',
+    notes:document.getElementById('ap-no').value.trim(),owner_email:me,owner_name:myName,
+    last_action_date:new Date().toISOString().split('T')[0],createdAt:firebase.firestore.FieldValue.serverTimestamp()
+  }).then(function(){closeAddProspect();});
+}
+
+// ── RDV Modal ────────────────────────────────────────────────────
+var curRdvId=null;
+function openAddRdv(){curRdvId=null;document.getElementById('rdv-modal-title').innerText='Ajouter un RDV';document.getElementById('rdv-edit-id').value='';['rdv-co','rdv-raison','rdv-inter','rdv-next'].forEach(function(i){document.getElementById(i).value='';});['rdv-demande','rdv-suite'].forEach(function(i){document.getElementById(i).value='';});document.getElementById('rdv-date').value=new Date().toISOString().split('T')[0];document.getElementById('rdv-signe').value='';document.getElementById('rdv-montant').value='';document.getElementById('rdv-next-date').value='';document.getElementById('modal-rdv').classList.add('open');}
+function openRdvModal(id){
+  var r=allRdvs.find(function(x){return x.id===id;});
+  if(!r&&id.startsWith('auto_')){var pid=id.replace('auto_','');var p=allP.find(function(x){return x.id===pid;});r=p?{id:id,entreprise:p.entreprise,date:p.rdv_date,signe:'',owner_email:p.owner_email}:null;}
+  curRdvId=id;
+  document.getElementById('rdv-modal-title').innerText='Modifier le RDV';
+  document.getElementById('rdv-edit-id').value=id;
+  document.getElementById('rdv-co').value=(r&&r.entreprise)||'';
+  document.getElementById('rdv-date').value=(r&&r.date)||'';
+  document.getElementById('rdv-signe').value=(r&&r.signe)||'';
+  document.getElementById('rdv-raison').value=(r&&r.raison)||'';
+  document.getElementById('rdv-demande').value=(r&&r.demande)||'';
+  document.getElementById('rdv-suite').value=(r&&r.suite)||'';
+  document.getElementById('rdv-inter').value=(r&&r.interlocuteur)||'';
+  document.getElementById('rdv-montant').value=(r&&r.montant)||'';
+  document.getElementById('rdv-next').value=(r&&r.next)||'';
+  document.getElementById('rdv-next-date').value=(r&&r.next_date)||'';
+  document.getElementById('modal-rdv').classList.add('open');
+}
+function closeRdvModal(){document.getElementById('modal-rdv').classList.remove('open');}
+function confirmRdv(){
+  var co=document.getElementById('rdv-co').value.trim();
+  var dt=document.getElementById('rdv-date').value;
+  var sg=document.getElementById('rdv-signe').value;
+  var dm=document.getElementById('rdv-demande').value.trim();
+  var su=document.getElementById('rdv-suite').value.trim();
+  if(!co){alert('Merci de renseigner l\'entreprise.');return;}
+  if(!dt){alert('Merci de renseigner la date du RDV.');return;}
+  if(!sg){alert('Merci de renseigner l\'état de signature.');return;}
+  if(!dm){alert('Merci de renseigner la demande client.');return;}
+  if(!su){alert('Merci de renseigner la suite donnée.');return;}
+  var data={entreprise:co,date:dt,signe:sg,raison:document.getElementById('rdv-raison').value.trim(),
+    demande:dm,suite:su,interlocuteur:document.getElementById('rdv-inter').value.trim(),
+    montant:parseFloat(document.getElementById('rdv-montant').value)||0,
+    next:document.getElementById('rdv-next').value.trim(),next_date:document.getElementById('rdv-next-date').value,
+    owner_email:me,owner_name:myName,updatedAt:firebase.firestore.FieldValue.serverTimestamp()};
+  var eid=document.getElementById('rdv-edit-id').value;
+  if(eid&&!eid.startsWith('auto_')){
+    db.collection('prospects_rdv').doc(eid).update(data).then(function(){closeRdvModal();});
+  } else if(eid&&eid.startsWith('auto_')){
+    var pid2=eid.replace('auto_','');
+    db.collection('prospects_rdv').where('prospect_id','==',pid2).get().then(function(snap){
+      var d2=Object.assign(data,{prospect_id:pid2,rdv_status:sg});
+      if(snap.empty)db.collection('prospects_rdv').add(d2).then(function(){closeRdvModal();});
+      else db.collection('prospects_rdv').doc(snap.docs[0].id).update(d2).then(function(){closeRdvModal();});
+    });
+    db.collection('prospects').doc(pid2).update({rdv_status:sg}).catch(function(){});
+  } else {
+    data.createdAt=firebase.firestore.FieldValue.serverTimestamp();
+    db.collection('prospects_rdv').add(data).then(function(){closeRdvModal();});
+  }
+}
+
+// ── Charts ─────────────────────────────────────────────────────
+function initPeriods(){
+  ['ca','mine'].forEach(function(k){
+    document.getElementById('period-'+k).innerHTML=PERIODS.map(function(p){
+      return'<button class="period-btn'+(p==='Semaine'?' active':'')+'" onclick="setPeriod(\''+k+'\',\''+p+'\')">'+p+'</button>';
+    }).join('');
+  });
+}
+function setPeriod(k,p){
+  if(k==='ca')periodCA=p;else periodMine=p;
+  document.getElementById('period-'+k).querySelectorAll('.period-btn').forEach(function(b){b.classList.toggle('active',b.textContent===p);});
+  document.getElementById('daterange-'+k).classList.toggle('show',p==='Date à date');
+  if(p!=='Date à date'){if(k==='ca')renderCAChart();else renderMineChart();}
+}
+function getCols(period,fromId,toId){
+  var today=new Date();today.setHours(0,0,0,0);
+  var cols=[];
+  if(period==='Semaine'){for(var w=11;w>=0;w--){var ws=wkStart(-w);var we=wkEnd(-w);cols.push({label:'S'+isoWeek(ws),from:ws,to:we});}}
+  else if(period==='Mois'){var MLBL=['Jan','Fév','Mar','Avr','Mai','Jun','Jul','Aoû','Sep','Oct','Nov','Déc'];for(var m=5;m>=0;m--){var dm=new Date(today.getFullYear(),today.getMonth()-m,1);cols.push({label:MLBL[dm.getMonth()]+' '+dm.getFullYear().toString().slice(2),from:dm,to:new Date(dm.getFullYear(),dm.getMonth()+1,1)});}}
+  else if(period==='Trimestre'){for(var q=3;q>=0;q--){var qmo=today.getMonth()-q*3;var qyr=today.getFullYear()+(qmo<0?-1:0);qmo=((qmo%12)+12)%12;var qs=new Date(qyr,Math.floor(qmo/3)*3,1);cols.push({label:'T'+(Math.floor(qmo/3)+1)+' '+qyr.toString().slice(2),from:qs,to:new Date(qyr,Math.floor(qmo/3)*3+3,1)});}}
+  else if(period==='Semestre'){for(var s2=1;s2>=0;s2--){var sm2=today.getMonth()<6?-s2*6:6-s2*6;var sy=today.getFullYear()+(sm2<0?-1:0);sm2=((sm2%12)+12)%12;var ss=new Date(sy,sm2<6?0:6,1);cols.push({label:(sm2<6?'S1':'S2')+' '+sy.toString().slice(2),from:ss,to:new Date(sy,sm2<6?6:12,1)});}}
+  else if(period==='Année'){for(var y=2;y>=0;y--){var yr=today.getFullYear()-y;cols.push({label:''+yr,from:new Date(yr,0,1),to:new Date(yr+1,0,1)});}}
+  else if(period==='Date à date'){var f=new Date(document.getElementById(fromId).value||today);var t2=new Date(document.getElementById(toId).value||today);t2.setDate(t2.getDate()+1);cols.push({label:'Période',from:f,to:t2});}
+  return cols;
+}
+function renderBarChart(cid,datasets,labels){
+  var wrap=document.getElementById(cid);if(!wrap)return;
+  var maxV=Math.max(1,Math.max.apply(null,datasets.reduce(function(a,d){return a.concat(d.vals);},[0])));
+  var html='<div class="chart-bars">';
+  labels.forEach(function(lbl,li){
+    html+='<div class="chart-col"><div class="chart-col-bars">';
+    datasets.forEach(function(ds){var v=ds.vals[li]||0;var h=Math.round(v/maxV*130);html+='<div class="chart-bar" style="height:'+Math.max(h,v>0?3:0)+'px;background:'+ds.color+'" title="'+ds.label+': '+v+'"></div>';});
+    html+='</div><div class="chart-label">'+lbl+'</div></div>';
+  });
+  html+='</div><div class="chart-legend">';
+  datasets.forEach(function(ds){html+='<div class="chart-legend-item"><div class="chart-legend-dot" style="background:'+ds.color+'"></div>'+ds.label+'</div>';});
+  html+='</div>';
+  wrap.innerHTML=html;
+}
+function renderCAChart(){
+  var cols=getCols(periodCA,'dr-ca-from','dr-ca-to');
+  var prosp=allUsers.filter(function(u){return u.prospecte;});
+  renderBarChart('chart-ca',prosp.slice(0,6).map(function(u,i){
+    return{label:(u.prenom||u.email.split('@')[0]),color:COLORS[i%COLORS.length],
+      vals:cols.map(function(col){return allP.filter(function(p){if(p.owner_email!==u.email||!p.last_action_date||p.statut==='À contacter')return false;var d=new Date(p.last_action_date);return d>=col.from&&d<col.to;}).length;})};
+  }),cols.map(function(c){return c.label;}));
+}
+function renderMineChart(){
+  var cols=getCols(periodMine,'dr-mine-from','dr-mine-to');
+  renderBarChart('chart-mine',[
+    {label:'Contacts valorisés',color:COLORS[0],vals:cols.map(function(col){return allP.filter(function(p){if(p.owner_email!==me||!p.last_action_date||p.statut==='À contacter')return false;var d=new Date(p.last_action_date);return d>=col.from&&d<col.to;}).length;})},
+    {label:'Signés',color:COLORS[3],vals:cols.map(function(col){return allP.filter(function(p){if(p.owner_email!==me||!p.last_action_date||p.statut!=='Signé')return false;var d=new Date(p.last_action_date);return d>=col.from&&d<col.to;}).length;})}
+  ],cols.map(function(c){return c.label;}));
+}
+
+// ── Objectif ────────────────────────────────────────────────────
+function openGoalModal(){document.getElementById('modal-goal').classList.add('open');}
+function closeGoalModal(){document.getElementById('modal-goal').classList.remove('open');}
+function saveGoal(){
+  var v=parseInt(document.getElementById('goal-input').value)||10;
+  db.collection('crm_config').doc('objectifs').set({objectif_semaine:v,modifie_par:myName||me,modifie_le:new Date().toISOString().split('T')[0]}).then(function(){
+    goalWeek=v;document.getElementById('goal-display').innerText=v;closeGoalModal();refreshAll();
+  });
+}
+
+// ── Filtres & Export ─────────────────────────────────────────────
+function clearFilters(){['search-all','filter-member','filter-statut','filter-secteur'].forEach(function(i){document.getElementById(i).value='';});renderAll();}
+function exportXLSX(){
+  var data=isCA?allP:allP.filter(function(p){return p.owner_email===me;});
+  var rows=[['Entreprise','Contact','Poste','Email','Tél','Secteur','Source','Montant HT','Statut','Priorité','Responsable','Dernière action','Prochaine relance','Notes']];
+  data.forEach(function(p){rows.push([p.entreprise||'',p.contact||'',p.poste||'',p.email||'',p.tel||'',p.secteur||'',p.source||'',p.montant||0,p.statut||'',p.priority||'',p.owner_name||'',p.last_action_date||'',p.next_action_date||'',p.notes||'']);});
+  var ws=XLSX.utils.aoa_to_sheet(rows);var wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Prospection');XLSX.writeFile(wb,'Prospection_ICN_JC.xlsx');
+}
+</script>
 </body>
 </html>
