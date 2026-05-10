@@ -72,6 +72,15 @@
 
 /* ── Ranking ── */
 .ranking-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(255px,1fr));gap:10px;margin-bottom:20px;}
+.ranking-grid.compact{grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px;}
+.ranking-grid.compact .rank-card{padding:10px 12px;flex-direction:column;align-items:center;text-align:center;gap:6px;}
+.ranking-grid.compact .rank-info{display:none;}
+.ranking-grid.compact .rank-right{text-align:center;}
+.ranking-grid.compact .rank-prog{margin:4px auto 0;}
+.ranking-grid.compact .rank-medal{font-size:18px;}
+.ranking-grid.compact .rank-avatar{width:36px;height:36px;font-size:13px;}
+.rank-compact-status{font-size:16px;display:none;}
+.ranking-grid.compact .rank-compact-status{display:block;}
 .rank-card{background:var(--bg-card);border-radius:var(--radius-lg);padding:14px 16px;border:1px solid var(--border);display:flex;align-items:center;gap:12px;}
 .rank-card.rk-gold{border-color:#f59e0b;background:linear-gradient(135deg,#fffbeb,#fef9e0);}
 .rank-card.rk-silver{border-color:#9ca3af;background:linear-gradient(135deg,#f9fafb,#f1f3f5);}
@@ -284,7 +293,7 @@ td[contenteditable=true]:hover{background:rgba(163,33,95,0.04);border-radius:3px
       <div class="tab-pane" id="pane-ca">
         <div class="top-row">
           <div id="wn-ca"></div>
-          <div class="goal-cfg">
+          <div class="goal-cfg" id="goal-cfg-block">
             <div><div class="goal-cfg-lbl">Objectif / semaine</div><div class="goal-cfg-by" id="goal-by">—</div></div>
             <div><div class="goal-cfg-val" id="goal-display">10</div></div>
             <button class="goal-edit-btn" id="btn-edit-goal" onclick="openGoalModal()" style="display:none">✏ Modifier</button>
@@ -294,15 +303,15 @@ td[contenteditable=true]:hover{background:rgba(163,33,95,0.04);border-radius:3px
         <div class="sec-title">Semaine sélectionnée</div>
         <div class="stats-row" id="ca-stats-week"></div>
         <div class="sec-title" style="margin-top:4px">
-          Pipeline — période sélectionnée
-          <button onclick="openNotice('notice-pipeline-period')" style="background:none;border:none;cursor:pointer;font-size:13px;color:var(--text-tertiary)" title="En savoir plus">ℹ️</button>
-        </div>
-        <div class="stats-row" id="ca-stats-pipeline-period"></div>
-        <div class="sec-title" style="margin-top:4px">
           Pipeline global
           <button onclick="openNotice('notice-pipeline-global')" style="background:none;border:none;cursor:pointer;font-size:13px;color:var(--text-tertiary)" title="En savoir plus">ℹ️</button>
         </div>
         <div class="stats-row" id="ca-stats-pipeline"></div>
+        <div class="sec-title" style="margin-top:4px">
+          Pipeline — période sélectionnée
+          <button onclick="openNotice('notice-pipeline-period')" style="background:none;border:none;cursor:pointer;font-size:13px;color:var(--text-tertiary)" title="En savoir plus">ℹ️</button>
+        </div>
+        <div class="stats-row" id="ca-stats-pipeline-period"></div>
         <div class="flex items-center gap-3" style="margin-top:4px;flex-wrap:wrap;margin-bottom:8px">
           <div class="sec-title" style="margin-bottom:0;flex:none">Classement & Pipeline période</div>
           <div style="display:flex;gap:4px;flex-wrap:wrap" id="period-ca-stats"></div>
@@ -312,6 +321,7 @@ td[contenteditable=true]:hover{background:rgba(163,33,95,0.04);border-radius:3px
             <input type="date" class="input" id="dr-cas-to" style="font-size:12px;padding:5px;"/>
             <button class="btn btn-secondary btn-sm" onclick="renderCA()">Afficher</button>
           </div>
+          <button id="btn-compact-ranking" onclick="toggleCompactRanking()" style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-md);padding:4px 10px;font-size:11px;font-weight:600;cursor:pointer;color:var(--text-secondary);font-family:'Sora',sans-serif;margin-left:auto">⊟ Compact</button>
         </div>
         <div class="stats-row" id="ca-stats-period"></div>
         <div class="ranking-grid" id="ranking-grid"></div>
@@ -329,9 +339,12 @@ td[contenteditable=true]:hover{background:rgba(163,33,95,0.04);border-radius:3px
           <button onclick="openNotice('notice-mandats-compare')" style="background:none;border:none;cursor:pointer;font-size:13px;color:var(--text-tertiary)" title="En savoir plus">ℹ️</button>
         </div>
         <div style="background:var(--bg-card);border-radius:var(--radius-lg);padding:16px 18px;border:1px solid var(--border);margin-bottom:16px">
-          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px">
-            <span style="font-size:12px;font-weight:600;color:var(--navy)">KPI à afficher (max 5) :</span>
-            <div id="cmp-kpi-checks" style="display:flex;gap:8px;flex-wrap:wrap"></div>
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px;margin-bottom:14px">
+            <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+              <span style="font-size:12px;font-weight:600;color:var(--navy)">KPI à afficher (max 5) :</span>
+              <div id="cmp-kpi-checks" style="display:flex;gap:6px;flex-wrap:wrap"></div>
+            </div>
+            <div id="cmp-legend" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;font-size:11px;color:var(--text-secondary)"></div>
           </div>
           <div id="chart-mandats-compare"></div>
         </div>
@@ -661,6 +674,7 @@ var RLMAP = {super_admin:'Super Admin',president:'Président',vice_president:'VP
 // ÉTAT GLOBAL
 // ════════════════════════════════════════════════════════
 var ME = '', MY_NAME = '', MY_ROLE = '', IS_CA = false;
+var retroLimitDate = '2026-04-01'; // Date limite rétroactive (configurable par super_admin)
 var allProspects = [], allRdvs = [], allUsers = [], allMandats = [], goalWeek = 10;
 var curProspectId = null, curProspect = null;
 var weekOffCA = 0, weekOffMine = 0;
@@ -711,6 +725,13 @@ function loadData() {
     }
   });
 
+  // Charger la date limite rétroactive
+  db.collection('crm_config').doc('parametres').get().then(function(doc) {
+    if (doc.exists && doc.data().retro_limit_date) {
+      retroLimitDate = doc.data().retro_limit_date;
+    }
+  });
+
   // Seed objectif historique rétroactif (une seule fois si vide)
   seedObjectifHistorique(goalWeek || 10);
 
@@ -749,6 +770,66 @@ function loadData() {
     snap.forEach(function(doc) { allRdvs.push(Object.assign({id: doc.id}, doc.data())); });
     renderRdv();
   });
+}
+
+function renderRankingOnly(wkGoal) {
+  // Recalcule et réaffiche uniquement le classement avec le bon objectif de semaine
+  var off = weekOffCA;
+  var isPast = off < 0;
+  var activeProspectors = allUsers.filter(function(u) { return u.prospecte; });
+
+  // Afficher l'objectif figé de la semaine sélectionnée
+  var goalCfgEl = document.getElementById('goal-cfg-block');
+  var btnEditGoal = document.getElementById('btn-edit-goal');
+  if (isPast) {
+    var wsCaGoal = wkStart(off);
+    var wnCaGoal = isoWk(wsCaGoal);
+    var wkKeyCaGoal = wsCaGoal.getFullYear() + '-W' + String(wnCaGoal).padStart(2,'0');
+    db.collection('crm_config').doc('objectifs_historique').collection('semaines').doc(wkKeyCaGoal).get()
+      .then(function(doc) {
+        var frozenGoal = doc.exists ? (doc.data().objectif || goalWeek) : goalWeek;
+        if (goalCfgEl) goalCfgEl.innerHTML =
+          '<div style="display:flex;align-items:center;gap:10px">' +
+            '<div><div style="font-size:11px;color:var(--text-secondary)">Objectif fixé cette semaine-là</div>' +
+            '<div style="font-size:22px;font-weight:700;color:var(--navy)">' + frozenGoal + '</div></div>' +
+            '<div style="font-size:11px;color:var(--text-tertiary);background:#f1f5f9;padding:4px 10px;border-radius:99px">🔒 Figé</div>' +
+          '</div>';
+        if (btnEditGoal) btnEditGoal.style.display = 'none';
+      });
+  } else {
+    if (goalCfgEl) goalCfgEl.innerHTML =
+      '<div><div style="font-size:11px;color:var(--text-secondary)">Objectif semaine en cours</div>' +
+      '<div style="font-size:22px;font-weight:700;color:var(--navy)" id="goal-display">' + goalWeek + '</div></div>';
+    if (btnEditGoal) btnEditGoal.style.display = IS_CA ? 'flex' : 'none';
+  }
+  var range = getRankingRange ? getRankingRange() : {from:wkStart(off),to:wkEnd(off)};
+  var ranked = activeProspectors.map(function(u) {
+    return { u: u, n: countValPeriod(u.email, range), tot: allProspects.filter(function(p) { return p.owner_email === u.email; }).length };
+  }).sort(function(a, b) { return b.n - a.n; });
+  var medals = ['🥇','🥈','🥉'], golds = ['rk-gold','rk-silver','rk-bronze'];
+  var RLMAP2 = {super_admin:'Super Admin',president:'Président',vice_president:'VP',tresorier:'Trésorier',
+    secretaire:'Secrétaire',responsable_commercial:'RC',responsable_qualite:'RQ',
+    responsable_marketing:'RM',commercial:'Commercial',marketing:'Marketing'};
+  document.getElementById('ranking-grid').innerHTML = ranked.map(function(r, i) {
+    var pct = Math.min(100, wkGoal > 0 ? Math.round(r.n / wkGoal * 100) : 0);
+    var bc = isPast ? (r.n >= wkGoal ? 'rb-ok' : 'rb-late') : (r.n >= wkGoal ? 'rb-ok' : r.n >= wkGoal * 0.5 ? 'rb-warn' : 'rb-late');
+    var bt = isPast ? (r.n >= wkGoal ? '✅ Atteint' : '❌ Manqué') : (r.n >= wkGoal ? '✅ Atteint' : r.n >= wkGoal * 0.5 ? '⚡ En cours' : '🔴 En retard');
+    var ini = ((r.u.prenom||'?')[0] + (r.u.nom||'?')[0]).toUpperCase();
+    return '<div class="rank-card ' + (golds[i]||'') + '">' +
+      '<div class="rank-medal">' + (medals[i] || (i+1) + '.') + '</div>' +
+      '<div class="rank-avatar">' + ini + '</div>' +
+      '<div class="rank-info"><div class="rank-name">' + (r.u.prenom||'') + ' ' + (r.u.nom||'') + '</div>' +
+      '<div class="rank-role-lbl">' + (RLMAP2[r.u.role]||r.u.role||'') + '</div>' +
+      '<span class="rank-badge ' + bc + '">' + bt + '</span>' +
+      '<span class="rank-compact-status">' + (isPast?(r.n>=wkGoal?'✅':'❌'):(r.n>=wkGoal?'✅':r.n>=wkGoal*0.5?'⚡':'🔴')) + '</span>' +
+      '</div>' +
+      '<div class="rank-right"><div class="rank-n">' + r.n + '</div><div class="rank-n-lbl">valorisés</div>' +
+      '<div class="rank-prog"><div class="rank-prog-fill" style="width:' + pct + '%"></div></div>' +
+      '<div style="font-size:10px;color:var(--text-tertiary)">' + r.tot + ' total</div></div></div>';
+  }).join('');
+  if (rankingCompact && document.getElementById('ranking-grid')) {
+    document.getElementById('ranking-grid').classList.add('compact');
+  }
 }
 
 function populateMandatFilter() {
@@ -1039,16 +1120,20 @@ function renderMandatCompare() {
       html += '</div>';
     });
     html += '</div>';
-    // Légende
-    html += '<div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:8px">';
-    mandats.forEach(function(m,mi){
-      html += '<div style="display:flex;align-items:center;gap:3px;font-size:9px;color:var(--text-tertiary)">' +
-        '<div style="width:7px;height:7px;border-radius:1px;background:'+COLORS_CMP[mi%COLORS_CMP.length]+'"></div>'+m.id+'</div>';
-    });
-    html += '</div></div>';
+    html += '</div>';
   });
   html += '</div>';
   container.innerHTML = html;
+  // Légende unique en haut à droite
+  var legendEl = document.getElementById('cmp-legend');
+  if (legendEl) {
+    legendEl.innerHTML = mandats.map(function(m,mi){
+      return '<div style="display:flex;align-items:center;gap:4px">' +
+        '<div style="width:10px;height:10px;border-radius:2px;background:'+COLORS_CMP[mi%COLORS_CMP.length]+';opacity:'+(m.statut==='actif'?'1':'0.6')+'"></div>' +
+        '<span>' + m.id + (m.statut==='actif'?' 🟢':'') + '</span>' +
+      '</div>';
+    }).join('');
+  }
 }
 
 // ════════════════════════════════════════════════════════
@@ -1059,6 +1144,31 @@ function renderCA() {
   var off = weekOffCA;
   var isPast = off < 0;
   var activeProspectors = allUsers.filter(function(u) { return u.prospecte; });
+
+  // Afficher l'objectif figé de la semaine sélectionnée
+  var goalCfgEl = document.getElementById('goal-cfg-block');
+  var btnEditGoal = document.getElementById('btn-edit-goal');
+  if (isPast) {
+    var wsCaGoal = wkStart(off);
+    var wnCaGoal = isoWk(wsCaGoal);
+    var wkKeyCaGoal = wsCaGoal.getFullYear() + '-W' + String(wnCaGoal).padStart(2,'0');
+    db.collection('crm_config').doc('objectifs_historique').collection('semaines').doc(wkKeyCaGoal).get()
+      .then(function(doc) {
+        var frozenGoal = doc.exists ? (doc.data().objectif || goalWeek) : goalWeek;
+        if (goalCfgEl) goalCfgEl.innerHTML =
+          '<div style="display:flex;align-items:center;gap:10px">' +
+            '<div><div style="font-size:11px;color:var(--text-secondary)">Objectif fixé cette semaine-là</div>' +
+            '<div style="font-size:22px;font-weight:700;color:var(--navy)">' + frozenGoal + '</div></div>' +
+            '<div style="font-size:11px;color:var(--text-tertiary);background:#f1f5f9;padding:4px 10px;border-radius:99px">🔒 Figé</div>' +
+          '</div>';
+        if (btnEditGoal) btnEditGoal.style.display = 'none';
+      });
+  } else {
+    if (goalCfgEl) goalCfgEl.innerHTML =
+      '<div><div style="font-size:11px;color:var(--text-secondary)">Objectif semaine en cours</div>' +
+      '<div style="font-size:22px;font-weight:700;color:var(--navy)" id="goal-display">' + goalWeek + '</div></div>';
+    if (btnEditGoal) btnEditGoal.style.display = IS_CA ? 'flex' : 'none';
+  }
   var inactiveEmails = allUsers.filter(function(u) { return !u.prospecte; }).map(function(u) { return u.email; });
 
   // Stats semaine — par statut (contacts valorisés dans la semaine)
@@ -1106,6 +1216,20 @@ function renderCA() {
     document.getElementById('ca-alerts').innerHTML = '';
   }
 
+  // Objectif de la semaine sélectionnée
+  var goalWkVal = goalWeek; // default, sera remplacé si semaine passée
+  if (weekOffCA < 0) {
+    var wsCa = wkStart(weekOffCA);
+    var wnCa = isoWk(wsCa);
+    var wkKeyCa = wsCa.getFullYear() + '-W' + String(wnCa).padStart(2,'0');
+    db.collection('crm_config').doc('objectifs_historique').collection('semaines').doc(wkKeyCa).get()
+      .then(function(doc) {
+        goalWkVal = doc.exists ? (doc.data().objectif||goalWeek) : goalWeek;
+        // Re-render classement avec le bon objectif
+        renderRankingOnly(goalWkVal);
+      });
+  }
+
   // Pipeline période sélectionnée
   var range = getRankingRange();
   var pipPeriod = allProspects.filter(function(p) {
@@ -1145,7 +1269,9 @@ function renderCA() {
       '<div class="rank-avatar">' + ini + '</div>' +
       '<div class="rank-info"><div class="rank-name">' + (r.u.prenom||'') + ' ' + (r.u.nom||'') + '</div>' +
       '<div class="rank-role-lbl">' + (RLMAP[r.u.role]||r.u.role||'') + '</div>' +
-      '<span class="rank-badge ' + bc + '">' + bt + '</span></div>' +
+      '<span class="rank-badge ' + bc + '">' + bt + '</span>' +
+      '<span class="rank-compact-status">' + (isPast?(r.n>=goalWkVal?'✅':'❌'):(r.n>=goalWkVal?'✅':r.n>=goalWkVal*0.5?'⚡':'🔴')) + '</span>' +
+      '</div>' +
       '<div class="rank-right"><div class="rank-n">' + r.n + '</div><div class="rank-n-lbl">valorisés</div>' +
       '<div class="rank-prog"><div class="rank-prog-fill" style="width:' + pct + '%"></div></div>' +
       '<div style="font-size:10px;color:var(--text-tertiary)">' + r.tot + ' total</div></div></div>';
@@ -1321,7 +1447,7 @@ function renderAll() {
           '<td style="font-size:11px;color:var(--text-tertiary)">' + (p.last_contact_at ? fmtD(p.last_contact_at) : '—') + '</td>' +
           '<td style="font-size:11px;' + relCls + '">' + (p.next_action_at ? fmtD(p.next_action_at) : '—') + '</td>' +
           '<td style="text-align:center"><button class="action-btn" onclick="openActionPanel(\'' + pid + '\')">📋 Actions</button></td>' +
-          '<td>' + (isMe(p) ? '<button class="del-btn" onclick="delProspect(\'' + pid + '\')">✕</button>' : '') + '</td>' +
+          '<td>' + ((isMe(p) || MY_ROLE === 'super_admin') ? '<button class="del-btn" onclick="delProspect(\'' + pid + '\',\''+encodeURIComponent(p.company_name||'')+'\')" title="Supprimer">✕</button>' : '') + '</td>' +
         '</tr>';
       }).join('');
   document.getElementById('tbody-all').innerHTML = html;
@@ -1527,6 +1653,12 @@ function saveAction() {
   if (!curProspectId) return;
   var canal = document.getElementById('af-canal').value;
   var date = document.getElementById('af-date').value;
+  // Vérifier la limite rétroactive pour les non-super_admin
+  if (MY_ROLE !== 'super_admin' && date && date < retroLimitDate) {
+    alert('⛔ Tu ne peux pas enregistrer une action avant le ' + fmtD(retroLimitDate) + '.
+Contacte le Super Admin si nécessaire.');
+    return;
+  }
   var result = document.getElementById('af-result').value;
   var priority = document.getElementById('af-priority').value;
   var note = document.getElementById('af-note').value.trim();
@@ -1704,8 +1836,11 @@ function confirmAddProspect() {
   });
 }
 
-function delProspect(id) {
-  if (!confirm('Supprimer ce prospect ? Ses actions seront conservées dans Firestore.')) return;
+function delProspect(id, nameEnc) {
+  var name = nameEnc ? decodeURIComponent(nameEnc) : id;
+  if (!confirm('Supprimer le prospect "' + name + '" ?
+
+Ses actions historiques seront conservées dans Firestore.')) return;
   db.collection('prospects').doc(id).delete();
 }
 
@@ -2011,6 +2146,15 @@ function setCAStatsPeriod(p) {
 }
 
 // ── RDV helpers ──────────────────────────────────────────────────
+var rankingCompact = false;
+function toggleCompactRanking() {
+  rankingCompact = !rankingCompact;
+  var grid = document.getElementById('ranking-grid');
+  if (grid) grid.classList.toggle('compact', rankingCompact);
+  var btn = document.getElementById('btn-compact-ranking');
+  if (btn) btn.innerText = rankingCompact ? '⊞ Normal' : '⊟ Compact';
+}
+
 var rdvCompact = false;
 function toggleCompactRdv() {
   rdvCompact = !rdvCompact;
@@ -2128,14 +2272,31 @@ function exportXLSX() {
 <div class="modal-overlay" id="notice-pipeline-period" onclick="if(event.target===this)closeNotice('notice-pipeline-period')">
   <div class="modal-box" style="max-width:420px">
     <div class="modal-header"><div class="modal-title">📊 Pipeline — période sélectionnée</div><button class="modal-close" onclick="closeNotice('notice-pipeline-period')">×</button></div>
-    <p style="font-size:13px;color:var(--text-secondary);line-height:1.6">Affiche le montant estimé des prospects dont le <strong>dernier contact tombe dans la période choisie</strong> (filtre à côté de "Classement").<br><br>Exemple : si tu sélectionnes "Mois en cours", seuls les prospects contactés ce mois apparaissent dans ce pipeline.</p>
+    <p style="font-size:13px;color:var(--text-secondary);line-height:1.6">Affiche les montants des prospects dont le <strong>dernier contact tombe dans la période choisie</strong> via le filtre "Classement & Pipeline période".</p>
+    <p style="font-size:12px;color:var(--text-secondary);margin-top:8px"><strong>Ce qui peut apparaître :</strong></p>
+    <ul style="font-size:12px;color:var(--text-secondary);margin:6px 0 0 16px;line-height:1.8">
+      <li>🟣 <strong>Contacté</strong> — si premier contact dans la période</li>
+      <li>🟡 <strong>RDV planifié/effectué</strong> — si RDV fixé dans la période</li>
+      <li>🔵 <strong>Proposition envoyée</strong></li>
+      <li>💗 <strong>Négociation</strong></li>
+      <li>🟢 <strong>Signé</strong> — CA réalisé dans la période</li>
+    </ul>
+    <p style="font-size:12px;color:var(--text-tertiary);margin-top:8px;font-style:italic">Si une card n'apparaît pas : le dernier contact du prospect n'est pas dans la période sélectionnée.</p>
     <div class="modal-actions"><button class="btn btn-primary" onclick="closeNotice('notice-pipeline-period')">Compris ✓</button></div>
   </div>
 </div>
 <div class="modal-overlay" id="notice-pipeline-global" onclick="if(event.target===this)closeNotice('notice-pipeline-global')">
   <div class="modal-box" style="max-width:420px">
     <div class="modal-header"><div class="modal-title">🌐 Pipeline global</div><button class="modal-close" onclick="closeNotice('notice-pipeline-global')">×</button></div>
-    <p style="font-size:13px;color:var(--text-secondary);line-height:1.6">Affiche le <strong>total de tous les prospects actifs</strong> du mandat, sans filtre de période. C'est la photo complète du pipeline à l'instant T.<br><br>Le <strong>pipeline incertain</strong> = montants portés par des commerciaux qui ne sont plus actifs en prospection.</p>
+    <p style="font-size:13px;color:var(--text-secondary);line-height:1.6">Affiche le <strong>total de tous les prospects actifs</strong> du mandat, sans filtre de période. C'est la photo complète du pipeline à l'instant T.</p>
+    <p style="font-size:12px;color:var(--text-secondary);margin-top:10px"><strong>Statuts inclus :</strong></p>
+    <ul style="font-size:12px;color:var(--text-secondary);margin:6px 0 0 16px;line-height:1.8">
+      <li>✅ Contacté, Rappel demandé, RDV planifié/effectué</li>
+      <li>✅ Proposition envoyée, Négociation, Signé</li>
+      <li>❌ À contacter (pas encore valorisé)</li>
+      <li>❌ Perdu (exclu du pipeline)</li>
+    </ul>
+    <p style="font-size:12px;color:var(--text-secondary);margin-top:8px">Le <strong>pipeline incertain</strong> = montants portés par des commerciaux devenus inactifs (prospecte = false).</p>
     <div class="modal-actions"><button class="btn btn-primary" onclick="closeNotice('notice-pipeline-global')">Compris ✓</button></div>
   </div>
 </div>
