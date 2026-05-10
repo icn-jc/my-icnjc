@@ -386,7 +386,7 @@ td[contenteditable=true]:hover{background:rgba(163,33,95,0.04);border-radius:3px
             <span style="font-size:11px;font-weight:600;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:.08em">Évolution</span>
             <button id="btn-toggle-chart-mine" onclick="toggleMineChart()" style="background:none;border:1px solid var(--border);border-radius:var(--radius-md);padding:3px 10px;font-size:11px;cursor:pointer;color:var(--text-secondary);font-family:'Sora',sans-serif">⊟ Rétracter</button>
           </div>
-          <div class="chart-card" id="chart-mine" style="width:100%;box-sizing:border-box"></div>
+          <div class="chart-card" id="chart-mine" style="width:100%;box-sizing:border-box;min-height:220px"></div>
         </div>
         <div class="sec-title" style="flex-wrap:wrap;gap:8px">
           Mon portefeuille
@@ -2219,7 +2219,15 @@ function getCols(period, fromId, toId) {
 
 function renderLineChart(cid, datasets, labels) {
   var wrap = document.getElementById(cid); if (!wrap) return;
-  var W = Math.max(wrap.clientWidth || 600, 400);
+  // clientWidth peut être 0 si l'élément vient d'être rendu — on remonte au parent
+  var W = wrap.clientWidth || wrap.parentElement && wrap.parentElement.clientWidth || 0;
+  if (W < 100) {
+    // Forcer un reflow puis re-render
+    wrap.style.minHeight = '220px';
+    setTimeout(function() { renderLineChart(cid, datasets, labels); }, 50);
+    return;
+  }
+  W = Math.max(W, 400);
   var H = 200, PL = 36, PR = 16, PT = 20, PB = 32;
   var gW = W - PL - PR, gH = H - PT - PB;
   var nPts = labels.length;
