@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>KPI Trésorerie — My-ICN-JC</title>
+<link rel="stylesheet" href="../assets/css/global.css"/>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+<script src="../assets/js/firebase.js"></script>
+<script src="../assets/js/auth.js"></script>
+<script src="../assets/js/sidebar.js"></script>
+<style>
+/* ── KPI Cards ── */
+.kpi-row { display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:14px; margin-bottom:24px; }
+.kpi-card { background:var(--bg-card); border-radius:var(--radius-lg); padding:18px 20px; border:1px solid var(--border); box-shadow:var(--shadow-sm); position:relative; overflow:hidden; }
+.kpi-card::before { content:''; position:absolute; top:0; left:0; width:3px; height:100%; background:var(--bordeaux); opacity:0; transition:opacity .2s; }
+.kpi-card:hover::before { opacity:1; }
+.kpi-card-label { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.1em; color:var(--text-tertiary); margin-bottom:8px; }
+.kpi-card-val { font-size:26px; font-weight:800; color:var(--navy); line-height:1; }
+.kpi-card-sub { font-size:11px; color:var(--text-tertiary); margin-top:6px; }
+.kpi-card-delta { font-size:11px; font-weight:700; margin-top:4px; }
+.delta-up { color:var(--success); }
+.delta-down { color:var(--danger); }
+.kpi-card.primary .kpi-card-val { color:var(--bordeaux); }
+.kpi-card.success .kpi-card-val { color:var(--success); }
+.kpi-card.warning .kpi-card-val { color:#d97706; }
+
+/* ── Sections ── */
+.sec-hdr { display:flex; align-items:center; gap:12px; margin-bottom:16px; margin-top:28px; }
+.sec-hdr:first-child { margin-top:0; }
+.sec-title { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.1em; color:var(--text-tertiary); }
+.sec-hdr::after { content:''; flex:1; height:1px; background:var(--border); }
+
+/* ── Chart card ── */
+.chart-card { background:var(--bg-card); border-radius:var(--radius-lg); padding:20px; border:1px solid var(--border); margin-bottom:16px; }
+.chart-title { font-size:13px; font-weight:700; color:var(--navy); margin-bottom:4px; }
+.chart-sub { font-size:11px; color:var(--text-tertiary); margin-bottom:16px; }
+.chart-legend { display:flex; gap:14px; flex-wrap:wrap; margin-top:12px; }
+.legend-dot { width:10px; height:10px; border-radius:2px; flex-shrink:0; }
+.legend-item { display:flex; align-items:center; gap:5px; font-size:11px; color:var(--text-secondary); }
+
+/* ── Mandat tabs ── */
+.mandat-pills { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:20px; }
+.mandat-pill { padding:6px 14px; border-radius:99px; font-size:12px; font-weight:600; cursor:pointer; border:1.5px solid var(--border); background:var(--white); color:var(--text-secondary); font-family:'Sora',sans-serif; transition:all .2s; }
+.mandat-pill.active { background:var(--navy); color:white; border-color:var(--navy); }
+.mandat-pill.actif-pill { border-color:var(--bordeaux); color:var(--bordeaux); }
+.mandat-pill.actif-pill.active { background:var(--bordeaux); color:white; }
+
+/* ── Progress bar ── */
+.prog-wrap { background:#eee; border-radius:99px; height:8px; overflow:hidden; margin-top:6px; }
+.prog-fill { height:100%; border-radius:99px; transition:width .6s ease; }
+
+/* ── Gauge ── */
+.gauge-wrap { display:flex; flex-direction:column; align-items:center; }
+.gauge-label { font-size:11px; color:var(--text-tertiary); margin-top:6px; }
+</style>
+</head>
+<body>
+<div class="login-page" id="login-page">
+  <div class="login-box">
+    <div class="login-logo"><img src="../assets/images/ICN-Junior-Conseil_logo.png" style="height:54px;object-fit:contain"/></div>
+    <div class="login-title">Connexion</div>
+    <div class="login-sub">Accès réservé — CA ICN Junior Conseil.</div>
+    <button class="google-btn" onclick="doGoogleLogin()">
+      <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google"/>Se connecter avec Google
+    </button>
+    <div class="denied-box" id="denied-box"><strong>Accès refusé</strong><p id="denied-msg"></p></div>
+    <div class="login-error" id="login-error"></div>
+  </div>
+</div>
+
+<div class="app-page" id="app-page">
+  <div id="sidebar-container"></div>
+  <div class="app-content">
+    <div class="page-header">
+      <div class="flex justify-between items-center" style="flex-wrap:wrap;gap:10px">
+        <div>
+          <div class="page-title">KPI Trésorerie</div>
+          <div class="page-subtitle" id="mandat-label">Chargement…</div>
+        </div>
+        <button class="btn btn-secondary btn-sm" onclick="exportXLSX()">⬇ Excel</button>
+      </div>
+    </div>
+    <div class="page-body">
+
+      <!-- Sélecteur mandat -->
+      <div class="mandat-pills" id="mandat-pills"></div>
+
+      <!-- KPI principaux -->
+      <div class="sec-hdr"><span class="sec-title">Vue d'ensemble</span></div>
+      <div class="kpi-row" id="kpi-main"></div>
+
+      <!-- Taux et ratios -->
+      <div class="sec-hdr"><span class="sec-title">Ratios clés</span></div>
+      <div class="kpi-row" id="kpi-ratios"></div>
+
+      <!-- Graphique évolution + comparaison -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;flex-wrap:wrap" id="charts-row">
+        <div class="chart-card" id="chart-evolution">
+          <div class="chart-title">Évolution CA & Trésorerie</div>
+          <div class="chart-sub">Sur les mandats disponibles</div>
+          <div id="chart-evo-svg"></div>
+          <div class="chart-legend" id="chart-evo-legend"></div>
+        </div>
+        <div class="chart-card" id="chart-compare">
+          <div class="chart-title">Comparaison mandats</div>
+          <div class="chart-sub">Indicateurs clés côte à côte</div>
+          <div id="chart-cmp-svg"></div>
+        </div>
+      </div>
+
+      <!-- Social & fiscal -->
+      <div class="sec-hdr" style="margin-top:8px"><span class="sec-title">Social & Fiscal</span></div>
+      <div class="kpi-row" id="kpi-social"></div>
+
+      <!-- Note données -->
+      <div style="background:#f8f7f5;border-radius:var(--radius-md);padding:12px 16px;font-size:12px;color:var(--text-tertiary);margin-top:8px;border:1px solid var(--border)">
+        ℹ️ Les données sont saisies manuellement dans <strong>Historique mandats</strong>. Import automatique depuis SAGE disponible en V2.
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+var allMandats = [], curMandatId = null, curMandat = null;
+
+function fmtM(n) { return Number(n||0).toLocaleString('fr-FR',{minimumFractionDigits:0,maximumFractionDigits:0})+' €'; }
+function fmtP(n) { return Math.round(n||0)+'%'; }
+function fmtN(n) { return Number(n||0).toLocaleString('fr-FR'); }
+
+initAuth('kpi_treso', function(user, role, profile) {
+  renderSidebar(role, profile, user, 'kpi_treso');
+  showAppPage(user, role, profile);
+  updateHealthIndicator();
+  loadData();
+});
+
+function loadData() {
+  db.collection('mandats').orderBy('date_debut','desc').onSnapshot(function(snap) {
+    allMandats = [];
+    snap.forEach(function(doc) { allMandats.push(Object.assign({id:doc.id}, doc.data())); });
+    buildPills();
+    var actif = allMandats.find(function(m){return m.statut==='actif';});
+    selectMandat((actif||allMandats[0]||{}).id);
+  });
+}
+
+function buildPills() {
+  var html = allMandats.filter(function(m){return m.statut!=='archive';}).map(function(m){
+    var isActif = m.statut === 'actif';
+    return '<button class="mandat-pill'+(isActif?' actif-pill':'')+'" id="pill-'+m.id+'" onclick="selectMandat(\''+m.id+'\')">'+
+      m.label+(isActif?' 🟢':'')+'</button>';
+  }).join('');
+  document.getElementById('mandat-pills').innerHTML = html;
+}
+
+function selectMandat(id) {
+  if (!id) return;
+  curMandatId = id;
+  curMandat = allMandats.find(function(m){return m.id===id;}) || {};
+  document.querySelectorAll('.mandat-pill').forEach(function(p){
+    p.classList.toggle('active', p.id==='pill-'+id);
+  });
+  document.getElementById('mandat-label').innerText = (curMandat.label||id) +
+    (curMandat.date_debut?' · '+fmtD(curMandat.date_debut)+' → '+(curMandat.date_fin?fmtD(curMandat.date_fin):'En cours'):'');
+  renderAll();
+}
+
+function renderAll() {
+  if (!curMandat) return;
+  var kt = curMandat.kpi_treso || {};
+  var kc = curMandat.kpi_commercial || {};
+  var isActif = curMandat.statut === 'actif';
+
+  // ── KPI principaux ──────────────────────────────────────────
+  var caSign = parseFloat(kt.ca_signe)||0;
+  var caEnc  = parseFloat(kt.ca_encaisse)||0;
+  var cash   = parseFloat(kt.cash_disponible)||0;
+  var nbEt   = parseFloat(kt.nb_etudes)||0;
+  var nbIv   = parseFloat(kt.nb_intervenants)||0;
+  var panierMoy = parseFloat(kt.panier_moyen)||0;
+
+  // Delta vs mandat précédent
+  var prev = getPrevMandat();
+  var pkt = prev ? (prev.kpi_treso||{}) : null;
+  function delta(cur, prv, fmt) {
+    if (!prv || !prv) return '';
+    var d = cur - (parseFloat(prv)||0);
+    var pct = prv>0 ? Math.round(d/prv*100) : 0;
+    var cls = d>=0?'delta-up':'delta-down';
+    var arrow = d>=0?'↑':'↓';
+    return '<div class="kpi-card-delta '+cls+'">'+arrow+' '+fmt(Math.abs(d))+'  ('+Math.abs(pct)+'% vs mandat préc.)</div>';
+  }
+
+  document.getElementById('kpi-main').innerHTML = [
+    { label:'CA signé', val:fmtM(caSign), cls:'primary', delta:delta(caSign,pkt&&pkt.ca_signe,fmtM), sub:isActif?'Mandat en cours':'Mandat clôturé' },
+    { label:'CA encaissé + cotisations', val:fmtM(caEnc), cls:'success', delta:delta(caEnc,pkt&&pkt.ca_encaisse,fmtM), sub:'' },
+    { label:'Cash disponible', val:fmtM(cash), cls: cash>5000?'success':cash>0?'warning':'', delta:'', sub:'Trésorerie nette' },
+    { label:'Études réalisées', val:fmtN(nbEt), cls:'', delta:delta(nbEt,pkt&&pkt.nb_etudes,fmtN), sub:nbIv+' intervenant(s)' },
+    { label:'Panier moyen', val:fmtM(panierMoy), cls:'', delta:'', sub:'Par étude signée' },
+  ].map(function(k){
+    return '<div class="kpi-card '+k.cls+'">' +
+      '<div class="kpi-card-label">'+k.label+'</div>' +
+      '<div class="kpi-card-val">'+k.val+'</div>' +
+      (k.sub?'<div class="kpi-card-sub">'+k.sub+'</div>':'') +
+      k.delta +
+      (k.label==='CA signé'||k.label==='CA encaissé + cotisations' ? renderMiniProg(k.label==='CA signé'?caSign:caEnc, Math.max(caSign,1)) : '') +
+    '</div>';
+  }).join('');
+
+  // ── Ratios ──────────────────────────────────────────────────
+  var tauxTransfo = parseFloat(kt.taux_transformation)||0;
+  var tauxImpayes = parseFloat(kt.taux_impayes)||0;
+  var margeMoy    = parseFloat(kt.marge_nette_moy)||0;
+  var coutMoy     = parseFloat(kt.cout_moyen_etude)||0;
+  var tauxOuv     = parseFloat(kt.taux_ouverture)||0;
+
+  document.getElementById('kpi-ratios').innerHTML = [
+    { label:'Taux CA signé → encaissé', val:fmtP(tauxTransfo), good: tauxTransfo>=80, bad:tauxTransfo<60 },
+    { label:"Taux d'impayés", val:fmtP(tauxImpayes), good:tauxImpayes<5, bad:tauxImpayes>=10 },
+    { label:'Marge nette moyenne', val:fmtP(margeMoy), good:margeMoy>=60, bad:margeMoy<40 },
+    { label:'Coût moyen / étude', val:fmtM(coutMoy), good:false, bad:false },
+    { label:"Taux d'ouverture études", val:fmtP(tauxOuv), good:tauxOuv>=70, bad:tauxOuv<50 },
+  ].map(function(k){
+    var cls = k.good?'success':k.bad?'warning':'';
+    return '<div class="kpi-card '+cls+'">' +
+      '<div class="kpi-card-label">'+k.label+'</div>' +
+      '<div class="kpi-card-val">'+k.val+'</div>' +
+      (k.good?'<div class="kpi-card-sub" style="color:var(--success)">✅ Objectif atteint</div>':
+       k.bad?'<div class="kpi-card-sub" style="color:#d97706">⚠️ À surveiller</div>':'') +
+    '</div>';
+  }).join('');
+
+  // ── Social & Fiscal ─────────────────────────────────────────
+  var custKpis = curMandat.kpi_custom || [];
+  var socialHtml = custKpis.length === 0
+    ? '<div style="font-size:12px;color:var(--text-tertiary);padding:8px">KPI personnalisés à saisir dans <strong>Historique mandats</strong>.</div>'
+    : custKpis.map(function(k){
+        return '<div class="kpi-card">' +
+          '<div class="kpi-card-label">'+(k.label||'KPI')+'</div>' +
+          '<div class="kpi-card-val">'+(k.valeur||'—')+'</div>' +
+        '</div>';
+      }).join('');
+  document.getElementById('kpi-social').innerHTML = socialHtml;
+
+  // ── Graphiques ───────────────────────────────────────────────
+  renderEvoChart();
+  renderCmpChart();
+}
+
+function renderMiniProg(val, max) {
+  var pct = max>0?Math.min(100,Math.round(val/max*100)):0;
+  var color = pct>=80?'#22c55e':pct>=50?'#f59e0b':'#ef4444';
+  return '<div class="prog-wrap"><div class="prog-fill" style="width:'+pct+'%;background:'+color+'"></div></div>';
+}
+
+function getPrevMandat() {
+  var idx = allMandats.findIndex(function(m){return m.id===curMandatId;});
+  return idx>=0 && idx<allMandats.length-1 ? allMandats[idx+1] : null;
+}
+
+function fmtD(s) { if(!s)return'—'; var p=s.split('-'); return p.length===3?p[2]+'/'+p[1]+'/'+p[0]:s; }
+
+// ── Graphique évolution ────────────────────────────────────────
+function renderEvoChart() {
+  var mandats = allMandats.filter(function(m){return m.statut!=='archive';}).slice().reverse();
+  if (mandats.length < 2) {
+    document.getElementById('chart-evo-svg').innerHTML = '<div style="color:var(--text-tertiary);font-size:12px;text-align:center;padding:20px">Au moins 2 mandats nécessaires.</div>';
+    return;
+  }
+  var labels = mandats.map(function(m){return m.id;});
+  var caData = mandats.map(function(m){return parseFloat((m.kpi_treso||{}).ca_signe)||0;});
+  var cashData = mandats.map(function(m){return parseFloat((m.kpi_treso||{}).cash_disponible)||0;});
+  var datasets = [
+    {label:'CA signé', vals:caData, color:'#A3215F'},
+    {label:'Cash disponible', vals:cashData, color:'#10b981'},
+  ];
+  renderLineChartKpi('chart-evo-svg', datasets, labels);
+  document.getElementById('chart-evo-legend').innerHTML = datasets.map(function(d){
+    return '<div class="legend-item"><div class="legend-dot" style="background:'+d.color+'"></div>'+d.label+'</div>';
+  }).join('');
+}
+
+// ── Graphique comparaison ──────────────────────────────────────
+function renderCmpChart() {
+  var mandats = allMandats.filter(function(m){return m.statut!=='archive';});
+  var COLORS = ['#A3215F','#1B2A4A','#3b82f6','#10b981','#f59e0b'];
+  var kpis = [
+    {key:'ca_signe',label:'CA signé',fmt:fmtM},
+    {key:'nb_etudes',label:'Nb études',fmt:fmtN},
+    {key:'marge_nette_moy',label:'Marge %',fmt:fmtP},
+  ];
+  var W = 360, H = 200, PL=44, PR=10, PT=20, PB=32, gW=W-PL-PR, gH=H-PT-PB;
+  var svg = '<svg viewBox="0 0 '+W+' '+H+'" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:'+H+'px">';
+  kpis.forEach(function(kp, ki) {
+    var vals = mandats.map(function(m){return parseFloat((m.kpi_treso||{})[kp.key])||0;});
+    var maxV = Math.max(1,Math.max.apply(null,vals));
+    var x0 = ki * (gW/kpis.length) + PL + 10;
+    var colW = gW/kpis.length - 20;
+    var barW = colW / mandats.length;
+    // label kpi
+    svg += '<text x="'+(x0+colW/2)+'" y="'+(H-4)+'" text-anchor="middle" font-size="8" fill="#9ca3af">'+kp.label+'</text>';
+    mandats.forEach(function(m,mi){
+      var v = parseFloat((m.kpi_treso||{})[kp.key])||0;
+      var h = Math.round(v/maxV*gH);
+      var x = x0 + mi*barW + barW*0.1;
+      var y = PT+gH-h;
+      svg += '<rect x="'+x+'" y="'+y+'" width="'+(barW*0.8)+'" height="'+Math.max(h,2)+'" fill="'+COLORS[mi%COLORS.length]+'" opacity="0.85" rx="2">';
+      svg += '<title>'+m.id+' — '+kp.label+' : '+kp.fmt(v)+'</title></rect>';
+    });
+  });
+  // Légende mandats
+  var legY = PT + gH + 18;
+  mandats.forEach(function(m,mi){
+    svg += '<rect x="'+(PL + mi*50)+'" y="'+(H-14)+'" width="8" height="8" fill="'+COLORS[mi%COLORS.length]+'" rx="1"/>';
+    svg += '<text x="'+(PL + mi*50+11)+'" y="'+(H-6)+'" font-size="8" fill="#9ca3af">'+m.id+'</text>';
+  });
+  svg += '</svg>';
+  document.getElementById('chart-cmp-svg').innerHTML = svg;
+}
+
+// ── Line chart réutilisable ────────────────────────────────────
+function renderLineChartKpi(containerId, datasets, labels) {
+  var wrap = document.getElementById(containerId);
+  if (!wrap) return;
+  var W = wrap.clientWidth || wrap.parentElement.clientWidth || 400;
+  if (W < 100) { setTimeout(function(){renderLineChartKpi(containerId,datasets,labels);},60); return; }
+  var H=180, PL=44, PR=16, PT=16, PB=28, gW=W-PL-PR, gH=H-PT-PB;
+  var nPts = labels.length;
+  var allVals = datasets.reduce(function(a,d){return a.concat(d.vals);},[0]);
+  var maxV = Math.max(1,Math.max.apply(null,allVals));
+  function px(i){return PL+(nPts>1?i*gW/(nPts-1):gW/2);}
+  function py(v){return PT+gH-(v/maxV*gH);}
+  var svg = '<svg viewBox="0 0 '+W+' '+H+'" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:'+H+'px">';
+  for(var gi=0;gi<=4;gi++){
+    var gy=PT+(gH/4)*gi; var gv=Math.round(maxV-(maxV/4)*gi);
+    svg+='<line x1="'+PL+'" y1="'+gy+'" x2="'+(PL+gW)+'" y2="'+gy+'" stroke="#e5e7eb" stroke-width="1"/>';
+    svg+='<text x="'+(PL-4)+'" y="'+(gy+4)+'" text-anchor="end" font-size="9" fill="#9ca3af">'+fmtShort(gv)+'</text>';
+  }
+  labels.forEach(function(lbl,i){
+    svg+='<text x="'+px(i)+'" y="'+(H-4)+'" text-anchor="middle" font-size="9" fill="#9ca3af">'+lbl+'</text>';
+  });
+  datasets.forEach(function(ds){
+    if(!ds.vals||!ds.vals.length)return;
+    var lp='M '+px(0)+' '+py(ds.vals[0]);
+    ds.vals.forEach(function(v,i){if(i>0)lp+=' L '+px(i)+' '+py(v);});
+    svg+='<path d="'+lp+'" fill="none" stroke="'+ds.color+'" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>';
+    ds.vals.forEach(function(v,i){
+      svg+='<circle cx="'+px(i)+'" cy="'+py(v)+'" r="4" fill="'+ds.color+'" stroke="white" stroke-width="2">';
+      svg+='<title>'+labels[i]+' — '+ds.label+' : '+fmtM(v)+'</title></circle>';
+    });
+  });
+  svg+='</svg>';
+  wrap.innerHTML = svg;
+}
+
+function fmtShort(n) {
+  if(Math.abs(n)>=1000){return Math.round(n/1000)+'k';}
+  return String(n);
+}
+
+// ── Export ─────────────────────────────────────────────────────
+function exportXLSX() {
+  var rows=[['Mandat','CA Signé','CA Encaissé','Cash Dispo','Nb Études','Nb Intervenants','Panier Moyen','Taux Transfo','Taux Impayés','Marge Nette']];
+  allMandats.forEach(function(m){
+    var kt=m.kpi_treso||{};
+    rows.push([m.label,kt.ca_signe||0,kt.ca_encaisse||0,kt.cash_disponible||0,
+      kt.nb_etudes||0,kt.nb_intervenants||0,kt.panier_moyen||0,
+      kt.taux_transformation||0,kt.taux_impayes||0,kt.marge_nette_moy||0]);
+  });
+  var ws=XLSX.utils.aoa_to_sheet(rows);
+  var wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'KPI Tréso');
+  XLSX.writeFile(wb,'KPI_Treso_ICN_JC.xlsx');
+}
+</script>
+</body>
+</html>
