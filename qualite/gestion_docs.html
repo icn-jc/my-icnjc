@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Gestion documents — My-ICN-JC</title>
+<link rel="stylesheet" href="../assets/css/global.css"/>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script src="../assets/js/firebase.js"></script>
+<script src="../assets/js/auth.js"></script>
+<script src="../assets/js/sidebar.js"></script>
+<style>
+.gd-tabs{display:flex;gap:3px;background:var(--bg);border-radius:var(--radius-lg);padding:4px;border:1px solid var(--border);width:fit-content;margin-bottom:20px;}
+.gd-tab{padding:8px 18px;border-radius:var(--radius-md);font-size:13px;font-weight:500;cursor:pointer;border:none;background:transparent;color:var(--text-secondary);font-family:'Sora',sans-serif;transition:all .2s;}
+.gd-tab.active{background:var(--white);color:var(--bordeaux);box-shadow:var(--shadow-sm);font-weight:600;}
+.gd-pane{display:none;}
+.gd-pane.active{display:block;}
+/* Doc cards */
+.doc-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px;}
+.doc-card{background:var(--bg-card);border-radius:var(--radius-lg);padding:16px 18px;border:1px solid var(--border);box-shadow:var(--shadow-sm);}
+.doc-card.attente{border-left:3px solid #f59e0b;}
+.doc-card.dispo{border-left:3px solid var(--success);}
+.dc-type{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--bordeaux);margin-bottom:4px;}
+.dc-name{font-weight:600;font-size:13px;color:var(--navy);}
+.dc-ref{font-size:11px;color:var(--text-tertiary);font-family:monospace;margin-top:2px;}
+.dc-iv{font-size:12px;color:var(--text-secondary);margin-top:4px;}
+.dc-status{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:700;padding:2px 8px;border-radius:99px;margin-top:6px;}
+.ds-attente{background:#fef3c7;color:#78350f;}
+.ds-dispo{background:#dcfce7;color:#14532d;}
+/* Q builder */
+.q-builder{background:var(--bg-card);border-radius:var(--radius-lg);padding:20px;border:1px solid var(--border);margin-bottom:16px;}
+.q-item{background:var(--bg);border-radius:var(--radius-md);padding:12px 14px;border:1px solid var(--border);margin-bottom:10px;}
+.q-item-header{display:flex;align-items:center;gap:10px;margin-bottom:8px;}
+.q-drag{cursor:grab;color:var(--text-tertiary);font-size:14px;}
+.q-num{font-size:11px;font-weight:700;color:var(--bordeaux);width:22px;}
+.q-text{font-weight:600;font-size:13px;color:var(--navy);flex:1;}
+/* Réponses */
+.rep-item{background:var(--bg-card);border-radius:var(--radius-lg);padding:14px 16px;border:1px solid var(--border);margin-bottom:10px;}
+</style>
+</head>
+<body>
+<div class="login-page" id="login-page">
+  <div class="login-box">
+    <div class="login-logo"><img src="../assets/images/ICN-Junior-Conseil_logo.png" style="height:54px;object-fit:contain"/></div>
+    <div class="login-title">Connexion</div>
+    <div class="login-sub">Accès réservé — Responsable qualité et Super Admin.</div>
+    <button class="google-btn" onclick="doGoogleLogin()">
+      <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google"/>Se connecter avec Google
+    </button>
+    <div class="denied-box" id="denied-box"><strong>Accès refusé</strong><p id="denied-msg"></p></div>
+    <div class="login-error" id="login-error"></div>
+  </div>
+</div>
+
+<div class="app-page" id="app-page">
+  <div id="sidebar-container"></div>
+  <div class="app-content">
+    <div class="page-header">
+      <div class="page-title">Gestion documents & questionnaires</div>
+      <div class="page-subtitle">Espace responsable qualité</div>
+    </div>
+    <div class="page-body">
+      <div class="gd-tabs">
+        <button class="gd-tab active" onclick="switchTab('docs')" id="gdt-docs">📄 Documents</button>
+        <button class="gd-tab" onclick="switchTab('questionnaire')" id="gdt-questionnaire">📋 Questionnaire</button>
+        <button class="gd-tab" onclick="switchTab('reponses')" id="gdt-reponses">📊 Réponses</button>
+      </div>
+
+      <!-- ═══ DOCUMENTS ═══ -->
+      <div class="gd-pane active" id="gdp-docs">
+        <div class="flex justify-between items-center" style="flex-wrap:wrap;gap:10px;margin-bottom:14px">
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <select id="df-type" onchange="renderDocs()" style="padding:6px 10px;border-radius:var(--radius-md);border:1.5px solid var(--border-strong);font-family:'Sora',sans-serif;font-size:12px;background:var(--white)">
+              <option value="">Tous types</option><option value="RM">RM</option>
+              <option value="CE">CE</option><option value="BV">BV</option>
+            </select>
+            <select id="df-status" onchange="renderDocs()" style="padding:6px 10px;border-radius:var(--radius-md);border:1.5px solid var(--border-strong);font-family:'Sora',sans-serif;font-size:12px;background:var(--white)">
+              <option value="">Tous statuts</option>
+              <option value="en_attente_lien">En attente de lien</option>
+              <option value="disponible">Disponible</option>
+            </select>
+            <input type="text" id="df-search" placeholder="🔍 Intervenant, réf…" oninput="renderDocs()" style="padding:6px 10px;border-radius:var(--radius-md);border:1.5px solid var(--border-strong);font-family:'Sora',sans-serif;font-size:12px;"/>
+          </div>
+          <span id="doc-count" style="font-size:12px;color:var(--text-tertiary)"></span>
+        </div>
+        <div style="background:#fef3c7;border:1px solid #fde68a;border-radius:var(--radius-md);padding:10px 14px;font-size:12px;color:#78350f;margin-bottom:16px">
+          ℹ️ Les cards sont créées automatiquement depuis <strong>CRM Intervenants</strong> lors de l'assignation. Pour chaque card en attente, colle le lien GDrive vers le document correspondant.
+        </div>
+        <div class="doc-grid" id="doc-grid">
+          <div style="color:var(--text-tertiary);font-size:13px">Chargement…</div>
+        </div>
+      </div>
+
+      <!-- ═══ QUESTIONNAIRE ═══ -->
+      <div class="gd-pane" id="gdp-questionnaire">
+        <div class="q-builder">
+          <div class="flex justify-between items-center" style="margin-bottom:16px;flex-wrap:wrap;gap:10px">
+            <div>
+              <div style="font-size:15px;font-weight:700;color:var(--navy)">Questionnaire de fin d'étude</div>
+              <div style="font-size:12px;color:var(--text-tertiary);margin-top:2px" id="q-status-lbl"></div>
+            </div>
+            <div style="display:flex;gap:8px">
+              <button class="btn btn-secondary btn-sm" onclick="addQuestion()">+ Question</button>
+              <button class="btn btn-primary btn-sm" onclick="saveQuestionnaire()">💾 Sauvegarder</button>
+            </div>
+          </div>
+          <div id="q-fields-list"></div>
+          <div id="q-empty" style="color:var(--text-tertiary);font-size:13px;text-align:center;padding:20px;display:none">Aucune question. Clique sur "+ Question" pour commencer.</div>
+        </div>
+      </div>
+
+      <!-- ═══ RÉPONSES ═══ -->
+      <div class="gd-pane" id="gdp-reponses">
+        <div class="flex justify-between items-center" style="margin-bottom:14px;flex-wrap:wrap;gap:10px">
+          <div style="font-size:14px;font-weight:600;color:var(--navy)">Réponses soumises</div>
+          <button class="btn btn-secondary btn-sm" onclick="exportReponses()">⬇ Excel</button>
+        </div>
+        <div id="reponses-list"><div style="color:var(--text-tertiary)">Chargement…</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL LIEN GDRIVE -->
+<div class="modal-overlay" id="modal-lien" onclick="if(event.target===this)closeLien()">
+  <div class="modal-box" style="max-width:480px">
+    <div class="modal-header"><div class="modal-title" id="lien-modal-title">Ajouter le lien GDrive</div><button class="modal-close" onclick="closeLien()">×</button></div>
+    <p style="font-size:13px;color:var(--text-secondary);margin-bottom:14px">Colle le lien de partage GDrive. Assure-toi que l'accès est configuré pour les personnes concernées.</p>
+    <div class="form-field">
+      <label class="input-label">Lien GDrive</label>
+      <input class="input" id="lien-input" placeholder="https://drive.google.com/…" type="url"/>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeLien()">Annuler</button>
+      <button class="btn btn-primary" onclick="saveLien()">Enregistrer →</button>
+    </div>
+  </div>
+</div>
+
+<script>
+var MY_ROLE = '';
+var allDocs = [], allReponses = [], questionnaire = null, questionnaireId = null;
+var curDocId = null;
+
+initAuth('gestion_docs', function(user, role, profile) {
+  MY_ROLE = role;
+  renderSidebar(role, profile, user, 'gestion_docs');
+  showAppPage(user, role, profile);
+  updateHealthIndicator();
+  loadData();
+});
+
+function loadData() {
+  db.collection('documents').orderBy('created_at','desc').onSnapshot(function(snap){
+    allDocs = [];
+    snap.forEach(function(doc){allDocs.push(Object.assign({id:doc.id},doc.data()));});
+    renderDocs();
+  });
+
+  db.collection('questionnaires').where('actif','==',true).limit(1).get().then(function(snap){
+    if (!snap.empty) {
+      questionnaireId = snap.docs[0].id;
+      questionnaire = Object.assign({id:questionnaireId},snap.docs[0].data());
+    } else {
+      // Créer un questionnaire vide
+      db.collection('questionnaires').add({actif:true,questions:[],created_at:firebase.firestore.FieldValue.serverTimestamp()}).then(function(ref){
+        questionnaireId = ref.id;
+        questionnaire = {id:ref.id,actif:true,questions:[]};
+        renderQuestionnaire();
+      });
+    }
+    renderQuestionnaire();
+  });
+
+  db.collection('questionnaire_reponses').orderBy('created_at','desc').onSnapshot(function(snap){
+    allReponses = [];
+    snap.forEach(function(doc){allReponses.push(Object.assign({id:doc.id},doc.data()));});
+    renderReponses();
+  });
+}
+
+function switchTab(key) {
+  ['docs','questionnaire','reponses'].forEach(function(k){
+    document.getElementById('gdt-'+k).classList.toggle('active',k===key);
+    document.getElementById('gdp-'+k).classList.toggle('active',k===key);
+  });
+}
+
+// ═══ DOCUMENTS ═══════════════════════════════════════════════
+function renderDocs() {
+  var ft = document.getElementById('df-type').value;
+  var fs = document.getElementById('df-status').value;
+  var fq = (document.getElementById('df-search').value||'').toLowerCase();
+  var data = allDocs.filter(function(d){
+    if (ft && d.type !== ft) return false;
+    if (fs && d.statut !== fs) return false;
+    if (fq && !(d.nom_affiche||'').toLowerCase().includes(fq) && !(d.intervenant_nom||'').toLowerCase().includes(fq) && !(d.etude_ref||'').toLowerCase().includes(fq)) return false;
+    return true;
+  });
+  document.getElementById('doc-count').innerText = data.length+' document(s)';
+  var ICONS = {RM:'📄',CE:'📋',BV:'💰'};
+  document.getElementById('doc-grid').innerHTML = data.length===0
+    ? '<div style="color:var(--text-tertiary);font-size:13px">Aucun document.</div>'
+    : data.map(function(d){
+        var isAttente = d.statut==='en_attente_lien';
+        return '<div class="doc-card '+(isAttente?'attente':'dispo')+'">' +
+          '<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">' +
+            '<div style="font-size:24px">'+(ICONS[d.type]||'📎')+'</div>' +
+            '<div style="flex:1">' +
+              '<div class="dc-type">'+(d.type||'DOC')+'</div>' +
+              '<div class="dc-name">'+(d.nom_affiche||'Document')+'</div>' +
+            '</div>' +
+          '</div>' +
+          '<div class="dc-ref">'+(d.etude_ref||'')+'</div>' +
+          '<div class="dc-iv">👤 '+(d.intervenant_nom||'—')+'</div>' +
+          '<div><span class="dc-status '+(isAttente?'ds-attente':'ds-dispo')+'">' +
+            (isAttente?'⏳ En attente de lien':'✅ Disponible')+'</span></div>' +
+          (d.lien_gdrive?'<a href="'+d.lien_gdrive+'" target="_blank" style="font-size:11px;color:var(--bordeaux);text-decoration:none;display:block;margin-top:6px">🔗 Voir sur GDrive</a>':'') +
+          '<div style="margin-top:10px;display:flex;gap:8px">' +
+            '<button class="btn btn-primary btn-sm" onclick="openLien(\''+d.id+'\')">'+
+            (isAttente?'+ Coller le lien':'✏ Modifier le lien')+'</button>' +
+            (d.lien_gdrive?'<button class="btn btn-secondary btn-sm" onclick="removeLien(\''+d.id+'\')">Retirer</button>':'') +
+          '</div>' +
+        '</div>';
+      }).join('');
+}
+
+function openLien(docId) {
+  curDocId = docId;
+  var d = allDocs.find(function(x){return x.id===docId;});
+  document.getElementById('lien-modal-title').innerText = 'Lien GDrive — '+(d?d.nom_affiche:'');
+  document.getElementById('lien-input').value = d&&d.lien_gdrive ? d.lien_gdrive : '';
+  document.getElementById('modal-lien').classList.add('open');
+}
+function closeLien() { document.getElementById('modal-lien').classList.remove('open'); curDocId = null; }
+function saveLien() {
+  if (!curDocId) return;
+  var lien = document.getElementById('lien-input').value.trim();
+  db.collection('documents').doc(curDocId).update({
+    lien_gdrive: lien,
+    statut: lien ? 'disponible' : 'en_attente_lien',
+    updated_at: firebase.firestore.FieldValue.serverTimestamp()
+  }).then(function(){closeLien();});
+}
+function removeLien(docId) {
+  if (!confirm('Retirer le lien GDrive ?')) return;
+  db.collection('documents').doc(docId).update({lien_gdrive:'',statut:'en_attente_lien',updated_at:firebase.firestore.FieldValue.serverTimestamp()});
+}
+
+// ═══ QUESTIONNAIRE ════════════════════════════════════════════
+function renderQuestionnaire() {
+  if (!questionnaire) return;
+  var questions = questionnaire.questions || [];
+  document.getElementById('q-status-lbl').innerText = 'Questionnaire actif · '+questions.length+' question(s)';
+  if (questions.length===0) {
+    document.getElementById('q-fields-list').innerHTML = '';
+    document.getElementById('q-empty').style.display='block';
+    return;
+  }
+  document.getElementById('q-empty').style.display='none';
+  document.getElementById('q-fields-list').innerHTML = questions.map(function(q,i){
+    var typeOpts = ['texte','note','oui_non','choix'].map(function(t){
+      return '<option value="'+t+'"'+(q.type===t?' selected':'')+'>'+
+        {texte:'Texte libre',note:'Note /5',oui_non:'Oui / Non',choix:'Choix multiple'}[t]+'</option>';
+    }).join('');
+    return '<div class="q-item" data-qi="'+i+'">' +
+      '<div class="q-item-header">' +
+        '<span class="q-num">'+(i+1)+'.</span>' +
+        '<input class="input" style="flex:1;font-size:13px" value="'+escHtml(q.question||'')+'" placeholder="Question…" onblur="updateQ('+i+',\'question\',this.value)"/>' +
+        '<select style="padding:4px 8px;border-radius:var(--radius-sm);border:1px solid var(--border);font-size:12px;font-family:\'Sora\',sans-serif" onchange="updateQ('+i+',\'type\',this.value)">'+typeOpts+'</select>' +
+        '<button onclick="delQuestion('+i+')" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:14px;padding:0 4px">✕</button>' +
+      '</div>' +
+      '<input class="input" style="font-size:12px;margin-top:4px" value="'+escHtml(q.description||'')+'" placeholder="Description / aide (optionnel)" onblur="updateQ('+i+',\'description\',this.value)"/>' +
+      (q.type==='choix'?'<div style="margin-top:6px"><input class="input" style="font-size:12px" value="'+escHtml((q.options||[]).join(', '))+'" placeholder="Option 1, Option 2, Option 3…" onblur="updateQOptions('+i+',this.value)"/><div style="font-size:10px;color:var(--text-tertiary);margin-top:2px">Sépare les options par des virgules</div></div>':'') +
+    '</div>';
+  }).join('');
+}
+
+function escHtml(s) { return (s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
+
+function updateQ(i, field, val) {
+  if (!questionnaire) return;
+  questionnaire.questions[i][field] = val;
+}
+function updateQOptions(i, val) {
+  if (!questionnaire) return;
+  questionnaire.questions[i].options = val.split(',').map(function(s){return s.trim();}).filter(Boolean);
+}
+function addQuestion() {
+  if (!questionnaire) return;
+  questionnaire.questions.push({question:'',description:'',type:'texte',options:[]});
+  renderQuestionnaire();
+}
+function delQuestion(i) {
+  if (!questionnaire) return;
+  questionnaire.questions.splice(i,1);
+  renderQuestionnaire();
+}
+function saveQuestionnaire() {
+  if (!questionnaireId) return;
+  db.collection('questionnaires').doc(questionnaireId).update({
+    questions: questionnaire.questions,
+    updated_at: firebase.firestore.FieldValue.serverTimestamp()
+  }).then(function(){
+    var btn = document.querySelector('#gdp-questionnaire .btn-primary');
+    if(btn){var orig=btn.innerText;btn.innerText='✅ Sauvegardé';setTimeout(function(){btn.innerText=orig;},1500);}
+  });
+}
+
+// ═══ RÉPONSES ════════════════════════════════════════════════
+function renderReponses() {
+  if (allReponses.length===0) {
+    document.getElementById('reponses-list').innerHTML = '<div style="color:var(--text-tertiary);font-size:13px;text-align:center;padding:30px">Aucune réponse soumise.</div>';
+    return;
+  }
+  document.getElementById('reponses-list').innerHTML = allReponses.map(function(r){
+    return '<div class="rep-item">' +
+      '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;flex-wrap:wrap;gap:6px">' +
+        '<div>' +
+          '<div style="font-weight:600;font-size:13px;color:var(--navy)">'+(r.intervenant_email||'—')+'</div>' +
+          '<div style="font-size:11px;color:var(--text-tertiary)">Étude : '+(r.etude_id||'—')+' · '+formatDate(r.soumis_le)+'</div>' +
+        '</div>' +
+      '</div>' +
+      (r.reponses||[]).map(function(rep){
+        return '<div style="padding:6px 0;border-bottom:1px solid var(--border)">' +
+          '<div style="font-size:11px;color:var(--text-tertiary)">'+escHtml(rep.question||'')+'</div>' +
+          '<div style="font-size:13px;color:var(--text-primary);margin-top:2px">'+escHtml(rep.reponse||'—')+'</div>' +
+        '</div>';
+      }).join('') +
+    '</div>';
+  }).join('');
+}
+
+function formatDate(s) { if (!s) return '—'; var p=s.split('-'); return p.length===3?p[2]+'/'+p[1]+'/'+p[0]:s; }
+
+function exportReponses() {
+  if (typeof XLSX === 'undefined') { alert('Export non disponible sur cette page.'); return; }
+}
+</script>
+</body>
+</html>
