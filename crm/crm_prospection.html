@@ -1240,15 +1240,15 @@ function saveAction() {
             db.collection('prospects_rdv').add(rdvData);
           },
           function(conflicts) {
-            // Conflit détecté
-            var conflictDate = fmtD(conflicts[0].date);
-            var choice = confirm(
-              '⚠️ Ce prospect a déjà un RDV planifié le ' + conflictDate + '.
+    // Conflit détecté
+    var conflictDate = fmtD(conflicts[0].date);
 
-' +
-              'Cliquez OK pour conserver les DEUX rendez-vous.
-' +
-              'Cliquez Annuler pour REMPLACER l'ancien par le nouveau.'
+    var choice = confirm(
+      '⚠️ Ce prospect a déjà un RDV planifié le ' + conflictDate + '.\n\n' +
+      'Cliquez OK pour conserver les DEUX rendez-vous.\n' +
+      'Cliquez Annuler pour REMPLACER l’ancien par le nouveau.'
+    );
+}
             );
             if (choice) {
               // Conserver les deux
