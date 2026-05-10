@@ -44,6 +44,7 @@
 .president-row{display:flex;gap:8px;align-items:center;margin-bottom:12px;}
 .president-row select{flex:1;padding:6px 8px;border:1px solid var(--border);border-radius:var(--radius-sm);font-family:'Sora',sans-serif;font-size:12px;}
 .auto-badge{background:#dbeafe;color:#1e3a5f;font-size:10px;font-weight:600;padding:2px 7px;border-radius:99px;margin-left:4px;}
+.active-tab{background:var(--navy);color:white;border-color:var(--navy);}
 </style>
 </head>
 <body>
@@ -69,12 +70,27 @@
           <div class="page-title">Historique mandats</div>
           <div class="page-subtitle">Gestion des mandats, saisie des KPI historiques — Super Admin uniquement</div>
         </div>
-        <button class="btn btn-primary" onclick="openNewMandat()">+ Nouveau mandat</button>
+        <div class="flex gap-2">
+          <button class="btn btn-secondary" id="btn-tab-kpi" onclick="switchMandatTab('kpi')">📊 KPI & données</button>
+          <button class="btn btn-secondary active-tab" id="btn-tab-membres" onclick="switchMandatTab('membres')">👥 Membres</button>
+          <button class="btn btn-primary" id="btn-tab-new" onclick="openNewMandat()">+ Nouveau mandat</button>
+        </div>
       </div>
     </div>
     <div class="page-body">
-      <div class="mandat-grid" id="mandat-grid">
-        <div style="color:var(--text-tertiary);font-size:13px">Chargement…</div>
+      <div id="view-kpi" style="display:none">
+        <div class="mandat-grid" id="mandat-grid">
+          <div style="color:var(--text-tertiary);font-size:13px">Chargement…</div>
+        </div>
+      </div>
+      <div id="view-membres">
+        <div style="display:flex;gap:10px;align-items:center;margin-bottom:16px;flex-wrap:wrap">
+          <select id="membres-mandat-sel" onchange="renderMembresView()" style="padding:7px 12px;border-radius:var(--radius-md);border:1.5px solid var(--border-strong);font-family:'Sora',sans-serif;font-size:13px;">
+            <option value="">— Sélectionner un mandat —</option>
+          </select>
+          <button class="btn btn-primary btn-sm" onclick="saveMembres()">💾 Sauvegarder membres</button>
+        </div>
+        <div id="membres-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px"></div>
       </div>
     </div>
   </div>
@@ -110,11 +126,12 @@
 
 <script>
 var allMandats = [], allUsers = [];
-var ME = '', MY_NAME = '';
+var ME = '', MY_NAME = '', MY_ROLE_MANDATS = '';
 
 initAuth('mandats', function(user, role, profile) {
   ME = user.email;
   MY_NAME = ((profile.prenom||'') + ' ' + (profile.nom||'')).trim();
+  MY_ROLE_MANDATS = role;
   renderSidebar(role, profile, user, 'mandats');
   showAppPage(user, role, profile);
   updateHealthIndicator();
@@ -122,6 +139,7 @@ initAuth('mandats', function(user, role, profile) {
 });
 
 function loadData() {
+  switchMandatTab('membres'); // Démarrer sur l'onglet membres
   db.collection('users').get().then(function(snap) {
     allUsers = [];
     snap.forEach(function(doc) { allUsers.push(Object.assign({email: doc.id}, doc.data())); });
@@ -132,7 +150,11 @@ function loadData() {
     snap.forEach(function(doc) { allMandats.push(Object.assign({id: doc.id}, doc.data())); });
     // Si aucun mandat, créer les mandats initiaux
     if (allMandats.length === 0) seedMandats();
-    else renderMandats();
+    else {
+      renderMandats();
+      populateMandatSel('membres-mandat-sel');
+      renderMembresView();
+    }
   });
 }
 
@@ -155,7 +177,10 @@ function seedMandats() {
 function populatePresidentSelect(selectId) {
   var sel = document.getElementById(selectId);
   if (!sel) return;
-  var pres = allUsers.filter(function(u) { return ['president','super_admin'].includes(u.role || (u.roles&&u.roles[0])); });
+  var pres = allUsers.filter(function(u) {
+    var r = u.role || (Array.isArray(u.roles) ? u.roles[0] : '');
+    return r === 'president';
+  });
   pres.forEach(function(u) {
     var o = document.createElement('option');
     o.value = u.email; o.text = (u.prenom||'') + ' ' + (u.nom||'');
@@ -178,7 +203,13 @@ function renderMandatCard(m) {
   var isArch  = m.statut === 'archive';
   var badgeCls = isActif ? 'mc-badge-actif' : isClos ? 'mc-badge-clos' : 'mc-badge-archive';
   var badgeTxt = isActif ? '🟢 Actif' : isClos ? '✅ Clôturé' : '📁 Archivé';
-  var locked = m.locked === true;
+  // super_admin = toujours éditable
+  // president/vp = éditable seulement si désigné président de ce mandat
+  var locked = false;
+  if (MY_ROLE_MANDATS !== 'super_admin') {
+    var isPresident = m.president_email === ME;
+    locked = !isPresident; // lecture seule si pas président du mandat
+  }
   var mid = m.id;
 
   // KPI fields tréso
@@ -264,7 +295,10 @@ function renderMandatCard(m) {
     '</div>' +
     '<div class="president-row"><select id="pres-sel-' + mid + '" onchange="updateMandatField(\'' + mid + '\',\'president_email\',this.value)">' +
     '<option value="">— Président du mandat —</option>' +
-    allUsers.filter(function(u){return ['president','super_admin','vice_president'].includes(u.role||'');}).map(function(u){
+    allUsers.filter(function(u){
+      var r = u.role || (Array.isArray(u.roles)?u.roles[0]:'');
+      return r === 'president';
+    }).map(function(u){
       return '<option value="' + u.email + '"' + (m.president_email===u.email?' selected':'') + '>' + (u.prenom||'') + ' ' + (u.nom||'') + '</option>';
     }).join('') +
     '</select></div>';
@@ -407,6 +441,66 @@ function confirmNewMandat() {
     kpi_treso: {}, kpi_commercial: {}, kpi_custom: [], locked: false,
     created_at: firebase.firestore.FieldValue.serverTimestamp()
   }).then(function(){ closeNewMandat(); });
+}
+
+// ── TABS ──────────────────────────────────────────────────────
+function switchMandatTab(tab) {
+  document.getElementById('view-kpi').style.display = tab === 'kpi' ? 'block' : 'none';
+  document.getElementById('view-membres').style.display = tab === 'membres' ? 'block' : 'none';
+  document.getElementById('btn-tab-new').style.display = tab === 'kpi' ? '' : 'none';
+  document.getElementById('btn-tab-kpi').classList.toggle('active-tab', tab === 'kpi');
+  document.getElementById('btn-tab-membres').classList.toggle('active-tab', tab === 'membres');
+  if (tab === 'membres') {
+    populateMandatSel('membres-mandat-sel');
+    renderMembresView();
+  }
+}
+
+function populateMandatSel(selId) {
+  var sel = document.getElementById(selId);
+  if (!sel) return;
+  var cur = sel.value;
+  sel.innerHTML = '<option value="">— Sélectionner un mandat —</option>' +
+    allMandats.filter(function(m){return m.statut!=='archive';}).map(function(m){
+      return '<option value="'+m.id+'"'+(cur===m.id?' selected':'')+'>'+m.label+'</option>';
+    }).join('');
+  if (!cur && allMandats.length > 0) sel.value = allMandats.find(function(m){return m.statut==='actif';})?allMandats.find(function(m){return m.statut==='actif';}).id:allMandats[0].id;
+}
+
+function renderMembresView() {
+  var mandatId = document.getElementById('membres-mandat-sel').value;
+  var container = document.getElementById('membres-grid');
+  if (!mandatId) { container.innerHTML = '<div style="color:var(--text-tertiary);font-size:13px">Sélectionne un mandat.</div>'; return; }
+  var mandat = allMandats.find(function(m){return m.id===mandatId;});
+  var membresActuels = (mandat && mandat.membres) || [];
+  var canEdit = MY_ROLE_MANDATS === 'super_admin' || (mandat && mandat.president_email === ME);
+
+  container.innerHTML = allUsers.map(function(u) {
+    var checked = membresActuels.includes(u.email);
+    var ri = u.role || '';
+    var RLMAP = {super_admin:'Super Admin',president:'Président',vice_president:'VP',tresorier:'Trésorier',
+      secretaire:'Secrétaire',responsable_commercial:'Resp. Commercial',responsable_qualite:'Resp. Qualité',
+      responsable_marketing:'Resp. Marketing',commercial:'Commercial',marketing:'Marketing',
+      tresorerie:'Trésorerie',auditeur:'Auditeur',intervenant:'Intervenant',membre_cos:'Membre COS'};
+    var ini = ((u.prenom||'?')[0]+(u.nom||'?')[0]).toUpperCase();
+    return '<label style="display:flex;align-items:center;gap:10px;background:var(--bg-card);border:1.5px solid '+(checked?'var(--bordeaux)':'var(--border)')+';border-radius:var(--radius-lg);padding:12px;cursor:'+(canEdit?'pointer':'default')+';transition:border .15s">' +
+      '<input type="checkbox" value="'+u.email+'"'+(checked?' checked':'')+(!canEdit?' disabled':'')+' style="accent-color:var(--bordeaux);width:16px;height:16px;flex-shrink:0">' +
+      '<div style="width:32px;height:32px;border-radius:50%;background:rgba(163,33,95,0.12);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--bordeaux);flex-shrink:0">'+ini+'</div>' +
+      '<div><div style="font-weight:600;font-size:12px;color:var(--navy)">'+(u.prenom||'')+' '+(u.nom||'')+'</div>' +
+      '<div style="font-size:10px;color:var(--text-tertiary)">'+(RLMAP[ri]||ri)+'</div></div>' +
+    '</label>';
+  }).join('');
+}
+
+function saveMembres() {
+  var mandatId = document.getElementById('membres-mandat-sel').value;
+  if (!mandatId) return;
+  var checked = Array.from(document.getElementById('membres-grid').querySelectorAll('input[type=checkbox]:checked'))
+    .map(function(el){return el.value;});
+  db.collection('mandats').doc(mandatId).update({membres: checked}).then(function(){
+    var btn = document.querySelector('#view-membres .btn-primary');
+    if (btn) { var orig = btn.innerText; btn.innerText = '✅ Sauvegardé'; setTimeout(function(){btn.innerText=orig;},1500); }
+  });
 }
 
 // ── HELPERS ────────────────────────────────────────────────────
