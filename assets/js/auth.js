@@ -65,7 +65,7 @@ const PAGE_ACCESS = {
                  'responsable_commercial','responsable_qualite','responsable_marketing',
                  'tresorerie','auditeur','marketing','commercial','membre_cos'],
   'mes_missions': ROLE_HIERARCHY_AUTH,
-  'mandats': ['super_admin'], // Page historique mandats — super_admin uniquement
+  'mandats': ['super_admin','president','vice_president'], // Lecture tous, modif super_admin + président du mandat
 
   'admin': ['super_admin','president'],
 };
