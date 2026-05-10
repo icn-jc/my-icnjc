@@ -450,9 +450,7 @@ function decloreMandat(mandatId) {
 }
 
 function deleteMandat(mandatId) {
-  if (!confirm('⚠️ SUPPRIMER définitivement le mandat ' + mandatId + ' ?
-
-Cette action est irréversible. Les données KPI seront perdues.')) return;
+  if (!confirm('⚠️ SUPPRIMER définitivement le mandat ' + mandatId + ' ?\n\nCette action est irréversible. Les données KPI seront perdues.')) return;
   if (!confirm('Dernière confirmation : supprimer ' + mandatId + ' ?')) return;
   db.collection('mandats').doc(mandatId).delete();
 }
