@@ -116,6 +116,9 @@
 .chart-col-inner{display:flex;align-items:flex-end;gap:2px;height:140px;}
 .chart-bar{width:13px;border-radius:3px 3px 0 0;opacity:.85;cursor:default;}
 .chart-lbl{font-size:9px;color:var(--text-tertiary);margin-top:4px;white-space:nowrap;}
+/* Line chart SVG */
+.line-chart-wrap{width:100%;overflow-x:auto;}
+.line-chart-wrap svg{display:block;}
 .chart-legend{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;}
 .legend-item{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text-secondary);}
 .legend-dot{width:10px;height:10px;border-radius:2px;flex-shrink:0;}
@@ -1655,8 +1658,7 @@ function saveAction() {
   var date = document.getElementById('af-date').value;
   // Vérifier la limite rétroactive pour les non-super_admin
   if (MY_ROLE !== 'super_admin' && date && date < retroLimitDate) {
-    alert('⛔ Tu ne peux pas enregistrer une action avant le ' + fmtD(retroLimitDate) + '.
-Contacte le Super Admin si nécessaire.');
+    alert('⛔ Tu ne peux pas enregistrer une action avant le ' + fmtD(retroLimitDate) + '. Contacte le Super Admin si nécessaire.');
     return;
   }
   var result = document.getElementById('af-result').value;
@@ -1838,9 +1840,7 @@ function confirmAddProspect() {
 
 function delProspect(id, nameEnc) {
   var name = nameEnc ? decodeURIComponent(nameEnc) : id;
-  if (!confirm('Supprimer le prospect "' + name + '" ?
-
-Ses actions historiques seront conservées dans Firestore.')) return;
+  if (!confirm('Supprimer le prospect "' + name + '" ?\n\nSes actions historiques seront conservées dans Firestore.')) return;
   db.collection('prospects').doc(id).delete();
 }
 
@@ -2046,6 +2046,71 @@ function getCols(period, fromId, toId) {
   return cols;
 }
 
+function renderLineChart(cid, datasets, labels) {
+  var wrap = document.getElementById(cid); if (!wrap) return;
+  var W = Math.max(wrap.clientWidth || 600, 400);
+  var H = 200, PL = 36, PR = 16, PT = 20, PB = 32;
+  var gW = W - PL - PR, gH = H - PT - PB;
+  var nPts = labels.length;
+  if (nPts === 0) { wrap.innerHTML = '<div style="text-align:center;color:var(--text-tertiary);padding:20px">Pas de données</div>'; return; }
+  var allVals = datasets.reduce(function(a,d){return a.concat(d.vals);},[0]);
+  var maxV = Math.max(1, Math.max.apply(null, allVals));
+  var xStep = nPts > 1 ? gW / (nPts - 1) : gW;
+
+  function px(i) { return PL + (nPts > 1 ? i * gW / (nPts - 1) : gW / 2); }
+  function py(v) { return PT + gH - (v / maxV * gH); }
+
+  var svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:' + H + 'px">';
+
+  // Grid lines
+  var gridSteps = 4;
+  for (var gi = 0; gi <= gridSteps; gi++) {
+    var gy = PT + (gH / gridSteps) * gi;
+    var gv = Math.round(maxV - (maxV / gridSteps) * gi);
+    svg += '<line x1="' + PL + '" y1="' + gy + '" x2="' + (PL+gW) + '" y2="' + gy + '" stroke="#e5e7eb" stroke-width="1"/>';
+    svg += '<text x="' + (PL-4) + '" y="' + (gy+4) + '" text-anchor="end" font-size="9" fill="#9ca3af">' + gv + '</text>';
+  }
+
+  // X labels
+  labels.forEach(function(lbl, i) {
+    var skip = nPts > 20 ? Math.floor(nPts / 10) : 1;
+    if (i % skip !== 0 && i !== nPts - 1) return;
+    svg += '<text x="' + px(i) + '" y="' + (H - 4) + '" text-anchor="middle" font-size="9" fill="#9ca3af">' + lbl + '</text>';
+  });
+
+  // Dataset lines + dots
+  datasets.forEach(function(ds) {
+    if (!ds.vals || ds.vals.length === 0) return;
+    // Area fill
+    var areaPath = 'M ' + px(0) + ' ' + py(ds.vals[0]);
+    ds.vals.forEach(function(v, i) { if (i > 0) areaPath += ' L ' + px(i) + ' ' + py(v); });
+    areaPath += ' L ' + px(ds.vals.length-1) + ' ' + (PT+gH) + ' L ' + px(0) + ' ' + (PT+gH) + ' Z';
+    svg += '<path d="' + areaPath + '" fill="' + ds.color + '" opacity="0.08"/>';
+    // Line
+    var linePath = 'M ' + px(0) + ' ' + py(ds.vals[0]);
+    ds.vals.forEach(function(v, i) { if (i > 0) linePath += ' L ' + px(i) + ' ' + py(v); });
+    svg += '<path d="' + linePath + '" fill="none" stroke="' + ds.color + '" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>';
+    // Dots
+    ds.vals.forEach(function(v, i) {
+      if (v > 0 || i === 0 || i === ds.vals.length-1) {
+        svg += '<circle cx="' + px(i) + '" cy="' + py(v) + '" r="3" fill="' + ds.color + '" stroke="white" stroke-width="1.5">';
+        svg += '<title>' + ds.label + ' — ' + labels[i] + ' : ' + v + '</title></circle>';
+      }
+    });
+  });
+
+  svg += '</svg>';
+
+  // Legend
+  var legend = '<div class="chart-legend" style="margin-top:8px">';
+  datasets.forEach(function(ds) {
+    legend += '<div class="legend-item"><div class="legend-dot" style="background:' + ds.color + '"></div>' + ds.label + '</div>';
+  });
+  legend += '</div>';
+
+  wrap.innerHTML = '<div class="line-chart-wrap">' + svg + '</div>' + legend;
+}
+
 function renderBarChart(cid, datasets, labels) {
   var wrap = document.getElementById(cid); if (!wrap) return;
   var maxV = Math.max(1, Math.max.apply(null, datasets.reduce(function(a,d) { return a.concat(d.vals); }, [0])));
@@ -2067,7 +2132,7 @@ function renderBarChart(cid, datasets, labels) {
 function renderCAChart() {
   var cols = getCols(periodCA, 'dr-ca-from', 'dr-ca-to');
   var prosp = allUsers.filter(function(u) { return u.prospecte; });
-  renderBarChart('chart-ca', prosp.slice(0, 6).map(function(u, i) {
+  renderLineChart('chart-ca', prosp.slice(0, 6).map(function(u, i) {
     return {
       label: (u.prenom || u.email.split('@')[0]),
       color: COLORS[i % COLORS.length],
@@ -2084,7 +2149,7 @@ function renderCAChart() {
 
 function renderMineChart() {
   var cols = getCols(periodMine, 'dr-mine-from', 'dr-mine-to');
-  renderBarChart('chart-mine', [
+  renderLineChart('chart-mine', [
     {
       label: 'Contacts valorisés', color: COLORS[0],
       vals: cols.map(function(col) {
