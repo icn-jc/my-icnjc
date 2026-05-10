@@ -265,17 +265,30 @@ function render() {
         var dc = dispoCls[iv.disponibilite]||'dispo';
         var sc = iv.statut==='Actif'?'actif':iv.statut==='En mission'?'mission':'inactif';
         var comps = (iv.competences||[]).slice(0,3).map(function(c){return '<span class="comp-tag">'+c+'</span>';}).join('');
+        // 3 dernières missions
+        var myM = allEtudes.filter(function(e){return (e.intervenants||[]).some(function(i){return i.intervenant_id===iv.id;});});
+        myM.sort(function(a,b){return (b.created_at_str||'').localeCompare(a.created_at_str||'');});
+        var lastM = myM.slice(0,3).map(function(e){
+          return '<span class="comp-tag" style="background:rgba(27,42,74,0.07);color:var(--navy);font-size:9px">'+(e.reference||'')+(e.title?' · '+e.title.slice(0,16)+(e.title.length>16?'…':''):'')+'</span>';
+        }).join('');
+        // Période dispo
+        var dispoPeriod = (iv.dispo_debut||iv.dispo_fin)
+          ? '<div style="font-size:10px;color:var(--text-tertiary);margin-top:4px">📅 '+(iv.dispo_debut?fmtD(iv.dispo_debut):'?')+' → '+(iv.dispo_fin?fmtD(iv.dispo_fin):'?')+'</div>'
+          : '';
         return '<div class="iv-card '+sc+'" onclick="openIv(\''+iv.id+'\')">' +
-          '<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">' +
+          '<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">' +
             '<div class="iv-avatar">'+ini(iv)+'</div>' +
             '<div style="flex:1;min-width:0">' +
               '<div class="iv-name">'+(iv.prenom||'')+' '+(iv.nom||'')+'</div>' +
-              '<div class="iv-role">'+(iv.specialite||iv.ecole||'—')+'</div>' +
+              '<div class="iv-role">'+(iv.specialite||iv.ecole||'—')+
+                (iv.ville?' <span style="opacity:.7">· 📍'+iv.ville+'</span>':'')+'</div>' +
             '</div>' +
             '<span class="dispo-badge dispo-'+dc+'">'+(iv.disponibilite||'—')+'</span>' +
           '</div>' +
-          (comps?'<div>'+comps+'</div>':'') +
-          '<div style="font-size:11px;color:var(--text-tertiary);margin-top:6px">'+nbM+' mission(s)</div>' +
+          dispoPeriod +
+          (comps?'<div style="margin-top:6px">'+comps+'</div>':'') +
+          (lastM?'<div style="margin-top:7px;padding-top:7px;border-top:1px solid var(--border)"><div style="font-size:9px;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:.07em;margin-bottom:3px">Dernières missions</div>'+lastM+'</div>':'') +
+          '<div style="font-size:11px;color:var(--text-tertiary);margin-top:6px">'+nbM+' mission(s) au total</div>' +
         '</div>';
       }).join('');
 }
@@ -297,7 +310,8 @@ function openIv(id) {
   document.getElementById('ivp-meta').innerHTML =
     '<span class="dispo-badge '+dc+'">'+(iv.disponibilite||'—')+'</span>' +
     (iv.statut?'<span style="font-size:11px;color:var(--text-tertiary)">'+iv.statut+'</span>':'') +
-    (iv.ville?'<span style="font-size:11px;color:var(--text-tertiary)">📍 '+iv.ville+'</span>':'');
+    (iv.ville?'<span style="font-size:11px;color:var(--text-tertiary)">📍 '+iv.ville+'</span>':'') +
+    ((iv.dispo_debut||iv.dispo_fin)?'<span style="font-size:11px;color:var(--text-tertiary)">📅 '+fmtD(iv.dispo_debut)+' → '+fmtD(iv.dispo_fin)+'</span>':'');
 
   document.getElementById('ivt-edit').style.display = CAN_EDIT ? '' : 'none';
   document.getElementById('ivt-assigner').style.display = CAN_EDIT ? '' : 'none';
@@ -347,6 +361,7 @@ function renderIvInfos(iv) {
     '<div class="sec" style="margin-top:16px">Finances</div>' +
     fld('IBAN', iv.iban ? iv.iban.slice(0,8)+'…'+iv.iban.slice(-4) : '—') +
     fld('CA généré', fmtM(iv.ca_genere)) +
+    (iv.dispo_debut||iv.dispo_fin ? fld('Période dispo', fmtD(iv.dispo_debut)+' → '+fmtD(iv.dispo_fin)) : '') +
     (iv.notes?'<div class="sec" style="margin-top:16px">Notes</div><div style="font-size:13px;color:var(--text-secondary);line-height:1.6">'+iv.notes+'</div>':'');
 }
 
@@ -449,6 +464,8 @@ function renderIvEdit(iv) {
     ef('Statut','select:'+statOpts,iv.statut||'','statut',id)+
     ef('Compétences','text',(iv.competences||[]).join(', '),'competences_str',id)+
     ef('Langues','text',(iv.langues||[]).join(', '),'langues_str',id)+
+    ef('Dispo — date début','date',iv.dispo_debut||'','dispo_debut',id)+
+    ef('Dispo — date fin','date',iv.dispo_fin||'','dispo_fin',id)+
     ef('IBAN','text',iv.iban||'','iban',id)+
     ef('Notes','textarea',iv.notes||'','notes',id)+
     '</div>';
