@@ -402,15 +402,7 @@ function delCustomKpi(mandatId, idx) {
 }
 
 function snapshotMandat(mandatId) {
-  if (!confirm('Prendre un snapshot pour le mandat ' + mandatId + ' ?
-
-Cela va calculer depuis Firestore :
-• Nb prospects contactés
-• Nb signés
-• CA signé (prospects Firestore)
-• Taux de conversion
-
-Ces valeurs rempliront les champs. Tu pourras ensuite les ajuster manuellement.')) return;
+  if (!confirm('Prendre un snapshot pour le mandat ' + mandatId + ' ?\n\nCela va calculer depuis Firestore :\n• Nb prospects contactés\n• Nb signés\n• CA signé (prospects)\n• Taux de conversion\n\nCes valeurs rempliront les champs. Tu pourras ensuite les ajuster.')) return;
   var today = new Date();
   var snap = localDateStr(today);
   // Calculer les KPI depuis Firestore (prospects + études)
@@ -432,15 +424,7 @@ Ces valeurs rempliront les champs. Tu pourras ensuite les ajuster manuellement.'
       snapshot_at: snap
     });
   }).then(function(){
-    alert('✅ Snapshot pris le ' + snap + '.
-
-Les champs suivants ont été remplis automatiquement :
-• Nb prospects contactés
-• Nb signés
-• CA signé
-• Taux de conversion
-
-Tu peux maintenant ajuster ces valeurs manuellement si nécessaire.');
+    alert('✅ Snapshot pris le ' + snap + '.\n\nLes champs suivants ont été remplis automatiquement :\n• Nb prospects contactés\n• Nb signés\n• CA signé\n• Taux de conversion\n\nTu peux maintenant ajuster ces valeurs manuellement si nécessaire.');
   });
 }
 
