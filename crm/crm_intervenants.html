@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Intervenants — My-ICN-JC</title>
+<link rel="stylesheet" href="../assets/css/global.css"/>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+<script src="../assets/js/firebase.js"></script>
+<script src="../assets/js/auth.js"></script>
+<script src="../assets/js/sidebar.js"></script>
+<style>
+.iv-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px;}
+.iv-card{background:var(--bg-card);border-radius:var(--radius-lg);padding:14px 16px;border:1px solid var(--border);cursor:pointer;transition:all .15s;box-shadow:var(--shadow-sm);}
+.iv-card:hover{box-shadow:var(--shadow-md);border-color:var(--bordeaux);transform:translateY(-1px);}
+.iv-card.actif{border-left:3px solid var(--success);}
+.iv-card.inactif{border-left:3px solid var(--text-tertiary);}
+.iv-card.mission{border-left:3px solid #f59e0b;}
+.iv-avatar{width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,var(--bordeaux),#d4527f);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:white;flex-shrink:0;}
+.iv-name{font-weight:700;font-size:14px;color:var(--navy);}
+.iv-role{font-size:11px;color:var(--text-tertiary);}
+.dispo-badge{font-size:10px;font-weight:700;padding:2px 8px;border-radius:99px;}
+.dispo-dispo{background:#dcfce7;color:#14532d;}
+.dispo-mission{background:#fef3c7;color:#78350f;}
+.dispo-indispo{background:#fee2e2;color:#991b1b;}
+.comp-tag{display:inline-block;background:rgba(163,33,95,0.08);color:var(--bordeaux);border-radius:99px;padding:2px 8px;font-size:10px;font-weight:600;margin:2px;}
+/* Panel */
+.iv-panel{position:fixed;right:0;top:0;bottom:0;width:540px;max-width:96vw;background:var(--white);box-shadow:-8px 0 40px rgba(27,42,74,0.18);z-index:400;display:flex;flex-direction:column;transform:translateX(100%);transition:transform .25s ease;}
+.iv-panel.open{transform:translateX(0);}
+.ivp-header{padding:18px 22px;border-bottom:1px solid var(--border);position:relative;display:flex;gap:14px;align-items:center;}
+.ivp-close{position:absolute;top:14px;right:16px;background:none;border:none;font-size:22px;cursor:pointer;color:var(--text-tertiary);}
+.ivp-tabs{display:flex;border-bottom:1px solid var(--border);}
+.ivp-tab{flex:1;padding:10px;font-size:12px;font-weight:600;cursor:pointer;border:none;background:transparent;font-family:'Sora',sans-serif;color:var(--text-secondary);border-bottom:2px solid transparent;transition:all .15s;}
+.ivp-tab.active{color:var(--bordeaux);border-bottom-color:var(--bordeaux);}
+.ivp-pane{display:none;flex:1;overflow-y:auto;padding:18px 22px;}
+.ivp-pane.active{display:block;}
+.overlay{position:fixed;inset:0;background:rgba(15,25,35,0.35);z-index:399;display:none;}
+.overlay.open{display:block;}
+.sec{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--text-tertiary);margin-bottom:8px;margin-top:16px;display:flex;align-items:center;gap:8px;}
+.sec::after{content:'';flex:1;height:1px;background:var(--border);}
+.sec:first-child{margin-top:0;}
+.mission-item{background:var(--bg);border-radius:var(--radius-md);padding:10px 12px;border:1px solid var(--border);margin-bottom:8px;}
+.toolbar{display:flex;gap:7px;flex-wrap:wrap;align-items:center;margin-bottom:16px;}
+.toolbar select,.toolbar input{padding:6px 10px;border-radius:var(--radius-md);border:1.5px solid var(--border-strong);font-family:'Sora',sans-serif;font-size:12px;background:var(--white);}
+</style>
+</head>
+<body>
+<div class="login-page" id="login-page">
+  <div class="login-box">
+    <div class="login-logo"><img src="../assets/images/ICN-Junior-Conseil_logo.png" style="height:54px;object-fit:contain"/></div>
+    <div class="login-title">Connexion</div>
+    <div class="login-sub">Accès réservé aux membres ICN Junior Conseil.</div>
+    <button class="google-btn" onclick="doGoogleLogin()">
+      <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google"/>Se connecter avec Google
+    </button>
+    <div class="denied-box" id="denied-box"><strong>Accès refusé</strong><p id="denied-msg"></p></div>
+    <div class="login-error" id="login-error"></div>
+  </div>
+</div>
+
+<div class="app-page" id="app-page">
+  <div id="sidebar-container"></div>
+  <div class="app-content">
+    <div class="page-header">
+      <div class="flex justify-between items-center" style="flex-wrap:wrap;gap:10px">
+        <div><div class="page-title">Intervenants</div><div class="page-subtitle" id="page-subtitle"></div></div>
+        <div class="flex gap-2">
+          <button class="btn btn-primary btn-sm" id="btn-add" onclick="openAdd()" style="display:none">+ Intervenant</button>
+          <button class="btn btn-secondary btn-sm" onclick="exportXLSX()">⬇ Excel</button>
+        </div>
+      </div>
+    </div>
+    <div class="page-body">
+      <div class="toolbar">
+        <input type="text" id="srch" placeholder="🔍 Nom, compétence…" oninput="render()"/>
+        <select id="f-dispo" onchange="render()">
+          <option value="">Disponibilité</option>
+          <option value="Disponible">✅ Disponible</option>
+          <option value="En mission">🟡 En mission</option>
+          <option value="Indisponible">🔴 Indisponible</option>
+        </select>
+        <select id="f-statut" onchange="render()">
+          <option value="">Statut</option>
+          <option value="Actif">Actif</option>
+          <option value="Inactif">Inactif</option>
+          <option value="Ancien membre">Ancien membre</option>
+        </select>
+        <button class="btn btn-secondary btn-sm" onclick="clearFilters()">Réinitialiser</button>
+        <span style="font-size:11px;color:var(--text-tertiary);font-style:italic" id="f-note"></span>
+      </div>
+      <div class="iv-grid" id="iv-grid">
+        <div style="color:var(--text-tertiary);font-size:13px">Chargement…</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="overlay" onclick="closePanel()"></div>
+
+<!-- PANNEAU INTERVENANT -->
+<div class="iv-panel" id="iv-panel">
+  <div class="ivp-header">
+    <div class="iv-avatar" id="ivp-avatar">?</div>
+    <div style="flex:1;min-width:0">
+      <div style="font-family:'Playfair Display',serif;font-size:17px;color:var(--navy)" id="ivp-name"></div>
+      <div style="font-size:12px;color:var(--text-tertiary);margin-top:2px" id="ivp-sub"></div>
+      <div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap" id="ivp-meta"></div>
+    </div>
+    <button class="ivp-close" onclick="closePanel()">×</button>
+  </div>
+  <div class="ivp-tabs">
+    <button class="ivp-tab active" onclick="switchTab('infos')" id="ivt-infos">Profil</button>
+    <button class="ivp-tab" onclick="switchTab('missions')" id="ivt-missions">Missions</button>
+    <button class="ivp-tab" onclick="switchTab('assigner')" id="ivt-assigner" style="display:none">✚ Assigner</button>
+    <button class="ivp-tab" onclick="switchTab('edit')" id="ivt-edit" style="display:none">✏ Modifier</button>
+  </div>
+  <div class="ivp-pane active" id="ivp-infos"></div>
+  <div class="ivp-pane" id="ivp-missions"></div>
+  <div class="ivp-pane" id="ivp-assigner"></div>
+  <div class="ivp-pane" id="ivp-edit"></div>
+</div>
+
+<!-- MODAL AJOUT INTERVENANT -->
+<div class="modal-overlay" id="modal-add" onclick="if(event.target===this)closeAdd()">
+  <div class="modal-box" style="max-width:600px">
+    <div class="modal-header"><div class="modal-title" id="modal-title">Ajouter un intervenant</div><button class="modal-close" onclick="closeAdd()">×</button></div>
+    <div class="form-grid">
+      <div class="form-field"><label class="input-label">Prénom *</label><input class="input" id="ni-prenom"/></div>
+      <div class="form-field"><label class="input-label">Nom *</label><input class="input" id="ni-nom"/></div>
+      <div class="form-field"><label class="input-label">Email</label><input class="input" type="email" id="ni-email"/></div>
+      <div class="form-field"><label class="input-label">Téléphone</label><input class="input" id="ni-tel"/></div>
+      <div class="form-field"><label class="input-label">Ville</label><input class="input" id="ni-ville"/></div>
+      <div class="form-field"><label class="input-label">Adresse</label><input class="input" id="ni-adresse"/></div>
+      <div class="form-field"><label class="input-label">Date de naissance</label><input class="input" type="date" id="ni-ddn"/></div>
+      <div class="form-field"><label class="input-label">Nationalité</label><input class="input" id="ni-nat" placeholder="Française"/></div>
+      <div class="form-field"><label class="input-label">École / Formation</label><input class="input" id="ni-ecole" placeholder="ICN Business School"/></div>
+      <div class="form-field"><label class="input-label">Niveau d'études</label>
+        <select class="select-field" id="ni-niveau">
+          <option value="">—</option><option>L1</option><option>L2</option><option>L3</option>
+          <option>M1</option><option>M2</option><option>Diplômé</option><option>Autre</option>
+        </select></div>
+      <div class="form-field"><label class="input-label">Spécialité</label><input class="input" id="ni-spec" placeholder="Marketing, Finance…"/></div>
+      <div class="form-field"><label class="input-label">Disponibilité</label>
+        <select class="select-field" id="ni-dispo">
+          <option value="Disponible">✅ Disponible</option>
+          <option value="En mission">🟡 En mission</option>
+          <option value="Indisponible">🔴 Indisponible</option>
+        </select></div>
+      <div class="form-field"><label class="input-label">Statut</label>
+        <select class="select-field" id="ni-statut">
+          <option value="Actif">Actif</option>
+          <option value="Inactif">Inactif</option>
+          <option value="Ancien membre">Ancien membre</option>
+        </select></div>
+      <div class="form-field full"><label class="input-label">Compétences (séparées par virgules)</label><input class="input" id="ni-comp" placeholder="Excel, Python, Marketing digital…"/></div>
+      <div class="form-field full"><label class="input-label">Langues (séparées par virgules)</label><input class="input" id="ni-langues" placeholder="Français, Anglais…"/></div>
+      <div class="form-field full"><label class="input-label">IBAN</label><input class="input" id="ni-iban" placeholder="FR76…" autocomplete="off"/></div>
+      <div class="form-field full"><label class="input-label">Notes</label><textarea class="input" id="ni-notes" rows="2" style="resize:vertical"></textarea></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeAdd()">Annuler</button>
+      <button class="btn btn-primary" onclick="confirmAdd()">Ajouter →</button>
+    </div>
+  </div>
+</div>
+
+<script>
+var ME = '', MY_ROLE = '', CAN_EDIT = false;
+var allIntervenants = [], allEtudes = [];
+var curIvId = null;
+var EDIT_ROLES_IV = ['super_admin','president','vice_president','responsable_commercial','secretaire'];
+
+// 35 intervenants initiaux
+var SEED_INTERVENANTS = [
+  {nom:'FERNANDES',prenom:'Antoine'},{nom:'GRANDIN',prenom:'Maeline'},
+  {nom:'FORTUNATO',prenom:'Enzo'},{nom:'KANESALINGAM',prenom:'Suhirthan'},
+  {nom:'BOUVIER',prenom:'Eliott'},{nom:'DESMOND',prenom:'Nicolas'},
+  {nom:'CORNET',prenom:'Olivier'},{nom:'BOUTARFA',prenom:'Mathis'},
+  {nom:'NEIFAR',prenom:'Taoufik'},{nom:'RENARD',prenom:'Julia'},
+  {nom:'SERS',prenom:'Raoul'},{nom:'DA CUNHA',prenom:'JB'},
+  {nom:'AMELINE',prenom:'Julie'},{nom:'GERNET',prenom:'Cecil'},
+  {nom:'BAHMED',prenom:'Gwilherm'},{nom:'YATHE',prenom:'Stella'},
+  {nom:'LI',prenom:'Sophia'},{nom:'ETIENNE',prenom:'Océane'},
+  {nom:'CISSOKHO',prenom:'Maryama'},{nom:'CAVERY',prenom:'Djalil'},
+  {nom:'NYAZI',prenom:'Bilal'},{nom:'TRUFFO',prenom:'Nathan'},
+  {nom:'BANGOURA',prenom:'Mamet'},{nom:'LOPES',prenom:'Diego'},
+  {nom:'WELLENREITER',prenom:'Tom'},{nom:'DELABARRE',prenom:'Oriane'},
+  {nom:'CHARRIER',prenom:'Arthur'},{nom:'ARUDCHELVAN',prenom:'Pagesan'},
+  {nom:'MARGOSSIAN',prenom:'Jorys'},{nom:'RAMADAN',prenom:'Celine'},
+  {nom:'ABIDI',prenom:'Roua'},{nom:'SAMUEL',prenom:'Victor'},
+  {nom:'TOUAITI',prenom:'Amen'},{nom:"L'HOMÉ",prenom:'Léo'},
+  {nom:'DOYEN',prenom:'Antoine'}
+];
+
+function localDateStr(d) { return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function fmtD(s) { if (!s) return '—'; var p=s.split('-'); return p.length===3?p[2]+'/'+p[1]+'/'+p[0]:s; }
+function fmtM(n) { return Number(n||0).toLocaleString('fr-FR',{minimumFractionDigits:0,maximumFractionDigits:0})+' €'; }
+function ini(iv) { return ((iv.prenom||'?')[0]+(iv.nom||'?')[0]).toUpperCase(); }
+
+initAuth('crm_intervenants', function(user, role, profile) {
+  ME = user.email; MY_ROLE = role;
+  CAN_EDIT = EDIT_ROLES_IV.includes(role);
+  renderSidebar(role, profile, user, 'crm_intervenants');
+  showAppPage(user, role, profile);
+  updateHealthIndicator();
+  if (CAN_EDIT) document.getElementById('btn-add').style.display = 'flex';
+  var now = new Date();
+  var M=['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
+  document.getElementById('page-subtitle').innerText = now.getDate()+' '+M[now.getMonth()]+' '+now.getFullYear();
+  loadData();
+});
+
+function loadData() {
+  db.collection('etudes').get().then(function(snap) {
+    allEtudes = [];
+    snap.forEach(function(doc){allEtudes.push(Object.assign({id:doc.id},doc.data()));});
+  });
+
+  db.collection('intervenants').onSnapshot(function(snap) {
+    allIntervenants = [];
+    snap.forEach(function(doc){allIntervenants.push(Object.assign({id:doc.id},doc.data()));});
+    if (allIntervenants.length === 0) seedIntervenants();
+    else render();
+  });
+}
+
+function seedIntervenants() {
+  var batch = db.batch();
+  SEED_INTERVENANTS.forEach(function(iv) {
+    var ref = db.collection('intervenants').doc();
+    batch.set(ref, Object.assign({
+      email:'',tel:'',ville:'',adresse:'',date_naissance:'',nationalite:'Française',
+      ecole:'ICN Business School',niveau_etudes:'',specialite:'',
+      iban:'',competences:[],langues:['Français'],
+      disponibilite:'Disponible',statut:'Actif',
+      nb_missions:0,ca_genere:0,notes:'',
+      created_at:firebase.firestore.FieldValue.serverTimestamp()
+    }, iv));
+  });
+  batch.commit();
+}
+
+function render() {
+  var srch = (document.getElementById('srch').value||'').toLowerCase();
+  var fd = document.getElementById('f-dispo').value;
+  var fs = document.getElementById('f-statut').value;
+  var data = allIntervenants.filter(function(iv) {
+    var name = ((iv.prenom||'')+' '+(iv.nom||'')).toLowerCase();
+    var comp = (iv.competences||[]).join(' ').toLowerCase();
+    if (srch && !name.includes(srch) && !comp.includes(srch)) return false;
+    if (fd && iv.disponibilite !== fd) return false;
+    if (fs && iv.statut !== fs) return false;
+    return true;
+  }).sort(function(a,b){return (a.nom||'').localeCompare(b.nom||'');});
+  document.getElementById('f-note').innerText = data.length < allIntervenants.length ? data.length+' / '+allIntervenants.length : '';
+
+  var dispoCls = {Disponible:'dispo',　'En mission':'mission',Indisponible:'indispo'};
+  document.getElementById('iv-grid').innerHTML = data.length === 0
+    ? '<div style="color:var(--text-tertiary);font-size:13px">Aucun intervenant.</div>'
+    : data.map(function(iv) {
+        var nbM = allEtudes.filter(function(e){return (e.intervenants||[]).some(function(i){return i.intervenant_id===iv.id;});}).length;
+        var dc = dispoCls[iv.disponibilite]||'dispo';
+        var sc = iv.statut==='Actif'?'actif':iv.statut==='En mission'?'mission':'inactif';
+        var comps = (iv.competences||[]).slice(0,3).map(function(c){return '<span class="comp-tag">'+c+'</span>';}).join('');
+        return '<div class="iv-card '+sc+'" onclick="openIv(\''+iv.id+'\')">' +
+          '<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">' +
+            '<div class="iv-avatar">'+ini(iv)+'</div>' +
+            '<div style="flex:1;min-width:0">' +
+              '<div class="iv-name">'+(iv.prenom||'')+' '+(iv.nom||'')+'</div>' +
+              '<div class="iv-role">'+(iv.specialite||iv.ecole||'—')+'</div>' +
+            '</div>' +
+            '<span class="dispo-badge dispo-'+dc+'">'+(iv.disponibilite||'—')+'</span>' +
+          '</div>' +
+          (comps?'<div>'+comps+'</div>':'') +
+          '<div style="font-size:11px;color:var(--text-tertiary);margin-top:6px">'+nbM+' mission(s)</div>' +
+        '</div>';
+      }).join('');
+}
+
+function clearFilters() {
+  ['srch','f-dispo','f-statut'].forEach(function(id){document.getElementById(id).value='';});
+  render();
+}
+
+// ── Panel intervenant ─────────────────────────────────────────
+function openIv(id) {
+  var iv = allIntervenants.find(function(x){return x.id===id;});
+  if (!iv) return;
+  curIvId = id;
+  document.getElementById('ivp-avatar').innerText = ini(iv);
+  document.getElementById('ivp-name').innerText = (iv.prenom||'')+' '+(iv.nom||'');
+  document.getElementById('ivp-sub').innerText = (iv.specialite||'')+(iv.ecole?' · '+iv.ecole:'');
+  var dc = {Disponible:'dispo-dispo','En mission':'dispo-mission',Indisponible:'dispo-indispo'}[iv.disponibilite]||'';
+  document.getElementById('ivp-meta').innerHTML =
+    '<span class="dispo-badge '+dc+'">'+(iv.disponibilite||'—')+'</span>' +
+    (iv.statut?'<span style="font-size:11px;color:var(--text-tertiary)">'+iv.statut+'</span>':'') +
+    (iv.ville?'<span style="font-size:11px;color:var(--text-tertiary)">📍 '+iv.ville+'</span>':'');
+
+  document.getElementById('ivt-edit').style.display = CAN_EDIT ? '' : 'none';
+  document.getElementById('ivt-assigner').style.display = CAN_EDIT ? '' : 'none';
+
+  renderIvInfos(iv);
+  renderIvMissions(id);
+  renderIvAssigner(iv);
+  renderIvEdit(iv);
+  switchTab('infos');
+  document.getElementById('iv-panel').classList.add('open');
+  document.getElementById('overlay').classList.add('open');
+}
+
+function closePanel() {
+  document.getElementById('iv-panel').classList.remove('open');
+  document.getElementById('overlay').classList.remove('open');
+  curIvId = null;
+}
+
+function switchTab(key) {
+  ['infos','missions','assigner','edit'].forEach(function(k){
+    document.getElementById('ivt-'+k).classList.toggle('active',k===key);
+    document.getElementById('ivp-'+k).classList.toggle('active',k===key);
+  });
+}
+
+function fld(label, val) {
+  return '<div style="display:flex;gap:8px;padding:6px 0;border-bottom:1px solid var(--border)">' +
+    '<div style="font-size:12px;color:var(--text-tertiary);width:130px;flex-shrink:0">'+label+'</div>' +
+    '<div style="font-size:13px;color:var(--text-primary)">'+val+'</div></div>';
+}
+
+function renderIvInfos(iv) {
+  var comps = (iv.competences||[]).map(function(c){return '<span class="comp-tag">'+c+'</span>';}).join('');
+  var langs = (iv.langues||[]).map(function(l){return '<span class="comp-tag" style="background:rgba(27,42,74,0.08);color:var(--navy)">'+l+'</span>';}).join('');
+  document.getElementById('ivp-infos').innerHTML =
+    '<div class="sec">Coordonnées</div>' +
+    fld('Email', iv.email||'—') + fld('Téléphone', iv.tel||'—') +
+    fld('Ville', iv.ville||'—') + fld('Adresse', iv.adresse||'—') +
+    '<div class="sec" style="margin-top:16px">Formation</div>' +
+    fld('École', iv.ecole||'—') + fld('Niveau', iv.niveau_etudes||'—') +
+    fld('Spécialité', iv.specialite||'—') + fld('Nationalité', iv.nationalite||'—') +
+    fld('Date naissance', fmtD(iv.date_naissance)) +
+    '<div class="sec" style="margin-top:16px">Compétences & Langues</div>' +
+    (comps?'<div style="margin-bottom:8px">'+comps+'</div>':'<div style="font-size:12px;color:var(--text-tertiary);margin-bottom:8px">Aucune compétence renseignée</div>') +
+    (langs?'<div>'+langs+'</div>':'') +
+    '<div class="sec" style="margin-top:16px">Finances</div>' +
+    fld('IBAN', iv.iban ? iv.iban.slice(0,8)+'…'+iv.iban.slice(-4) : '—') +
+    fld('CA généré', fmtM(iv.ca_genere)) +
+    (iv.notes?'<div class="sec" style="margin-top:16px">Notes</div><div style="font-size:13px;color:var(--text-secondary);line-height:1.6">'+iv.notes+'</div>':'');
+}
+
+function renderIvMissions(ivId) {
+  var missions = allEtudes.filter(function(e){
+    return (e.intervenants||[]).some(function(i){return i.intervenant_id===ivId;});
+  });
+  var STATUT_CSS2 = {Signé:'s-signe','En cours':'s-encours',Livré:'s-livre',Clôturé:'s-cloture'};
+  document.getElementById('ivp-missions').innerHTML = missions.length === 0
+    ? '<div style="color:var(--text-tertiary);font-size:13px;text-align:center;padding:20px">Aucune mission assignée.</div>'
+    : missions.map(function(e) {
+        var iv2 = (e.intervenants||[]).find(function(i){return i.intervenant_id===ivId;}) || {};
+        var sc = STATUT_CSS2[e.statut]||'';
+        return '<div class="mission-item">' +
+          '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px">' +
+            '<span style="font-family:monospace;font-size:11px;font-weight:700;color:var(--bordeaux)">'+(e.reference||'—')+'</span>' +
+            '<span class="badge '+sc+'">'+(e.statut||'—')+'</span>' +
+          '</div>' +
+          '<div style="font-weight:600;font-size:13px;color:var(--navy)">'+(e.title||'—')+'</div>' +
+          '<div style="font-size:11px;color:var(--text-tertiary);margin-top:3px">'+(e.client_name||'—')+'</div>' +
+          (iv2.montant_brut?'<div style="font-size:12px;font-weight:600;color:var(--bordeaux);margin-top:4px">Rémunération brute : '+fmtM(iv2.montant_brut)+'</div>':'') +
+        '</div>';
+      }).join('');
+}
+
+function renderIvAssigner(iv) {
+  if (!CAN_EDIT) { document.getElementById('ivp-assigner').innerHTML = ''; return; }
+  var etudesActives = allEtudes.filter(function(e){
+    return ['Signé','En cours'].includes(e.statut) &&
+           !(e.intervenants||[]).some(function(i){return i.intervenant_id===iv.id;});
+  });
+  document.getElementById('ivp-assigner').innerHTML =
+    '<div style="font-size:13px;color:var(--text-secondary);margin-bottom:14px">Assigner '+(iv.prenom||'')+' à une étude</div>' +
+    '<div class="form-field"><label class="input-label">Étude</label>' +
+      '<select class="select-field" id="assign-etude"><option value="">— Choisir —</option>' +
+      etudesActives.map(function(e){return '<option value="'+e.id+'">'+e.reference+' — '+e.title+'</option>';}).join('') +
+      '</select></div>' +
+    '<div class="form-field"><label class="input-label">Montant brut (€)</label><input class="input" type="number" id="assign-montant" placeholder="0"/></div>' +
+    '<div class="form-field"><label class="input-label">Notes</label><input class="input" id="assign-notes" placeholder="Rôle, modalités…"/></div>' +
+    '<button class="btn btn-primary" style="margin-top:8px" onclick="assignToEtude()">Assigner →</button>';
+}
+
+function assignToEtude() {
+  var iv = allIntervenants.find(function(x){return x.id===curIvId;});
+  if (!iv) return;
+  var etudeId = document.getElementById('assign-etude').value;
+  var montant = parseFloat(document.getElementById('assign-montant').value)||0;
+  var notes = document.getElementById('assign-notes').value.trim();
+  if (!etudeId) { alert('Merci de choisir une étude.'); return; }
+  var etude = allEtudes.find(function(e){return e.id===etudeId;});
+  if (!etude) return;
+  var existing = etude.intervenants || [];
+  existing.push({
+    intervenant_id: curIvId,
+    nom: (iv.prenom||'')+' '+(iv.nom||''),
+    montant_brut: montant,
+    notes: notes,
+    statut: 'Assigné'
+  });
+  db.collection('etudes').doc(etudeId).update({intervenants: existing}).then(function() {
+    // Créer le doc document pour gestion_docs
+    db.collection('documents').add({
+      type: 'RM',
+      etude_id: etudeId,
+      etude_ref: etude.reference||'',
+      intervenant_id: curIvId,
+      intervenant_nom: (iv.prenom||'')+' '+(iv.nom||''),
+      nom_affiche: 'RM — '+(etude.reference||'')+(iv.nom?' — '+iv.prenom+' '+iv.nom:''),
+      lien_gdrive: '',
+      statut: 'en_attente_lien',
+      vu_par_intervenant: false,
+      created_at: firebase.firestore.FieldValue.serverTimestamp(),
+      updated_at: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    // MAJ disponibilité intervenant
+    db.collection('intervenants').doc(curIvId).update({disponibilite:'En mission'});
+    alert('✅ Assigné. Un RM a été créé dans Gestion documents.');
+    renderIvAssigner(iv);
+    renderIvMissions(curIvId);
+  });
+}
+
+function renderIvEdit(iv) {
+  if (!CAN_EDIT) { document.getElementById('ivp-edit').innerHTML = ''; return; }
+  var id = iv.id;
+  var dispoOpts = ['Disponible','En mission','Indisponible'].map(function(s){return '<option'+(iv.disponibilite===s?' selected':'')+'>'+s+'</option>';}).join('');
+  var statOpts = ['Actif','Inactif','Ancien membre'].map(function(s){return '<option'+(iv.statut===s?' selected':'')+'>'+s+'</option>';}).join('');
+  var niveauOpts = ['','L1','L2','L3','M1','M2','Diplômé','Autre'].map(function(s){return '<option'+(iv.niveau_etudes===s?' selected':'')+'>'+(s||'—')+'</option>';}).join('');
+  document.getElementById('ivp-edit').innerHTML =
+    '<div style="display:flex;flex-direction:column;gap:10px">' +
+    ef('Prénom','text',iv.prenom||'','prenom',id)+ef('Nom','text',iv.nom||'','nom',id)+
+    ef('Email','email',iv.email||'','email',id)+ef('Téléphone','text',iv.tel||'','tel',id)+
+    ef('Ville','text',iv.ville||'','ville',id)+ef('Adresse','text',iv.adresse||'','adresse',id)+
+    ef('Date naissance','date',iv.date_naissance||'','date_naissance',id)+
+    ef('Nationalité','text',iv.nationalite||'','nationalite',id)+
+    ef('École','text',iv.ecole||'','ecole',id)+
+    ef('Niveau','select:'+niveauOpts,iv.niveau_etudes||'','niveau_etudes',id)+
+    ef('Spécialité','text',iv.specialite||'','specialite',id)+
+    ef('Disponibilité','select:'+dispoOpts,iv.disponibilite||'','disponibilite',id)+
+    ef('Statut','select:'+statOpts,iv.statut||'','statut',id)+
+    ef('Compétences','text',(iv.competences||[]).join(', '),'competences_str',id)+
+    ef('Langues','text',(iv.langues||[]).join(', '),'langues_str',id)+
+    ef('IBAN','text',iv.iban||'','iban',id)+
+    ef('Notes','textarea',iv.notes||'','notes',id)+
+    '</div>';
+}
+
+function ef(label, type, val, field, id) {
+  var input;
+  if (type.startsWith('select:')) {
+    input = '<select class="select-field" style="font-size:12px" onchange="saveIvField(\''+id+'\',\''+field+'\',this.value)">'+type.slice(7)+'</select>';
+  } else if (type === 'textarea') {
+    input = '<textarea class="input" rows="3" style="font-size:12px;resize:vertical" onblur="saveIvField(\''+id+'\',\''+field+'\',this.value)">'+val+'</textarea>';
+  } else {
+    input = '<input class="input" type="'+type+'" value="'+val+'" style="font-size:12px" onblur="saveIvField(\''+id+'\',\''+field+'\',this.value)"/>';
+  }
+  return '<div><label class="input-label">'+label+'</label>'+input+'</div>';
+}
+
+function saveIvField(id, field, val) {
+  var u = {};
+  if (field === 'competences_str') { u.competences = val.split(',').map(function(s){return s.trim();}).filter(Boolean); }
+  else if (field === 'langues_str') { u.langues = val.split(',').map(function(s){return s.trim();}).filter(Boolean); }
+  else u[field] = val;
+  db.collection('intervenants').doc(id).update(u);
+}
+
+// ── Ajout intervenant ─────────────────────────────────────────
+function openAdd() { document.getElementById('modal-add').classList.add('open'); }
+function closeAdd() { document.getElementById('modal-add').classList.remove('open'); }
+
+function confirmAdd() {
+  var prenom = document.getElementById('ni-prenom').value.trim();
+  var nom = document.getElementById('ni-nom').value.trim();
+  if (!prenom || !nom) { alert('Prénom et nom obligatoires.'); return; }
+  db.collection('intervenants').add({
+    prenom:prenom, nom:nom,
+    email:document.getElementById('ni-email').value.trim(),
+    tel:document.getElementById('ni-tel').value.trim(),
+    ville:document.getElementById('ni-ville').value.trim(),
+    adresse:document.getElementById('ni-adresse').value.trim(),
+    date_naissance:document.getElementById('ni-ddn').value||'',
+    nationalite:document.getElementById('ni-nat').value.trim()||'Française',
+    ecole:document.getElementById('ni-ecole').value.trim(),
+    niveau_etudes:document.getElementById('ni-niveau').value,
+    specialite:document.getElementById('ni-spec').value.trim(),
+    disponibilite:document.getElementById('ni-dispo').value,
+    statut:document.getElementById('ni-statut').value,
+    competences:document.getElementById('ni-comp').value.split(',').map(function(s){return s.trim();}).filter(Boolean),
+    langues:document.getElementById('ni-langues').value.split(',').map(function(s){return s.trim();}).filter(Boolean),
+    iban:document.getElementById('ni-iban').value.trim(),
+    notes:document.getElementById('ni-notes').value.trim(),
+    nb_missions:0, ca_genere:0,
+    created_at:firebase.firestore.FieldValue.serverTimestamp()
+  }).then(function(){closeAdd();});
+}
+
+function exportXLSX() {
+  var rows = [['Prénom','Nom','Email','Tél','Ville','École','Niveau','Spécialité','Disponibilité','Statut','Compétences','Nb missions']];
+  allIntervenants.forEach(function(iv){
+    var nb = allEtudes.filter(function(e){return (e.intervenants||[]).some(function(i){return i.intervenant_id===iv.id;});}).length;
+    rows.push([iv.prenom||'',iv.nom||'',iv.email||'',iv.tel||'',iv.ville||'',
+      iv.ecole||'',iv.niveau_etudes||'',iv.specialite||'',iv.disponibilite||'',iv.statut||'',
+      (iv.competences||[]).join(', '),nb]);
+  });
+  var ws = XLSX.utils.aoa_to_sheet(rows);
+  var wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Intervenants');
+  XLSX.writeFile(wb, 'Intervenants_ICN_JC.xlsx');
+}
+</script>
+</body>
+</html>
