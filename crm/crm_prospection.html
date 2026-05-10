@@ -293,10 +293,16 @@ td[contenteditable=true]:hover{background:rgba(163,33,95,0.04);border-radius:3px
         <div id="ca-alerts"></div>
         <div class="sec-title">Semaine sélectionnée</div>
         <div class="stats-row" id="ca-stats-week"></div>
-        <div class="sec-title" style="margin-top:4px">Pipeline global</div>
-        <div class="stats-row" id="ca-stats-pipeline"></div>
-        <div class="sec-title" style="margin-top:4px">Pipeline — période sélectionnée</div>
+        <div class="sec-title" style="margin-top:4px">
+          Pipeline — période sélectionnée
+          <button onclick="openNotice('notice-pipeline-period')" style="background:none;border:none;cursor:pointer;font-size:13px;color:var(--text-tertiary)" title="En savoir plus">ℹ️</button>
+        </div>
         <div class="stats-row" id="ca-stats-pipeline-period"></div>
+        <div class="sec-title" style="margin-top:4px">
+          Pipeline global
+          <button onclick="openNotice('notice-pipeline-global')" style="background:none;border:none;cursor:pointer;font-size:13px;color:var(--text-tertiary)" title="En savoir plus">ℹ️</button>
+        </div>
+        <div class="stats-row" id="ca-stats-pipeline"></div>
         <div class="flex items-center gap-3" style="margin-top:4px;flex-wrap:wrap;margin-bottom:8px">
           <div class="sec-title" style="margin-bottom:0;flex:none">Classement & Pipeline période</div>
           <div style="display:flex;gap:4px;flex-wrap:wrap" id="period-ca-stats"></div>
@@ -318,6 +324,17 @@ td[contenteditable=true]:hover{background:rgba(163,33,95,0.04);border-radius:3px
           <button class="btn btn-secondary btn-sm" onclick="renderCAChart()">Afficher</button>
         </div>
         <div class="chart-card" id="chart-ca"></div>
+        <div class="sec-title" style="margin-top:4px">
+          Comparaison mandats
+          <button onclick="openNotice('notice-mandats-compare')" style="background:none;border:none;cursor:pointer;font-size:13px;color:var(--text-tertiary)" title="En savoir plus">ℹ️</button>
+        </div>
+        <div style="background:var(--bg-card);border-radius:var(--radius-lg);padding:16px 18px;border:1px solid var(--border);margin-bottom:16px">
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px">
+            <span style="font-size:12px;font-weight:600;color:var(--navy)">KPI à afficher (max 5) :</span>
+            <div id="cmp-kpi-checks" style="display:flex;gap:8px;flex-wrap:wrap"></div>
+          </div>
+          <div id="chart-mandats-compare"></div>
+        </div>
       </div>
 
       <!-- ═══════════════ MES PROSPECTS ═══════════════ -->
@@ -694,6 +711,9 @@ function loadData() {
     }
   });
 
+  // Seed objectif historique rétroactif (une seule fois si vide)
+  seedObjectifHistorique(goalWeek || 10);
+
   // Membres
   db.collection('users').get().then(function(snap) {
     allUsers = [];
@@ -719,7 +739,8 @@ function loadData() {
     snap.forEach(function(doc) { allMandats.push(Object.assign({id:doc.id},doc.data())); });
     allMandats.sort(function(a,b) { return (b.date_debut||'').localeCompare(a.date_debut||''); });
     populateMandatFilter();
-    // Set mandat_id on new prospects (default = mandat actif)
+    initMandatCompare();
+    renderMandatCompare();
   });
 
   // RDV (temps réel)
@@ -933,6 +954,104 @@ function initPeriodRanking() {
 }
 
 // ════════════════════════════════════════════════════════
+// COMPARAISON MANDATS (Vue CA)
+// ════════════════════════════════════════════════════════
+var CMP_KPI_OPTIONS = [
+  {key:'ca_signe',       label:'CA signé',         fmt:'money'},
+  {key:'nb_etudes',      label:'Nb études',         fmt:'num'},
+  {key:'nb_prospects',   label:'Prospects contactés',fmt:'num'},
+  {key:'taux_conversion',label:'Taux conversion',   fmt:'pct'},
+  {key:'taux_prospection',label:'Taux prospection', fmt:'pct'},
+  {key:'panier_moyen',   label:'Panier moyen',      fmt:'money'},
+  {key:'nb_rdv',         label:'Nb RDV',            fmt:'num'},
+];
+var selectedCmpKpis = ['ca_signe','nb_etudes','taux_conversion'];
+
+function initMandatCompare() {
+  var container = document.getElementById('cmp-kpi-checks');
+  if (!container) return;
+  container.innerHTML = CMP_KPI_OPTIONS.map(function(k) {
+    var checked = selectedCmpKpis.includes(k.key);
+    return '<label style="display:flex;align-items:center;gap:4px;font-size:11px;cursor:pointer;background:'+(checked?'var(--navy)':'var(--bg)')+';color:'+(checked?'white':'var(--text-secondary)')+';padding:3px 9px;border-radius:99px;border:1px solid var(--border);transition:all .15s">' +
+      '<input type="checkbox" value="'+k.key+'"'+(checked?' checked':'')+' onchange="toggleCmpKpi(this)" style="display:none">' +
+      k.label+'</label>';
+  }).join('');
+}
+
+function toggleCmpKpi(el) {
+  if (el.checked) {
+    if (selectedCmpKpis.length >= 5) { el.checked = false; alert('Maximum 5 KPI.'); return; }
+    selectedCmpKpis.push(el.value);
+  } else {
+    selectedCmpKpis = selectedCmpKpis.filter(function(k){return k!==el.value;});
+  }
+  initMandatCompare();
+  renderMandatCompare();
+}
+
+function getKpiValue(mandat, key, prospects) {
+  if (mandat.statut === 'actif') {
+    var mid = mandat.id;
+    var mp = prospects || allProspects.filter(function(p){return !p.mandat_id||p.mandat_id===mid;});
+    var signes = mp.filter(function(p){return p.status==='Signé';});
+    var contactes = mp.filter(function(p){return p.status!=='À contacter';});
+    var ca = signes.reduce(function(a,p){return a+(parseFloat(p.estimated_amount)||0);},0);
+    switch(key) {
+      case 'ca_signe': return ca;
+      case 'nb_etudes': return signes.length;
+      case 'nb_prospects': return contactes.length;
+      case 'taux_conversion': return mp.length>0?Math.round(signes.length/mp.length*100):0;
+      case 'panier_moyen': return signes.length>0?Math.round(ca/signes.length):0;
+      default: return (mandat.kpi_commercial&&mandat.kpi_commercial[key])||0;
+    }
+  }
+  // Mandat passé — données manuelles
+  var kc = mandat.kpi_commercial || {};
+  return parseFloat(kc[key]) || 0;
+}
+
+function renderMandatCompare() {
+  var container = document.getElementById('chart-mandats-compare');
+  if (!container) return;
+  var mandats = allMandats.filter(function(m){return m.statut!=='archive';});
+  if (mandats.length === 0) {
+    container.innerHTML = '<div style="font-size:13px;color:var(--text-tertiary);text-align:center;padding:20px">Aucun mandat chargé.</div>';
+    return;
+  }
+  var COLORS_CMP = ['#A3215F','#1B2A4A','#3b82f6','#10b981','#f59e0b'];
+  var html = '<div style="display:flex;gap:24px;flex-wrap:wrap">';
+  selectedCmpKpis.forEach(function(kkey, ki) {
+    var kDef = CMP_KPI_OPTIONS.find(function(k){return k.key===kkey;});
+    if (!kDef) return;
+    var values = mandats.map(function(m){return getKpiValue(m,kkey);});
+    var maxV = Math.max(1,Math.max.apply(null,values));
+    var isMoney = kDef.fmt==='money', isPct = kDef.fmt==='pct';
+    html += '<div style="flex:1;min-width:140px">';
+    html += '<div style="font-size:11px;font-weight:600;color:var(--navy);margin-bottom:10px">'+kDef.label+'</div>';
+    html += '<div style="display:flex;align-items:flex-end;gap:8px;height:100px">';
+    mandats.forEach(function(m,mi) {
+      var v = values[mi];
+      var h = Math.round(v/maxV*90);
+      var disp = isMoney ? fmtM(v) : isPct ? Math.round(v)+'%' : v;
+      html += '<div style="display:flex;flex-direction:column;align-items:center;flex:1">';
+      html += '<div style="font-size:9px;color:var(--text-secondary);margin-bottom:3px;text-align:center">'+disp+'</div>';
+      html += '<div style="height:'+Math.max(h,v>0?4:0)+'px;background:'+COLORS_CMP[mi%COLORS_CMP.length]+';border-radius:3px 3px 0 0;width:100%;opacity:'+(m.statut==='actif'?'1':'0.6')+'" title="'+m.label+': '+disp+'"></div>';
+      html += '</div>';
+    });
+    html += '</div>';
+    // Légende
+    html += '<div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:8px">';
+    mandats.forEach(function(m,mi){
+      html += '<div style="display:flex;align-items:center;gap:3px;font-size:9px;color:var(--text-tertiary)">' +
+        '<div style="width:7px;height:7px;border-radius:1px;background:'+COLORS_CMP[mi%COLORS_CMP.length]+'"></div>'+m.id+'</div>';
+    });
+    html += '</div></div>';
+  });
+  html += '</div>';
+  container.innerHTML = html;
+}
+
+// ════════════════════════════════════════════════════════
 // RENDER VUE CA
 // ════════════════════════════════════════════════════════
 function renderCA() {
@@ -1063,6 +1182,7 @@ function renderCA() {
   document.getElementById('ca-stats-period').innerHTML = pHtml2;
 
   renderCAChart();
+  renderMandatCompare();
 }
 
 function kpiCard(label, val, cls) {
@@ -1521,7 +1641,34 @@ function confirmAddProspect() {
   var st = document.getElementById('np-st').value;
   if (!co) { alert('Merci de renseigner l\'entreprise.'); return; }
   if (!st) { alert('Merci de choisir un statut.'); return; }
-  var tags = document.getElementById('np-tags').value.split(',').map(function(s) { return s.trim(); }).filter(Boolean);
+
+  // Tags
+  var tagsEl = document.getElementById('np-tags');
+  var tags = tagsEl ? tagsEl.value.split(',').map(function(s){return s.trim();}).filter(Boolean) : [];
+
+  // Super admin : pour qui ?
+  var targetEmail = ME;
+  var targetName = MY_NAME;
+  if (MY_ROLE === 'super_admin') {
+    var forWhomEl = document.getElementById('np-for-whom');
+    if (forWhomEl && forWhomEl.value === 'other') {
+      var memberSelEl = document.getElementById('np-member-sel');
+      if (memberSelEl && memberSelEl.value) {
+        targetEmail = memberSelEl.value;
+        var foundU = allUsers.find(function(x){ return x.email === memberSelEl.value; });
+        targetName = foundU ? ((foundU.prenom||'') + ' ' + (foundU.nom||'')).trim() : memberSelEl.value;
+      }
+    }
+  }
+
+  // Date premier contact
+  var fcEl = document.getElementById('np-first-contact');
+  var firstContact = fcEl && fcEl.value ? fcEl.value : null;
+  var contactDate = firstContact || (st === 'Contacté' ? localDateStr(new Date()) : null);
+
+  // Mandat
+  var mandatId = getMandatActifId();
+
   db.collection('prospects').add({
     company_name: co,
     contact_name: document.getElementById('np-ct').value.trim(),
@@ -1536,13 +1683,25 @@ function confirmAddProspect() {
     tags: tags,
     notes: document.getElementById('np-no').value.trim(),
     owner_email: targetEmail,
-    owner_name: targetName.trim(),
+    owner_name: targetName,
     actif_pipeline: st !== 'À contacter',
-    last_contact_at: st === 'Contacté' ? (document.getElementById('np-first-contact').value || localDateStr(new Date())) : null,
-    mandat_id: getMandatActifId(),
+    had_valuable_contact: st !== 'À contacter',
+    last_contact_at: contactDate,
+    mandat_id: mandatId,
     created_at: firebase.firestore.FieldValue.serverTimestamp(),
     updated_at: firebase.firestore.FieldValue.serverTimestamp()
-  }).then(function() { closeAddProspect(); });
+  }).then(function() {
+    closeAddProspect();
+    // Reset form
+    ['np-co','np-ct','np-po','np-em','np-te','np-mo','np-no','np-tags'].forEach(function(id){
+      var el = document.getElementById(id); if(el) el.value = '';
+    });
+    ['np-se','np-so','np-st','np-pr'].forEach(function(id){
+      var el = document.getElementById(id); if(el) el.value = '';
+    });
+  }).catch(function(err) {
+    alert('Erreur lors de l\'ajout : ' + err.message);
+  });
 }
 
 function delProspect(id) {
@@ -1909,6 +2068,14 @@ function openReglementModal() {
 function closeReglementModal() {
   document.getElementById('modal-reglement').classList.remove('open');
 }
+function openNotice(id) {
+  var el = document.getElementById(id);
+  if (el) el.classList.add('open');
+}
+function closeNotice(id) {
+  var el = document.getElementById(id);
+  if (el) el.classList.remove('open');
+}
 
 function exportXLSX() {
   var data = IS_CA ? allProspects : allProspects.filter(function(p) { return p.owner_email === ME; });
@@ -1953,6 +2120,30 @@ function exportXLSX() {
     <div class="modal-actions">
       <button class="btn btn-primary" onclick="closeReglementModal()">Compris ✓</button>
     </div>
+  </div>
+</div>
+
+
+<!-- NOTICES -->
+<div class="modal-overlay" id="notice-pipeline-period" onclick="if(event.target===this)closeNotice('notice-pipeline-period')">
+  <div class="modal-box" style="max-width:420px">
+    <div class="modal-header"><div class="modal-title">📊 Pipeline — période sélectionnée</div><button class="modal-close" onclick="closeNotice('notice-pipeline-period')">×</button></div>
+    <p style="font-size:13px;color:var(--text-secondary);line-height:1.6">Affiche le montant estimé des prospects dont le <strong>dernier contact tombe dans la période choisie</strong> (filtre à côté de "Classement").<br><br>Exemple : si tu sélectionnes "Mois en cours", seuls les prospects contactés ce mois apparaissent dans ce pipeline.</p>
+    <div class="modal-actions"><button class="btn btn-primary" onclick="closeNotice('notice-pipeline-period')">Compris ✓</button></div>
+  </div>
+</div>
+<div class="modal-overlay" id="notice-pipeline-global" onclick="if(event.target===this)closeNotice('notice-pipeline-global')">
+  <div class="modal-box" style="max-width:420px">
+    <div class="modal-header"><div class="modal-title">🌐 Pipeline global</div><button class="modal-close" onclick="closeNotice('notice-pipeline-global')">×</button></div>
+    <p style="font-size:13px;color:var(--text-secondary);line-height:1.6">Affiche le <strong>total de tous les prospects actifs</strong> du mandat, sans filtre de période. C'est la photo complète du pipeline à l'instant T.<br><br>Le <strong>pipeline incertain</strong> = montants portés par des commerciaux qui ne sont plus actifs en prospection.</p>
+    <div class="modal-actions"><button class="btn btn-primary" onclick="closeNotice('notice-pipeline-global')">Compris ✓</button></div>
+  </div>
+</div>
+<div class="modal-overlay" id="notice-mandats-compare" onclick="if(event.target===this)closeNotice('notice-mandats-compare')">
+  <div class="modal-box" style="max-width:420px">
+    <div class="modal-header"><div class="modal-title">📋 Comparaison mandats</div><button class="modal-close" onclick="closeNotice('notice-mandats-compare')">×</button></div>
+    <p style="font-size:13px;color:var(--text-secondary);line-height:1.6">Compare les KPI clés entre les différents mandats. Sélectionne jusqu'à <strong>5 KPI</strong> à afficher simultanément.<br><br>Les données du mandat actuel sont <strong>calculées en temps réel</strong> depuis Firestore. Les données des mandats passés viennent de la page "Historique mandats".</p>
+    <div class="modal-actions"><button class="btn btn-primary" onclick="closeNotice('notice-mandats-compare')">Compris ✓</button></div>
   </div>
 </div>
 
