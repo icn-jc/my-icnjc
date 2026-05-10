@@ -6,85 +6,76 @@
 function buildNavItems(role, basePath) {
   const ALL = ['super_admin','president','vice_president','tresorier','secretaire',
                'responsable_commercial','responsable_qualite','responsable_marketing',
-               'tresorerie','auditeur','marketing','commercial','membre_cos'];
+               'tresorerie','auditeur','marketing','commercial','membre_cos','intervenant'];
   const all = [
-    { section: null, key:'home', label:'Accueil', icon:'home',
-      href: basePath + 'index.html', roles: ALL },
+    // ── Accueil ──────────────────────────────────────────────
+    { section:null, key:'home', label:'Accueil', icon:'home',
+      href: basePath+'index.html', roles:ALL },
 
+    // ── AUDIT ────────────────────────────────────────────────
     { section:'AUDIT', key:'tracker_treso', label:'Tracker Tréso', icon:'clipboard',
-      href: basePath + 'audit/tracker_treso.html',
+      href: basePath+'audit/tracker_treso.html',
       roles:['super_admin','vice_president','tresorier','tresorerie','responsable_qualite'] },
-
     { section:null, key:'tracker_orga', label:'Tracker Orga', icon:'check-square',
-      href: basePath + 'audit/tracker_orga.html',
+      href: basePath+'audit/tracker_orga.html',
       roles:['super_admin','president','vice_president','tresorier','responsable_qualite','auditeur'] },
 
-    { section:'DASHBOARD', key:'kpi_treso', label:'KPI Trésorerie', icon:'trending-up',
-      href: basePath + 'dashboard/kpi_treso.html',
+    // ── KPI ──────────────────────────────────────────────────
+    { section:'KPI', key:'kpi_treso', label:'KPI Trésorerie', icon:'trending-up',
+      href: basePath+'dashboard/kpi_treso.html',
       roles:['super_admin','president','vice_president','tresorier','tresorerie',
-             'secretaire','responsable_marketing','responsable_commercial','responsable_qualite'] },
-
+             'secretaire','responsable_marketing','responsable_commercial','responsable_qualite','membre_cos'] },
     { section:null, key:'kpi_commercial', label:'KPI Commercial', icon:'bar-chart',
-      href: basePath + 'dashboard/kpi_commercial.html',
+      href: basePath+'dashboard/kpi_commercial.html',
       roles:['super_admin','president','vice_president','tresorier','responsable_commercial',
-             'secretaire','marketing','responsable_marketing','auditeur','commercial'] },
+             'secretaire','marketing','responsable_marketing','auditeur','commercial','membre_cos'] },
 
+    // ── CRM ──────────────────────────────────────────────────
     { section:'CRM', key:'crm_prospection', label:'Prospection', icon:'target',
-      href: basePath + 'crm/crm_prospection.html',
+      href: basePath+'crm/crm_prospection.html',
       roles:['super_admin','president','vice_president','tresorier','secretaire',
              'responsable_commercial','responsable_qualite','responsable_marketing',
              'tresorerie','auditeur','marketing','commercial','membre_cos'] },
     { section:null, key:'crm_clients', label:'Clients', icon:'briefcase',
-      href: basePath + 'crm/crm_clients.html',
+      href: basePath+'crm/crm_clients.html',
       roles:['super_admin','president','vice_president','tresorier','responsable_commercial',
              'responsable_marketing','responsable_qualite','secretaire','tresorerie','commercial','membre_cos'] },
     { section:null, key:'crm_intervenants', label:'Intervenants', icon:'users',
-      href: basePath + 'crm/crm_intervenants.html',
+      href: basePath+'crm/crm_intervenants.html',
       roles:['super_admin','president','vice_president','tresorier','responsable_commercial',
              'responsable_marketing','responsable_qualite','secretaire','tresorerie','membre_cos'] },
     { section:null, key:'etudes', label:'Études', icon:'folder',
-      href: basePath + 'etudes/etudes_index.html',
+      href: basePath+'etudes/etudes_index.html',
       roles:['super_admin','president','vice_president','tresorier','responsable_commercial',
              'responsable_qualite','secretaire','tresorerie','responsable_marketing','commercial','membre_cos'] },
+    { section:null, key:'crm_partenariats', label:'Partenariats', icon:'link',
+      href: basePath+'crm/crm_partenariats.html',
+      roles:['super_admin','president','vice_president','responsable_commercial',
+             'responsable_marketing','responsable_qualite','secretaire','tresorerie','commercial'] },
+
+    // ── MON ESPACE ───────────────────────────────────────────
     { section:'MON ESPACE', key:'mes_missions', label:'Mes missions', icon:'award',
-      href: basePath + 'crm/mes_missions.html', roles: ALL },
-    { section:'QUALITÉ', key:'gestion_docs', label:'Gestion documents', icon:'file-text',
-      href: basePath + 'qualite/gestion_docs.html',
+      href: basePath+'crm/mes_missions.html', roles:ALL },
+    { section:null, key:'gestion_docs', label:'Gestion documents', icon:'file-text',
+      href: basePath+'qualite/gestion_docs.html',
       roles:['super_admin','responsable_qualite'] },
 
-    { section:null, key:'crm_clients', label:'Clients', icon:'briefcase',
-      href: basePath + 'crm/crm_clients.html',
-      roles:['super_admin','president','vice_president','responsable_commercial',
-             'responsable_marketing','responsable_qualite','secretaire','tresorerie','commercial'] },
+    // ── DIVERS ───────────────────────────────────────────────
+    { section:'DIVERS', key:'evenements', label:'Événements', icon:'calendar',
+      href: basePath+'evenements/evenements_index.html', roles:ALL },
 
-    { section:null, key:'crm_intervenants', label:'Intervenants', icon:'users',
-      href: basePath + 'crm/crm_intervenants.html',
-      roles:['super_admin','president','vice_president','responsable_commercial',
-             'responsable_marketing','responsable_qualite','secretaire','tresorerie'] },
-
-    { section:null, key:'crm_partenariats', label:'Partenariats', icon:'link',
-      href: basePath + 'crm/crm_partenariats.html',
-      roles:['super_admin','president','vice_president','responsable_commercial',
-             'responsable_marketing','responsable_qualite','secretaire','tresorerie','commercial'] },
-
-    { section:'ÉTUDES', key:'etudes', label:'Suivi études', icon:'folder',
-      href: basePath + 'etudes/etudes_index.html',
-      roles:['super_admin','president','vice_president','responsable_commercial',
-             'responsable_qualite','secretaire','tresorerie','responsable_marketing'] },
-
-    { section:'ÉVÉNEMENTS', key:'evenements', label:'Événements', icon:'calendar',
-      href: basePath + 'evenements/evenements_index.html', roles: ALL },
-
+    // ── ADMIN ────────────────────────────────────────────────
     { section:'ADMIN', key:'admin', label:'Administration', icon:'settings',
-      href: basePath + 'admin/admin_index.html',
+      href: basePath+'admin/admin_index.html',
       roles:['super_admin','president'] },
     { section:null, key:'mandats', label:'Historique mandats', icon:'book-open',
-      href: basePath + 'admin/mandats.html',
+      href: basePath+'admin/mandats.html',
       roles:['super_admin','president','vice_president'] },
   ];
 
   return all.filter(item => item.roles.includes(role));
 }
+
 
 function getIcon(name) {
   const icons = {
