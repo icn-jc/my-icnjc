@@ -537,7 +537,7 @@ td[contenteditable=true]:hover{background:rgba(163,33,95,0.04);border-radius:3px
 // ════════════════════════════════════════════════════════
 // CONSTANTES MÉTIER
 // ════════════════════════════════════════════════════════
-var CA_ROLES = ['super_admin','president','vice_president','tresorier','responsable_commercial','responsable_qualite','secretaire'];
+var CRM_CA_ROLES = ['super_admin','president','vice_president','tresorier','responsable_commercial','responsable_qualite','secretaire'];
 
 // Statuts dans l'ordre logique du pipeline
 var STATUTS = ['À contacter','Contacté','RDV planifié','RDV effectué','Proposition envoyée','Négociation','Signé','Perdu'];
@@ -588,7 +588,7 @@ initAuth('crm_prospection', function(user, role, profile) {
   ME = user.email;
   MY_NAME = ((profile.prenom||'') + ' ' + (profile.nom||'')).trim();
   MY_ROLE = role;
-  IS_CA = CA_ROLES.includes(role);
+  IS_CA = CRM_CA_ROLES.includes(role);
 
   renderSidebar(role, profile, user, 'crm_prospection');
   showAppPage(user, role, profile);
