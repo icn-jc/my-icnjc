@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>KPI Commercial — My-ICN-JC</title>
+<link rel="stylesheet" href="../assets/css/global.css"/>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+<script src="../assets/js/firebase.js"></script>
+<script src="../assets/js/auth.js"></script>
+<script src="../assets/js/sidebar.js"></script>
+<style>
+.kpi-tabs{display:flex;gap:3px;background:var(--bg);border-radius:var(--radius-lg);padding:4px;border:1px solid var(--border);width:fit-content;margin-bottom:20px;}
+.kpi-tab{padding:8px 18px;border-radius:var(--radius-md);font-size:13px;font-weight:500;cursor:pointer;border:none;background:transparent;color:var(--text-secondary);font-family:'Sora',sans-serif;transition:all .2s;}
+.kpi-tab.active{background:var(--white);color:var(--bordeaux);box-shadow:var(--shadow-sm);font-weight:600;}
+.kpi-pane{display:none;}
+.kpi-pane.active{display:block;}
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;margin-bottom:24px;}
+.kpi-card{background:var(--bg-card);border-radius:var(--radius-lg);padding:16px 18px;box-shadow:var(--shadow-sm);border:1px solid var(--border);}
+.kpi-card-label{font-size:10px;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px;}
+.kpi-card-val{font-size:24px;font-weight:700;color:var(--navy);}
+.kpi-card-sub{font-size:11px;color:var(--text-tertiary);margin-top:4px;}
+.kpi-card.kc-success .kpi-card-val{color:var(--success);}
+.kpi-card.kc-danger .kpi-card-val{color:var(--danger);}
+.kpi-card.kc-bordeaux .kpi-card-val{color:var(--bordeaux);}
+.sec-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--text-tertiary);margin-bottom:12px;display:flex;align-items:center;gap:8px;}
+.sec-title::after{content:'';flex:1;height:1px;background:var(--border);}
+.chart-card{background:var(--bg-card);border-radius:var(--radius-lg);padding:20px;border:1px solid var(--border);margin-bottom:20px;}
+.chart-title{font-size:13px;font-weight:600;color:var(--navy);margin-bottom:14px;}
+/* ── Graphique barres CSS ── */
+.bar-chart{display:flex;align-items:flex-end;gap:16px;height:200px;padding:0 8px;}
+.bar-group{display:flex;flex-direction:column;align-items:center;flex:1;}
+.bar-group-bars{display:flex;gap:4px;align-items:flex-end;height:160px;}
+.bar{border-radius:4px 4px 0 0;min-width:20px;transition:height .4s;cursor:default;}
+.bar-lbl{font-size:10px;color:var(--text-tertiary);margin-top:6px;text-align:center;white-space:nowrap;}
+.bar-val{font-size:10px;font-weight:600;color:var(--navy);margin-bottom:2px;}
+.chart-legend{display:flex;gap:12px;margin-top:12px;flex-wrap:wrap;}
+.legend-dot{width:10px;height:10px;border-radius:2px;flex-shrink:0;}
+.legend-item{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text-secondary);}
+/* ── Comparaison selector ── */
+.compare-controls{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:16px;background:var(--bg-card);padding:12px 16px;border-radius:var(--radius-lg);border:1px solid var(--border);}
+.compare-controls label{font-size:12px;font-weight:600;color:var(--navy);}
+.compare-controls select{padding:6px 10px;border-radius:var(--radius-md);border:1.5px solid var(--border-strong);font-family:'Sora',sans-serif;font-size:12px;background:var(--white);}
+.compare-controls select:focus{outline:none;border-color:var(--bordeaux);}
+.mandat-badge{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:99px;font-size:11px;font-weight:600;}
+.mb-actif{background:rgba(163,33,95,0.1);color:var(--bordeaux);}
+.mb-clos{background:#dcfce7;color:#14532d;}
+.no-data{font-size:13px;color:var(--text-tertiary);text-align:center;padding:32px;font-style:italic;}
+</style>
+</head>
+<body>
+<div class="login-page" id="login-page">
+  <div class="login-box">
+    <div class="login-logo"><img src="../assets/images/ICN-Junior-Conseil_logo.png" style="height:54px;object-fit:contain"/></div>
+    <div class="login-title">Connexion</div>
+    <div class="login-sub">Accès réservé aux membres ICN Junior Conseil.</div>
+    <button class="google-btn" onclick="doGoogleLogin()">
+      <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google"/>Se connecter avec Google
+    </button>
+    <div class="denied-box" id="denied-box"><strong>Accès refusé</strong><p id="denied-msg"></p></div>
+    <div class="login-error" id="login-error"></div>
+  </div>
+</div>
+
+<div class="app-page" id="app-page">
+  <div id="sidebar-container"></div>
+  <div class="app-content">
+    <div class="page-header">
+      <div class="flex justify-between items-center" style="flex-wrap:wrap;gap:10px;">
+        <div>
+          <div class="page-title">KPI Commercial</div>
+          <div class="page-subtitle" id="mandat-actif-label">Mandat en cours</div>
+        </div>
+        <button class="btn btn-secondary btn-sm" onclick="exportXLSX()">⬇ Excel</button>
+      </div>
+    </div>
+    <div class="page-body">
+      <div class="kpi-tabs">
+        <button class="kpi-tab active" onclick="switchTab('actif')" id="tab-actif">📊 Mandat actuel</button>
+        <button class="kpi-tab" onclick="switchTab('compare')" id="tab-compare">📈 Comparaison mandats</button>
+      </div>
+
+      <!-- ═══ MANDAT ACTUEL ═══ -->
+      <div class="kpi-pane active" id="pane-actif">
+        <div class="sec-title">KPI clés — mandat en cours</div>
+        <div class="stats-grid" id="kpi-main-grid"></div>
+        <div class="sec-title">Pipeline par statut</div>
+        <div class="chart-card" id="chart-pipeline"></div>
+        <div class="sec-title">Évolution hebdomadaire</div>
+        <div class="chart-card" id="chart-weekly"></div>
+        <div class="sec-title">Top membres — mandat en cours</div>
+        <div class="stats-grid" id="kpi-members-grid"></div>
+      </div>
+
+      <!-- ═══ COMPARAISON ═══ -->
+      <div class="kpi-pane" id="pane-compare">
+        <div class="compare-controls">
+          <label>Indicateur à comparer :</label>
+          <select id="cmp-metric" onchange="renderComparison()">
+            <option value="ca_signe">CA signé (€)</option>
+            <option value="nb_etudes_signees">Nb études signées</option>
+            <option value="nb_prospects">Nb prospects contactés</option>
+            <option value="taux_conversion">Taux de conversion (%)</option>
+            <option value="taux_prospection">Taux de prospection (%)</option>
+            <option value="panier_moyen">Panier moyen (€)</option>
+          </select>
+          <label>Mandats à afficher :</label>
+          <div id="cmp-mandat-checks" style="display:flex;gap:8px;flex-wrap:wrap"></div>
+        </div>
+        <div class="chart-card" id="chart-comparison">
+          <div class="no-data">Chargement des données…</div>
+        </div>
+        <div class="sec-title" style="margin-top:20px">Tableau récapitulatif</div>
+        <div style="overflow-x:auto">
+          <table style="width:100%;border-collapse:collapse;font-size:13px;min-width:600px" id="cmp-table"></table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+var allMandats = [], allProspects = [], allUsers = [];
+var mandatActif = null;
+var selectedMandatsCompare = [];
+var COLORS = ['#A3215F','#1B2A4A','#3b82f6','#10b981','#f59e0b'];
+
+function localDateStr(d) {
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+function fmtM(n) { return Number(n||0).toLocaleString('fr-FR',{minimumFractionDigits:0,maximumFractionDigits:0})+' €'; }
+function fmtP(n) { return Math.round(n||0)+'%'; }
+
+initAuth('kpi_commercial', function(user, role, profile) {
+  renderSidebar(role, profile, user, 'kpi_commercial');
+  showAppPage(user, role, profile);
+  updateHealthIndicator();
+  loadData();
+});
+
+function loadData() {
+  // Charger mandats
+  db.collection('mandats').get().then(function(snap) {
+    allMandats = [];
+    snap.forEach(function(doc) { allMandats.push(Object.assign({id:doc.id},doc.data())); });
+    allMandats.sort(function(a,b){return (b.date_debut||'').localeCompare(a.date_debut||'');});
+    mandatActif = allMandats.find(function(m){return m.statut==='actif';}) || allMandats[0];
+    if (mandatActif) {
+      document.getElementById('mandat-actif-label').innerText = mandatActif.label + ' · ' + (mandatActif.date_debut||'') + ' → ' + (mandatActif.date_fin||'En cours');
+    }
+    selectedMandatsCompare = allMandats.filter(function(m){return m.statut!=='archive';}).map(function(m){return m.id;});
+    buildMandatChecks();
+    renderComparison();
+  });
+
+  // Charger prospects
+  db.collection('prospects').onSnapshot(function(snap) {
+    allProspects = [];
+    snap.forEach(function(doc){allProspects.push(Object.assign({id:doc.id},doc.data()));});
+    renderActif();
+  });
+
+  db.collection('users').get().then(function(snap) {
+    allUsers = [];
+    snap.forEach(function(doc){allUsers.push(Object.assign({email:doc.id},doc.data()));});
+  });
+}
+
+function switchTab(key) {
+  ['actif','compare'].forEach(function(k) {
+    document.getElementById('tab-'+k).classList.toggle('active', k===key);
+    document.getElementById('pane-'+k).classList.toggle('active', k===key);
+  });
+}
+
+// ═══ MANDAT ACTUEL ════════════════════════════════════════════
+function renderActif() {
+  if (!mandatActif) return;
+  var mid = mandatActif.id;
+  var prospects = allProspects.filter(function(p){return p.mandat_id===mid||!p.mandat_id;});
+  var signes = prospects.filter(function(p){return p.status==='Signé';});
+  var contactes = prospects.filter(function(p){return p.status!=='À contacter';});
+  var caTotal = signes.reduce(function(a,p){return a+(parseFloat(p.estimated_amount)||0);},0);
+  var pipeline = prospects.filter(function(p){return p.status!=='Perdu'&&p.status!=='À contacter';})
+    .reduce(function(a,p){return a+(parseFloat(p.estimated_amount)||0);},0);
+  var tauxConv = prospects.length>0 ? Math.round(signes.length/prospects.length*100) : 0;
+  var panierMoy = signes.length>0 ? Math.round(caTotal/signes.length) : 0;
+
+  // KPI cards
+  var kpis = [
+    {label:'CA signé', val:fmtM(caTotal), cls:'kc-bordeaux'},
+    {label:'Pipeline actif', val:fmtM(pipeline), cls:''},
+    {label:'Études signées', val:signes.length, cls:'kc-success'},
+    {label:'Prospects contactés', val:contactes.length, cls:''},
+    {label:'Taux de conversion', val:fmtP(tauxConv), cls:tauxConv>=20?'kc-success':tauxConv>=10?'':'kc-danger'},
+    {label:'Panier moyen', val:fmtM(panierMoy), cls:''},
+  ];
+  document.getElementById('kpi-main-grid').innerHTML = kpis.map(function(k){
+    return '<div class="kpi-card '+k.cls+'">' +
+      '<div class="kpi-card-label">'+k.label+'</div>' +
+      '<div class="kpi-card-val">'+k.val+'</div>' +
+    '</div>';
+  }).join('');
+
+  // Pipeline par statut
+  var STATUTS = ['Contacté','RDV planifié','RDV effectué','Proposition envoyée','Négociation','Signé'];
+  var ST_COLORS = {'Contacté':'#ede9fe','RDV planifié':'#fef3c7','RDV effectué':'#fef9c3',
+    'Proposition envoyée':'#dbeafe','Négociation':'#fce7f3','Signé':'#dcfce7'};
+  var ST_TEXT = {'Contacté':'#4c1d95','RDV planifié':'#78350f','RDV effectué':'#713f12',
+    'Proposition envoyée':'#1e3a5f','Négociation':'#831843','Signé':'#14532d'};
+
+  var maxPip = Math.max(1, Math.max.apply(null, STATUTS.map(function(s){
+    return prospects.filter(function(p){return p.status===s;}).reduce(function(a,p){return a+(parseFloat(p.estimated_amount)||0);},0);
+  })));
+
+  var pipeHtml = '<div class="chart-title">Pipeline (€) par statut</div><div class="bar-chart">';
+  STATUTS.forEach(function(s) {
+    var n = prospects.filter(function(p){return p.status===s;}).length;
+    var amt = prospects.filter(function(p){return p.status===s;}).reduce(function(a,p){return a+(parseFloat(p.estimated_amount)||0);},0);
+    var h = Math.round(amt/maxPip*140);
+    pipeHtml += '<div class="bar-group">' +
+      '<div class="bar-val">' + fmtM(amt) + '</div>' +
+      '<div class="bar-group-bars">' +
+        '<div class="bar" style="height:'+Math.max(h,2)+'px;background:'+ST_COLORS[s]+';border:1px solid '+ST_TEXT[s]+';width:30px" title="'+s+': '+n+' prospects — '+fmtM(amt)+'"></div>' +
+      '</div>' +
+      '<div class="bar-lbl">' + s.replace(' ','\n') + '<br><span style="color:var(--text-secondary)">' + n + '</span></div>' +
+    '</div>';
+  });
+  pipeHtml += '</div>';
+  document.getElementById('chart-pipeline').innerHTML = pipeHtml;
+
+  // Top membres
+  var prosp = allUsers.filter(function(u){return u.prospecte;});
+  var memberStats = prosp.map(function(u) {
+    var mine = prospects.filter(function(p){return p.owner_email===u.email;});
+    var mineSignes = mine.filter(function(p){return p.status==='Signé';});
+    return {
+      u:u, total:mine.length,
+      signes:mineSignes.length,
+      ca:mineSignes.reduce(function(a,p){return a+(parseFloat(p.estimated_amount)||0);},0),
+      taux:mine.length>0?Math.round(mineSignes.length/mine.length*100):0
+    };
+  }).sort(function(a,b){return b.ca-a.ca;});
+
+  document.getElementById('kpi-members-grid').innerHTML = memberStats.length===0
+    ? '<div class="no-data">Aucune donnée.</div>'
+    : memberStats.slice(0,8).map(function(m,i){
+      return '<div class="kpi-card">' +
+        '<div class="kpi-card-label">' + (i===0?'🥇':i===1?'🥈':i===2?'🥉':'') + ' ' + (m.u.prenom||'') + ' ' + (m.u.nom||'') + '</div>' +
+        '<div class="kpi-card-val" style="font-size:16px">' + fmtM(m.ca) + '</div>' +
+        '<div class="kpi-card-sub">' + m.signes + ' signés · ' + m.taux + '% conv. · ' + m.total + ' prospects</div>' +
+      '</div>';
+    }).join('');
+
+  // Évolution hebdo (12 dernières semaines)
+  renderWeeklyChart(prospects);
+}
+
+function renderWeeklyChart(prospects) {
+  var weeks = [];
+  for (var w=11;w>=0;w--) {
+    var ws = wkStart(-w); var we = wkEnd(-w);
+    weeks.push({label:'S'+isoWk(ws), from:ws, to:we});
+  }
+  var maxV = 0;
+  var weekData = weeks.map(function(wk) {
+    var n = prospects.filter(function(p){
+      if(!p.last_contact_at||p.status==='À contacter')return false;
+      var d=new Date(p.last_contact_at);return d>=wk.from&&d<wk.to;
+    }).length;
+    var s = prospects.filter(function(p){
+      if(!p.last_contact_at||p.status!=='Signé')return false;
+      var d=new Date(p.last_contact_at);return d>=wk.from&&d<wk.to;
+    }).length;
+    maxV = Math.max(maxV,n);
+    return {label:wk.label,contacts:n,signes:s};
+  });
+  maxV = Math.max(maxV,1);
+  var wHtml = '<div class="chart-title">Contacts valorisés (12 semaines)</div><div class="bar-chart">';
+  weekData.forEach(function(w) {
+    var h1 = Math.round(w.contacts/maxV*140);
+    var h2 = Math.round(w.signes/maxV*140);
+    wHtml += '<div class="bar-group">' +
+      '<div class="bar-group-bars">' +
+        '<div class="bar" style="height:'+Math.max(h1,w.contacts>0?2:0)+'px;background:#A3215F;opacity:.7" title="'+w.label+': '+w.contacts+' contacts"></div>' +
+        '<div class="bar" style="height:'+Math.max(h2,w.signes>0?2:0)+'px;background:#10b981" title="'+w.label+': '+w.signes+' signés"></div>' +
+      '</div>' +
+      '<div class="bar-lbl">'+w.label+'</div>' +
+    '</div>';
+  });
+  wHtml += '</div><div class="chart-legend">' +
+    '<div class="legend-item"><div class="legend-dot" style="background:#A3215F;opacity:.7"></div>Contacts valorisés</div>' +
+    '<div class="legend-item"><div class="legend-dot" style="background:#10b981"></div>Signés</div>' +
+  '</div>';
+  document.getElementById('chart-weekly').innerHTML = wHtml;
+}
+
+// ═══ COMPARAISON ══════════════════════════════════════════════
+function buildMandatChecks() {
+  var container = document.getElementById('cmp-mandat-checks');
+  if (!container) return;
+  container.innerHTML = allMandats.filter(function(m){return m.statut!=='archive';}).map(function(m,i){
+    var checked = selectedMandatsCompare.includes(m.id);
+    return '<label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer">' +
+      '<input type="checkbox" value="' + m.id + '"' + (checked?' checked':'') +
+      ' onchange="toggleMandatCompare(this)" style="accent-color:' + COLORS[i%COLORS.length] + '">' +
+      '<span class="mandat-badge ' + (m.statut==='actif'?'mb-actif':'mb-clos') + '">' + m.label + '</span>' +
+    '</label>';
+  }).join('');
+}
+
+function toggleMandatCompare(el) {
+  if (el.checked) { if (!selectedMandatsCompare.includes(el.value)) selectedMandatsCompare.push(el.value); }
+  else { selectedMandatsCompare = selectedMandatsCompare.filter(function(id){return id!==el.value;}); }
+  renderComparison();
+}
+
+function renderComparison() {
+  var metric = document.getElementById('cmp-metric') ? document.getElementById('cmp-metric').value : 'ca_signe';
+  var metricLabels = {
+    ca_signe:'CA signé (€)', nb_etudes_signees:'Nb études signées',
+    nb_prospects:'Nb prospects contactés', taux_conversion:'Taux de conversion (%)',
+    taux_prospection:'Taux de prospection (%)', panier_moyen:'Panier moyen (€)'
+  };
+  var mandats = allMandats.filter(function(m){ return selectedMandatsCompare.includes(m.id); });
+  if (mandats.length === 0) {
+    document.getElementById('chart-comparison').innerHTML = '<div class="no-data">Sélectionne au moins un mandat.</div>';
+    return;
+  }
+
+  // Calculer la valeur pour chaque mandat
+  var values = mandats.map(function(m) {
+    var mid = m.id;
+    var isActif = m.statut === 'actif';
+    if (isActif) {
+      // Temps réel depuis Firestore
+      var prospects = allProspects.filter(function(p){return p.mandat_id===mid||!p.mandat_id;});
+      var signes = prospects.filter(function(p){return p.status==='Signé';});
+      var contactes = prospects.filter(function(p){return p.status!=='À contacter';});
+      var caSigneActif = signes.reduce(function(a,p){return a+(parseFloat(p.estimated_amount)||0);},0);
+      switch(metric) {
+        case 'ca_signe': return caSigneActif;
+        case 'nb_etudes_signees': return signes.length;
+        case 'nb_prospects': return contactes.length;
+        case 'taux_conversion': return prospects.length>0?Math.round(signes.length/prospects.length*100):0;
+        case 'panier_moyen': return signes.length>0?Math.round(caSigneActif/signes.length):0;
+        default: return (m.kpi_commercial&&m.kpi_commercial[metric]) || 0;
+      }
+    } else {
+      // Données saisies manuellement
+      var kc = m.kpi_commercial || {};
+      return parseFloat(kc[metric]) || 0;
+    }
+  });
+
+  var maxVal = Math.max(1, Math.max.apply(null, values));
+  var isMoney = ['ca_signe','panier_moyen'].includes(metric);
+  var isPct   = ['taux_conversion','taux_prospection'].includes(metric);
+
+  // Graphique barres
+  var compHtml = '<div class="chart-title">' + metricLabels[metric] + ' — comparaison mandats</div>' +
+    '<div class="bar-chart">';
+  mandats.forEach(function(m, i) {
+    var v = values[i];
+    var h = Math.round(v/maxVal*150);
+    var dispVal = isMoney ? fmtM(v) : isPct ? fmtP(v) : v;
+    compHtml += '<div class="bar-group">' +
+      '<div class="bar-val">' + dispVal + '</div>' +
+      '<div class="bar-group-bars">' +
+        '<div class="bar" style="height:'+Math.max(h,v>0?3:0)+'px;background:'+COLORS[i%COLORS.length]+';width:40px" title="'+m.label+': '+dispVal+'"></div>' +
+      '</div>' +
+      '<div class="bar-lbl">' + m.id + (m.statut==='actif'?'\n🟢':'') + '</div>' +
+    '</div>';
+  });
+  compHtml += '</div>';
+  document.getElementById('chart-comparison').innerHTML = compHtml;
+
+  // Tableau récap
+  var rows = '<thead><tr style="background:#f8f7f5">' +
+    '<th style="padding:9px 12px;text-align:left;font-size:10px;color:var(--text-tertiary);text-transform:uppercase;border-bottom:1px solid var(--border)">Mandat</th>' +
+    ['ca_signe','nb_etudes_signees','nb_prospects','taux_conversion','taux_prospection','panier_moyen'].map(function(k){
+      return '<th style="padding:9px 12px;text-align:right;font-size:10px;color:var(--text-tertiary);text-transform:uppercase;border-bottom:1px solid var(--border)">' +
+        metricLabels[k] + '</th>';
+    }).join('') +
+  '</tr></thead><tbody>';
+  mandats.forEach(function(m,i) {
+    var mid = m.id;
+    var isActif = m.statut === 'actif';
+    var kc = isActif ? {} : (m.kpi_commercial||{});
+    if (isActif) {
+      var prospects = allProspects.filter(function(p){return p.mandat_id===mid||!p.mandat_id;});
+      var signes = prospects.filter(function(p){return p.status==='Signé';});
+      var contactes = prospects.filter(function(p){return p.status!=='À contacter';});
+      var ca = signes.reduce(function(a,p){return a+(parseFloat(p.estimated_amount)||0);},0);
+      kc = {
+        ca_signe: ca, nb_etudes_signees: signes.length, nb_prospects: contactes.length,
+        taux_conversion: prospects.length>0?Math.round(signes.length/prospects.length*100):0,
+        panier_moyen: signes.length>0?Math.round(ca/signes.length):0,
+        taux_prospection: m.kpi_commercial&&m.kpi_commercial.taux_prospection || 0
+      };
+    }
+    rows += '<tr style="'+(i%2===0?'':'background:#f8f7f5')+'">' +
+      '<td style="padding:9px 12px;font-weight:600;color:var(--navy);border-bottom:1px solid var(--border)">' +
+        m.label + (isActif?' <span style="font-size:10px;background:rgba(163,33,95,0.1);color:var(--bordeaux);padding:1px 6px;border-radius:99px">En cours</span>':'') +
+      '</td>' +
+      ['ca_signe','nb_etudes_signees','nb_prospects','taux_conversion','taux_prospection','panier_moyen'].map(function(k){
+        var v = parseFloat(kc[k])||0;
+        var disp = ['ca_signe','panier_moyen'].includes(k) ? fmtM(v) : ['taux_conversion','taux_prospection'].includes(k) ? fmtP(v) : v;
+        var isSelected = k === metric;
+        return '<td style="padding:9px 12px;text-align:right;font-size:13px;border-bottom:1px solid var(--border);' +
+          (isSelected?'font-weight:700;color:var(--bordeaux)':'color:var(--text-primary)') + '">' + disp + '</td>';
+      }).join('') +
+    '</tr>';
+  });
+  rows += '</tbody>';
+  document.getElementById('cmp-table').innerHTML = rows;
+}
+
+// ═══ WEEK HELPERS (copie de crm_prospection) ══════════════════
+function wkStart(off) {
+  var d = new Date(); d.setHours(0,0,0,0);
+  var dy = d.getDay();
+  var toMon = (dy === 0) ? 6 : dy - 1;
+  d.setDate(d.getDate() - toMon + off * 7);
+  return d;
+}
+function wkEnd(off) { var d = wkStart(off); d.setDate(d.getDate() + 7); return d; }
+function isoWk(d) {
+  var dt = new Date(d.getFullYear(),d.getMonth(),d.getDate());
+  dt.setDate(dt.getDate()+3-(dt.getDay()+6)%7);
+  var w1=new Date(dt.getFullYear(),0,4);
+  return 1+Math.round(((dt-w1)/864e5-3+(w1.getDay()+6)%7)/7);
+}
+
+// ═══ EXPORT ═══════════════════════════════════════════════════
+function exportXLSX() {
+  var rows = [['Mandat','CA Signé','Nb études','Nb prospects','Taux conversion','Panier moyen']];
+  allMandats.filter(function(m){return m.statut!=='archive';}).forEach(function(m) {
+    var kc = m.kpi_commercial||{};
+    rows.push([m.label, kc.ca_signe||0, kc.nb_etudes_signees||0, kc.nb_prospects||0, kc.taux_conversion||0, kc.panier_moyen||0]);
+  });
+  var ws = XLSX.utils.aoa_to_sheet(rows);
+  var wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'KPI Commercial');
+  XLSX.writeFile(wb, 'KPI_Commercial_ICN_JC.xlsx');
+}
+</script>
+</body>
+</html>
