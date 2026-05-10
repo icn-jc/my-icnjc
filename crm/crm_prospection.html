@@ -570,6 +570,14 @@ td[contenteditable=true]:hover{background:rgba(163,33,95,0.04);border-radius:3px
 </div>
 
 <script>
+// ── Helpers dates (définis en premier — utilisés partout) ──────
+function localDateStr(d) {
+  var yr = d.getFullYear();
+  var mo = String(d.getMonth() + 1).padStart(2, '0');
+  var da = String(d.getDate()).padStart(2, '0');
+  return yr + '-' + mo + '-' + da;
+}
+
 // ════════════════════════════════════════════════════════
 // CONSTANTES MÉTIER
 // ════════════════════════════════════════════════════════
