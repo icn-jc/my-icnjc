@@ -295,7 +295,17 @@ td[contenteditable=true]:hover{background:rgba(163,33,95,0.04);border-radius:3px
         <div class="stats-row" id="ca-stats-week"></div>
         <div class="sec-title" style="margin-top:4px">Pipeline global</div>
         <div class="stats-row" id="ca-stats-pipeline"></div>
-        <div class="sec-title" style="margin-top:4px">Classement</div>
+        <div class="flex items-center gap-3" style="margin-top:4px;flex-wrap:wrap;margin-bottom:8px">
+          <div class="sec-title" style="margin-bottom:0;flex:none">Classement & Pipeline période</div>
+          <div style="display:flex;gap:4px;flex-wrap:wrap" id="period-ca-stats"></div>
+          <div style="display:none;gap:8px;align-items:center" id="dr-ca-stats">
+            <input type="date" class="input" id="dr-cas-from" style="font-size:12px;padding:5px;"/>
+            <span style="font-size:12px;color:var(--text-tertiary)">→</span>
+            <input type="date" class="input" id="dr-cas-to" style="font-size:12px;padding:5px;"/>
+            <button class="btn btn-secondary btn-sm" onclick="renderCA()">Afficher</button>
+          </div>
+        </div>
+        <div class="stats-row" id="ca-stats-period"></div>
         <div class="ranking-grid" id="ranking-grid"></div>
         <div class="sec-title">Évolution</div>
         <div class="period-sel" id="period-ca"></div>
@@ -606,7 +616,7 @@ var ME = '', MY_NAME = '', MY_ROLE = '', IS_CA = false;
 var allProspects = [], allRdvs = [], allUsers = [], goalWeek = 10;
 var curProspectId = null, curProspect = null;
 var weekOffCA = 0, weekOffMine = 0;
-var periodCA = 'Semaine', periodMine = 'Semaine';
+var periodCA = 'Semaine', periodMine = 'Semaine', periodCAStats = 'Semaine';
 
 // ════════════════════════════════════════════════════════
 // AUTH
@@ -634,6 +644,7 @@ initAuth('crm_prospection', function(user, role, profile) {
 
   document.getElementById('af-date').value = now.toISOString().split('T')[0];
   initPeriods();
+  initCAStatsPeriod();
   loadData();
 });
 
@@ -696,14 +707,21 @@ function refreshAll() {
 // HELPERS DATES / SEMAINE ISO
 // ════════════════════════════════════════════════════════
 function wkStart(off) {
-  // Semaine lundi→dimanche
-  var d = new Date(); d.setHours(0,0,0,0);
-  var dy = d.getDay(); // 0=dim,1=lun,...,6=sam
-  var diffToMonday = (dy === 0) ? -6 : 1 - dy; // nb jours pour revenir au lundi
-  d.setDate(d.getDate() + diffToMonday + off * 7);
-  return d;
+  // Semaine ISO : lundi → dimanche
+  // On travaille en UTC pour éviter les décalages horaires
+  var now = new Date();
+  var y = now.getFullYear(), m = now.getMonth(), day = now.getDate();
+  var today = new Date(y, m, day); // minuit heure locale, pas UTC
+  var dow = today.getDay(); // 0=dim, 1=lun, ..., 6=sam
+  // Nombre de jours à soustraire pour arriver au lundi
+  var toMon = (dow === 0) ? 6 : dow - 1;
+  var mon = new Date(y, m, day - toMon + off * 7);
+  return mon;
 }
-function wkEnd(off) { var d = wkStart(off); d.setDate(d.getDate() + 7); return d; }
+function wkEnd(off) {
+  var s = wkStart(off);
+  return new Date(s.getFullYear(), s.getMonth(), s.getDate() + 7);
+}
 function isoWk(d) {
   // Numéro de semaine ISO 8601 (lundi = début de semaine)
   var dt = new Date(d); dt.setHours(0,0,0,0);
@@ -769,15 +787,16 @@ function switchApTab(key) {
 // LOGIQUE MÉTIER — OBJECTIFS
 // ════════════════════════════════════════════════════════
 function countVal(email, off) {
-  // Valorisé = au moins une action cette semaine avec statut valorisable
-  // "Pas de réponse" ne compte jamais
-  // "Perdu" compte seulement si au moins un statut valorisable dans l'historique
   return allProspects.filter(function(p) {
     if (p.owner_email !== email) return false;
     if (!inWk(p.last_contact_at, off)) return false;
-    if (p.status === 'À contacter' || p.status === 'Pas de réponse') return false;
-    // Perdu : vérifier qu'il y a eu au moins un statut valorisable avant
+    // À contacter = jamais valorisé
+    if (p.status === 'À contacter') return false;
+    // Pas de réponse = valorisé seulement si au moins un contact favorable dans l'historique
+    if (p.status === 'Pas de réponse') return p.had_valuable_contact === true;
+    // Perdu = valorisé seulement si au moins un contact favorable dans l'historique
     if (p.status === 'Perdu') return p.had_valuable_contact === true;
+    // Tous les autres statuts = valorisés
     return STATUTS_VALORISES.includes(p.status);
   }).length;
 }
@@ -859,6 +878,36 @@ function renderCA() {
       '<div class="rank-prog"><div class="rank-prog-fill" style="width:' + pct + '%"></div></div>' +
       '<div style="font-size:10px;color:var(--text-tertiary)">' + r.tot + ' total</div></div></div>';
   }).join('');
+
+  // ── Pipeline & classement période ──
+  var pCols = getCAStatsCols();
+  var pLabel = getPeriodLabel();
+  var pipPeriod = 0;
+  var rankPeriod = activeProspectors.map(function(u) {
+    var cnt = 0;
+    pCols.forEach(function(col) {
+      cnt += allProspects.filter(function(p) {
+        if (p.owner_email !== u.email || !p.last_contact_at) return false;
+        if (!STATUTS_VALORISES.includes(p.status)) return false;
+        var d = new Date(p.last_contact_at); return d >= col.from && d < col.to;
+      }).length;
+    });
+    return { u: u, n: cnt };
+  }).sort(function(a, b) { return b.n - a.n; });
+  // Pipeline période
+  var pipPeriodFiable = 0, pipPeriodIncertain = 0;
+  allProspects.filter(function(p) {
+    if (p.status === 'Perdu' || p.status === 'À contacter') return false;
+    if (!p.last_contact_at) return false;
+    return pCols.some(function(col) { var d = new Date(p.last_contact_at); return d >= col.from && d < col.to; });
+  }).forEach(function(p) {
+    var amt = parseFloat(p.estimated_amount) || 0;
+    if (inactiveEmails.includes(p.owner_email)) pipPeriodIncertain += amt;
+    else pipPeriodFiable += amt;
+  });
+  var pHtml2 = '<div class="kpi-card"><div class="kpi-label">Pipeline ' + pLabel + '</div><div class="kpi-val">' + fmtM(pipPeriodFiable + pipPeriodIncertain) + '</div></div>';
+  if (pipPeriodIncertain > 0) pHtml2 += '<div class="kpi-card kc-uncertain"><div class="kpi-label">Incertain ' + pLabel + '</div><div class="kpi-val">' + fmtM(pipPeriodIncertain) + '</div></div>';
+  document.getElementById('ca-stats-period').innerHTML = pHtml2;
 
   renderCAChart();
 }
@@ -1529,6 +1578,36 @@ function clearFilters() {
   renderAll();
 }
 
+// ── CA Stats period helpers ───────────────────────────────────────
+function getCAStatsCols() {
+  var p = periodCAStats;
+  if (p === 'Semaine') return [{from: wkStart(weekOffCA), to: wkEnd(weekOffCA)}];
+  return getCols(p, 'dr-cas-from', 'dr-cas-to');
+}
+function getPeriodLabel() {
+  var p = periodCAStats;
+  if (p === 'Semaine') return 'S' + isoWk(wkStart(weekOffCA));
+  if (p === 'Date à date') return 'Période';
+  return p.toLowerCase();
+}
+function initCAStatsPeriod() {
+  var el = document.getElementById('period-ca-stats');
+  if (!el) return;
+  var periods = ['Semaine','Mois','Trimestre','Semestre','Année','Date à date'];
+  el.innerHTML = periods.map(function(p) {
+    return '<button class="period-btn' + (p === 'Semaine' ? ' active' : '') + '" onclick="setCAStatsPeriod('' + p + '')">' + p + '</button>';
+  }).join('');
+}
+function setCAStatsPeriod(p) {
+  periodCAStats = p;
+  document.getElementById('period-ca-stats').querySelectorAll('.period-btn').forEach(function(b) {
+    b.classList.toggle('active', b.textContent === p);
+  });
+  var dr = document.getElementById('dr-ca-stats');
+  if (dr) dr.style.display = p === 'Date à date' ? 'flex' : 'none';
+  renderCA();
+}
+
 // ── RDV helpers ──────────────────────────────────────────────────
 var rdvCompact = false;
 function toggleCompactRdv() {
@@ -1613,20 +1692,20 @@ function exportXLSX() {
     </div>
     <div style="font-size:13px;color:var(--text-secondary);line-height:1.7;padding:4px 0">
       <p style="font-weight:600;color:var(--navy);margin-bottom:8px">🎯 Objectif hebdomadaire</p>
-      <p>Chaque membre prospecteur doit atteindre l'objectif fixé en contacts par semaine (lundi → dimanche).</p>
+      <p>Chaque membre prospecteur doit atteindre l'objectif fixé en contacts par semaine (lundi → dimanche), dans le respect des règles de prospection imposées par la CNJE.</p>
       <p style="font-weight:600;color:var(--navy);margin-bottom:8px;margin-top:16px">✅ Qu'est-ce qu'un contact valorisable ?</p>
       <p>Un contact compte dans l'objectif si tu as obtenu <strong>au moins une réponse</strong> du prospect cette semaine.</p>
-      <ul style="margin:8px 0 0 16px;display:flex;flex-direction:column;gap:4px">
-        <li>✅ <strong>Contacté</strong> — premier contact avec réponse</li>
+      <ul style="margin:8px 0 0 16px;display:flex;flex-direction:column;gap:5px">
+        <li>✅ <strong>Contacté</strong> — contact avec réponse</li>
         <li>✅ <strong>Rappel demandé</strong> — le prospect a répondu et demande un rappel</li>
         <li>✅ <strong>RDV planifié / effectué</strong></li>
         <li>✅ <strong>Proposition envoyée / Négociation / Signé</strong></li>
-        <li>✅ <strong>Perdu</strong> — si au moins un contact valorisable a eu lieu avant</li>
+        <li>✅ <strong>Perdu</strong> — si au moins un contact valorisable a eu lieu avant dans l'historique</li>
         <li>❌ <strong>À contacter</strong> — pas encore de contact</li>
-        <li>❌ <strong>Pas de réponse</strong> — tu as essayé mais pas de retour</li>
+        <li>❌ <strong>Pas de réponse</strong> — tu as essayé mais pas de retour <em>(valorisé uniquement si tu as au moins un contact favorable dans l'historique du prospect)</em></li>
       </ul>
       <p style="font-weight:600;color:var(--navy);margin-bottom:8px;margin-top:16px">📅 Semaines</p>
-      <p>Les semaines vont du <strong>lundi au dimanche</strong> (semaine ISO). La navigation ← → permet de consulter les semaines précédentes.</p>
+      <p>Les semaines vont du <strong>lundi au dimanche</strong>. La navigation ← → permet de consulter les semaines précédentes.</p>
     </div>
     <div class="modal-actions">
       <button class="btn btn-primary" onclick="closeReglementModal()">Compris ✓</button>
