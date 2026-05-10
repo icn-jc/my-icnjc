@@ -70,9 +70,10 @@
           <div class="page-title">Historique mandats</div>
           <div class="page-subtitle">Gestion des mandats, saisie des KPI historiques — Super Admin uniquement</div>
         </div>
-        <div class="flex gap-2">
+        <div class="flex gap-2" style="flex-wrap:wrap">
           <button class="btn btn-secondary" id="btn-tab-kpi" onclick="switchMandatTab('kpi')">📊 KPI & données</button>
           <button class="btn btn-secondary active-tab" id="btn-tab-membres" onclick="switchMandatTab('membres')">👥 Membres</button>
+          <button class="btn btn-secondary" id="btn-tab-params" onclick="switchMandatTab('params')">⚙️ Paramètres</button>
           <button class="btn btn-primary" id="btn-tab-new" onclick="openNewMandat()">+ Nouveau mandat</button>
         </div>
       </div>
@@ -91,6 +92,22 @@
           <button class="btn btn-primary btn-sm" onclick="saveMembres()">💾 Sauvegarder membres</button>
         </div>
         <div id="membres-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px"></div>
+      </div>
+      <div id="view-params" style="display:none">
+        <div style="max-width:500px">
+          <div style="background:var(--bg-card);border-radius:var(--radius-lg);padding:20px;border:1px solid var(--border)">
+            <div style="font-size:13px;font-weight:600;color:var(--navy);margin-bottom:6px">Date limite de modification rétroactive</div>
+            <div style="font-size:12px;color:var(--text-tertiary);margin-bottom:12px;line-height:1.5">
+              Les commerciaux ne peuvent pas enregistrer d'actions avant cette date.<br>
+              Toi (super_admin) tu n'as pas de limite.
+            </div>
+            <div style="display:flex;gap:10px;align-items:center">
+              <input type="date" id="retro-limit-input" class="input" style="max-width:200px"/>
+              <button class="btn btn-primary btn-sm" onclick="saveRetroLimit()">Enregistrer</button>
+            </div>
+            <div style="font-size:11px;color:var(--text-tertiary);margin-top:8px" id="retro-limit-current">Chargement…</div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -272,18 +289,27 @@ function renderMandatCard(m) {
   });
 
   var footerBtns = '';
+  var isSuperAdmin = MY_ROLE_MANDATS === 'super_admin';
+
+  // Boutons d'édition pour super_admin et président du mandat concerné
   if (!locked) {
     footerBtns += '<button class="btn btn-secondary btn-sm" onclick="addCustomKpi(\'' + mid + '\')">+ KPI personnalisé</button>';
     footerBtns += '<button class="btn btn-secondary btn-sm" onclick="saveMandat(\'' + mid + '\')">💾 Sauvegarder</button>';
   }
-  if (isActif) {
-    footerBtns += '<button class="btn btn-secondary btn-sm" onclick="snapshotMandat(\'' + mid + '\')" style="background:#fff7ed;color:#c2410c;border-color:#fed7aa">📸 Snapshot maintenant</button>';
-    footerBtns += '<button class="btn btn-secondary btn-sm" onclick="cloreMandat(\'' + mid + '\')">🔒 Clôturer ce mandat</button>';
-  }
-  if (!isArch) {
-    footerBtns += '<button class="btn btn-secondary btn-sm" onclick="archiveMandat(\'' + mid + '\')">📁 Archiver</button>';
-  } else {
-    footerBtns += '<button class="btn btn-secondary btn-sm" onclick="unarchiveMandat(\'' + mid + '\')">↩ Désarchiver</button>';
+  if (isSuperAdmin) {
+    if (isActif) {
+      footerBtns += '<button class="btn btn-secondary btn-sm" onclick="snapshotMandat(\'' + mid + '\')" style="background:#fff7ed;color:#c2410c;border-color:#fed7aa" title="Prend une photo des données Firestore et remplit les champs">📸 Snapshot</button>';
+      footerBtns += '<button class="btn btn-secondary btn-sm" onclick="cloreMandat(\'' + mid + '\')">🔒 Clôturer</button>';
+    }
+    if (isClos) {
+      footerBtns += '<button class="btn btn-secondary btn-sm" onclick="decloreMandat(\'' + mid + '\')" style="background:#eff6ff;color:#1e40af;border-color:#bfdbfe">🔓 Déclôturer</button>';
+    }
+    if (!isArch) {
+      footerBtns += '<button class="btn btn-secondary btn-sm" onclick="archiveMandat(\'' + mid + '\')">📁 Archiver</button>';
+    } else {
+      footerBtns += '<button class="btn btn-secondary btn-sm" onclick="unarchiveMandat(\'' + mid + '\')">↩ Désarchiver</button>';
+    }
+    footerBtns += '<button class="btn btn-secondary btn-sm" onclick="deleteMandat(\'' + mid + '\')" style="background:#fee2e2;color:#991b1b;border-color:#fca5a5">🗑 Supprimer</button>';
   }
 
   // Edit dates/president
@@ -376,7 +402,15 @@ function delCustomKpi(mandatId, idx) {
 }
 
 function snapshotMandat(mandatId) {
-  if (!confirm('Prendre un snapshot des KPI actuels depuis Firestore pour le mandat ' + mandatId + ' ?')) return;
+  if (!confirm('Prendre un snapshot pour le mandat ' + mandatId + ' ?
+
+Cela va calculer depuis Firestore :
+• Nb prospects contactés
+• Nb signés
+• CA signé (prospects Firestore)
+• Taux de conversion
+
+Ces valeurs rempliront les champs. Tu pourras ensuite les ajuster manuellement.')) return;
   var today = new Date();
   var snap = localDateStr(today);
   // Calculer les KPI depuis Firestore (prospects + études)
@@ -398,7 +432,15 @@ function snapshotMandat(mandatId) {
       snapshot_at: snap
     });
   }).then(function(){
-    alert('Snapshot pris le ' + snap + '. Tu peux maintenant ajuster manuellement les valeurs.');
+    alert('✅ Snapshot pris le ' + snap + '.
+
+Les champs suivants ont été remplis automatiquement :
+• Nb prospects contactés
+• Nb signés
+• CA signé
+• Taux de conversion
+
+Tu peux maintenant ajuster ces valeurs manuellement si nécessaire.');
   });
 }
 
@@ -409,12 +451,26 @@ function cloreMandat(mandatId) {
 }
 
 function archiveMandat(mandatId) {
-  if (!confirm('Archiver ce mandat ? Il ne sera plus visible dans le CRM.')) return;
+  if (!confirm('Archiver ce mandat ? Il ne sera plus visible dans le CRM (désarchivable à tout moment).')) return;
   db.collection('mandats').doc(mandatId).update({statut:'archive'});
 }
 
 function unarchiveMandat(mandatId) {
+  if (!confirm('Désarchiver ce mandat ?')) return;
   db.collection('mandats').doc(mandatId).update({statut:'clos'});
+}
+
+function decloreMandat(mandatId) {
+  if (!confirm('Déclôturer le mandat ' + mandatId + ' ? Il repassera en statut "actif" et les données seront à nouveau modifiables.')) return;
+  db.collection('mandats').doc(mandatId).update({statut:'actif', locked:false});
+}
+
+function deleteMandat(mandatId) {
+  if (!confirm('⚠️ SUPPRIMER définitivement le mandat ' + mandatId + ' ?
+
+Cette action est irréversible. Les données KPI seront perdues.')) return;
+  if (!confirm('Dernière confirmation : supprimer ' + mandatId + ' ?')) return;
+  db.collection('mandats').doc(mandatId).delete();
 }
 
 // ── NOUVEAU MANDAT ─────────────────────────────────────────────
@@ -445,15 +501,37 @@ function confirmNewMandat() {
 
 // ── TABS ──────────────────────────────────────────────────────
 function switchMandatTab(tab) {
-  document.getElementById('view-kpi').style.display = tab === 'kpi' ? 'block' : 'none';
-  document.getElementById('view-membres').style.display = tab === 'membres' ? 'block' : 'none';
+  ['kpi','membres','params'].forEach(function(t) {
+    var v = document.getElementById('view-'+t);
+    var b = document.getElementById('btn-tab-'+t);
+    if (v) v.style.display = t === tab ? 'block' : 'none';
+    if (b) b.classList.toggle('active-tab', t === tab);
+  });
   document.getElementById('btn-tab-new').style.display = tab === 'kpi' ? '' : 'none';
-  document.getElementById('btn-tab-kpi').classList.toggle('active-tab', tab === 'kpi');
-  document.getElementById('btn-tab-membres').classList.toggle('active-tab', tab === 'membres');
   if (tab === 'membres') {
     populateMandatSel('membres-mandat-sel');
     renderMembresView();
   }
+  if (tab === 'params') loadRetroLimit();
+}
+
+function loadRetroLimit() {
+  db.collection('crm_config').doc('parametres').get().then(function(doc) {
+    var val = doc.exists && doc.data().retro_limit_date ? doc.data().retro_limit_date : '2026-04-01';
+    var inp = document.getElementById('retro-limit-input');
+    var cur = document.getElementById('retro-limit-current');
+    if (inp) inp.value = val;
+    if (cur) cur.innerText = 'Valeur actuelle : ' + fmtD(val);
+  });
+}
+
+function saveRetroLimit() {
+  var val = document.getElementById('retro-limit-input').value;
+  if (!val) return;
+  db.collection('crm_config').doc('parametres').set({retro_limit_date: val}, {merge:true}).then(function() {
+    var cur = document.getElementById('retro-limit-current');
+    if (cur) cur.innerText = '✅ Sauvegardé — Valeur actuelle : ' + fmtD(val);
+  });
 }
 
 function populateMandatSel(selId) {
