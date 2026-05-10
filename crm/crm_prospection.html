@@ -322,7 +322,10 @@ td[contenteditable=true]:hover{background:rgba(163,33,95,0.04);border-radius:3px
 
       <!-- ═══════════════ MES PROSPECTS ═══════════════ -->
       <div class="tab-pane active" id="pane-mine">
-        <a class="cap-link" href="https://app-capfinancials-com.thebe.icn-nancy.fr/search?state=open&city%5B0%5D=Nancy&contact.exists=true&contact.email=true&hasPhone=true" target="_blank">🔍 Cap Financial — Nancy (625 contacts)</a>
+        <div class="flex justify-between items-center" style="margin-bottom:12px;flex-wrap:wrap;gap:8px;">
+          <a class="cap-link" style="margin-bottom:0" href="https://app-capfinancials-com.thebe.icn-nancy.fr/search?state=open&city%5B0%5D=Nancy&contact.exists=true&contact.email=true&hasPhone=true" target="_blank">🔍 Cap Financial — Nancy</a>
+          <button class="btn btn-primary btn-sm" id="btn-add-prospect-mine" onclick="openAddProspect()">+ Prospect</button>
+        </div>
         <div id="wn-mine" style="margin-bottom:16px"></div>
         <div id="mine-goal-hero"></div>
         <div class="sec-title" style="margin-top:16px">Mon évolution</div>
@@ -342,6 +345,7 @@ td[contenteditable=true]:hover{background:rgba(163,33,95,0.04);border-radius:3px
       <!-- ═══════════════ TOUS LES PROSPECTS ═══════════════ -->
       <div class="tab-pane" id="pane-all">
         <div class="toolbar">
+          <select class="mandat-sel" onchange="changeMandatFilter(this.value)" style="padding:6px 10px;border-radius:var(--radius-md);border:1.5px solid var(--border-strong);font-family:'Sora',sans-serif;font-size:12px;background:var(--white);"></select>
           <input type="text" id="srch-all" placeholder="🔍 Rechercher…" oninput="renderAll()"/>
           <select id="f-member" onchange="renderAll()"><option value="">Tous les membres</option></select>
           <select id="f-statut" onchange="renderAll()">
@@ -507,6 +511,23 @@ td[contenteditable=true]:hover{background:rgba(163,33,95,0.04);border-radius:3px
         </select></div>
       <div class="form-field full"><label class="input-label">Tags (séparés par virgules)</label><input class="input" id="np-tags" placeholder="Ex: PME, B2B, prioritaire"/></div>
       <div class="form-field full"><label class="input-label">Notes</label><textarea class="input" id="np-no" rows="2" style="resize:vertical"></textarea></div>
+      <!-- Super admin uniquement : pour qui + date premier contact -->
+      <div class="form-field full" id="np-for-whom-row" style="display:none">
+        <label class="input-label">📌 Pour qui ? (super admin)</label>
+        <select class="select-field" id="np-for-whom" onchange="toggleForWhom()">
+          <option value="me">Pour moi</option>
+          <option value="other">Pour quelqu'un d'autre</option>
+        </select>
+      </div>
+      <div class="form-field full" id="np-member-row" style="display:none">
+        <label class="input-label">Membre concerné</label>
+        <select class="select-field" id="np-member-sel"></select>
+      </div>
+      <div class="form-field" id="np-first-contact-row" style="display:none">
+        <label class="input-label">Date premier contact <span style="color:var(--danger)">*</span></label>
+        <input class="input" type="date" id="np-first-contact"/>
+        <div style="font-size:10px;color:var(--text-tertiary);margin-top:3px">Pour placer ce prospect dans la bonne semaine historique</div>
+      </div>
     </div>
     <div class="modal-actions">
       <button class="btn btn-secondary" onclick="closeAddProspect()">Annuler</button>
@@ -623,9 +644,10 @@ var RLMAP = {super_admin:'Super Admin',president:'Président',vice_president:'VP
 // ÉTAT GLOBAL
 // ════════════════════════════════════════════════════════
 var ME = '', MY_NAME = '', MY_ROLE = '', IS_CA = false;
-var allProspects = [], allRdvs = [], allUsers = [], goalWeek = 10;
+var allProspects = [], allRdvs = [], allUsers = [], allMandats = [], goalWeek = 10;
 var curProspectId = null, curProspect = null;
 var weekOffCA = 0, weekOffMine = 0;
+var currentMandatFilter = ''; // '' = mandat actif uniquement
 var periodCA = 'Semaine', periodMine = 'Semaine', periodCAStats = 'Semaine';
 
 // ════════════════════════════════════════════════════════
@@ -691,12 +713,49 @@ function loadData() {
     refreshAll();
   });
 
+  // Mandats
+  db.collection('mandats').where('statut','in',['actif','clos']).get().then(function(snap) {
+    allMandats = [];
+    snap.forEach(function(doc) { allMandats.push(Object.assign({id:doc.id},doc.data())); });
+    allMandats.sort(function(a,b) { return (b.date_debut||'').localeCompare(a.date_debut||''); });
+    populateMandatFilter();
+    // Set mandat_id on new prospects (default = mandat actif)
+  });
+
   // RDV (temps réel)
   db.collection('prospects_rdv').onSnapshot(function(snap) {
     allRdvs = [];
     snap.forEach(function(doc) { allRdvs.push(Object.assign({id: doc.id}, doc.data())); });
     renderRdv();
   });
+}
+
+function populateMandatFilter() {
+  var actif = allMandats.find(function(m) { return m.statut === 'actif'; });
+  // Build mandat selector in toolbar
+  var sels = document.querySelectorAll('.mandat-sel');
+  sels.forEach(function(sel) {
+    sel.innerHTML = '<option value="">Mandat actif</option>' +
+      allMandats.filter(function(m){return m.statut!=='archive';}).map(function(m) {
+        return '<option value="' + m.id + '"' + (currentMandatFilter===m.id?' selected':'') + '>' + m.label + '</option>';
+      }).join('');
+  });
+}
+
+function changeMandatFilter(val) {
+  currentMandatFilter = val;
+  var mandatActif = allMandats.find(function(m){return m.statut==='actif';});
+  var isCurrentMandat = !val || (mandatActif && val === mandatActif.id);
+  // Cacher/montrer ajout selon mandat
+  var pastMandat = val && (!mandatActif || val !== mandatActif.id);
+  var addBtn = document.getElementById('btn-add-prospect-mine');
+  if (addBtn) { addBtn.style.display = pastMandat ? 'none' : ''; }
+  refreshAll();
+}
+
+function getMandatActifId() {
+  var m = allMandats.find(function(x){return x.statut==='actif';});
+  return m ? m.id : '2025-2026';
 }
 
 function refreshAll() {
@@ -1018,9 +1077,25 @@ function renderMine() {
   var off = weekOffMine;
   var isPast = off < 0;
   var wkCnt = countVal(ME, off);
-  var pct = Math.min(100, goalWeek > 0 ? Math.round(wkCnt / goalWeek * 100) : 0);
+  // Charger l'objectif de la semaine concernée (figé pour semaines passées)
+  loadWeekObjectif(off, function(wkGoal) {
+    renderMineWithGoal(off, isPast, wkCnt, wkGoal);
+  });
+}
+function renderMineWithGoal(off, isPast, wkCnt, wkGoal) {
+  var pct = Math.min(100, wkGoal > 0 ? Math.round(wkCnt / wkGoal * 100) : 0);
   var bc = isPast ? 'gb-past' : (wkCnt >= goalWeek ? 'gb-ok' : wkCnt >= goalWeek * 0.5 ? 'gb-warn' : 'gb-late');
   var bt = isPast ? (wkCnt >= goalWeek ? '✅ Objectif atteint' : '❌ Objectif manqué') : (wkCnt >= goalWeek ? '🎯 Objectif atteint !' : wkCnt >= goalWeek * 0.5 ? '⚡ Bon rythme' : '🔴 Accélère !');
+  // Bloquer + Prospect si semaine passée
+  var isPastWeek = weekOffMine < 0;
+  var addBtn = document.getElementById('btn-add-prospect-mine');
+  if (addBtn) {
+    addBtn.disabled = isPastWeek;
+    addBtn.style.opacity = isPastWeek ? '.4' : '1';
+    addBtn.style.cursor = isPastWeek ? 'not-allowed' : 'pointer';
+    addBtn.title = isPastWeek ? 'Semaine passée — ajout impossible' : '';
+  }
+
   document.getElementById('mine-goal-hero').innerHTML =
     '<div class="goal-hero">' +
       '<div class="gh-text"><div class="gh-title" style="display:flex;align-items:center;gap:6px">Objectif semaine <button onclick="openReglementModal()" style="background:rgba(255,255,255,0.2);border:none;border-radius:50%;width:18px;height:18px;font-size:11px;cursor:pointer;color:white;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-family:serif">ℹ</button></div>' +
@@ -1034,7 +1109,13 @@ function renderMine() {
   renderMineChart();
 
   // Kanban
-  var mine = allProspects.filter(function(p) { return p.owner_email === ME; });
+  // Kanban = portefeuille complet, pas filtré par période
+  var mine = allProspects.filter(function(p) {
+    if (p.owner_email !== ME) return false;
+    // Filtrer par mandat si filtre actif (mais pas par période)
+    if (currentMandatFilter && p.mandat_id !== currentMandatFilter) return false;
+    return true;
+  });
   var today = new Date(); today.setHours(0,0,0,0);
   document.getElementById('kanban-mine').innerHTML = STATUTS.map(function(s) {
     var cards = mine.filter(function(p) { return p.status === s; });
@@ -1410,8 +1491,30 @@ function saveAction() {
 // ════════════════════════════════════════════════════════
 // PROSPECT CRUD
 // ════════════════════════════════════════════════════════
-function openAddProspect() { document.getElementById('modal-ap').classList.add('open'); }
+function openAddProspect() {
+  // Afficher options super_admin
+  var forWhomRow = document.getElementById('np-for-whom-row');
+  var firstContactRow = document.getElementById('np-first-contact-row');
+  if (forWhomRow) forWhomRow.style.display = MY_ROLE === 'super_admin' ? 'block' : 'none';
+  if (firstContactRow) firstContactRow.style.display = MY_ROLE === 'super_admin' ? 'block' : 'none';
+  // Populate member select
+  var sel = document.getElementById('np-member-sel');
+  if (sel) {
+    sel.innerHTML = allUsers.filter(function(u){return u.prospecte;}).map(function(u){
+      return '<option value="' + u.email + '">' + (u.prenom||'') + ' ' + (u.nom||'') + '</option>';
+    }).join('');
+  }
+  // Default first contact = today
+  var fc = document.getElementById('np-first-contact');
+  if (fc) fc.value = localDateStr(new Date());
+  document.getElementById('modal-ap').classList.add('open');
+}
 function closeAddProspect() { document.getElementById('modal-ap').classList.remove('open'); }
+function toggleForWhom() {
+  var val = document.getElementById('np-for-whom').value;
+  var memberRow = document.getElementById('np-member-row');
+  if (memberRow) memberRow.style.display = val === 'other' ? 'block' : 'none';
+}
 
 function confirmAddProspect() {
   var co = document.getElementById('np-co').value.trim();
@@ -1432,10 +1535,11 @@ function confirmAddProspect() {
     priority: document.getElementById('np-pr').value || 'Normale',
     tags: tags,
     notes: document.getElementById('np-no').value.trim(),
-    owner_email: ME,
-    owner_name: MY_NAME,
+    owner_email: targetEmail,
+    owner_name: targetName.trim(),
     actif_pipeline: st !== 'À contacter',
-    last_contact_at: st === 'Contacté' ? localDateStr(new Date()) : null,
+    last_contact_at: st === 'Contacté' ? (document.getElementById('np-first-contact').value || localDateStr(new Date())) : null,
+    mandat_id: getMandatActifId(),
     created_at: firebase.firestore.FieldValue.serverTimestamp(),
     updated_at: firebase.firestore.FieldValue.serverTimestamp()
   }).then(function() { closeAddProspect(); });
@@ -1553,14 +1657,59 @@ function openGoalModal() { document.getElementById('modal-goal').classList.add('
 function closeGoalModal() { document.getElementById('modal-goal').classList.remove('open'); }
 function saveGoal() {
   var v = parseInt(document.getElementById('goal-input').value) || 10;
-  db.collection('crm_config').doc('objectifs').set({
+  var today = new Date();
+  var wn = isoWk(wkStart(0));
+  var yr = wkStart(0).getFullYear();
+  var weekKey = yr + '-W' + String(wn).padStart(2,'0');
+  // Sauvegarder l'objectif courant + l'historique
+  var batch = db.batch();
+  batch.set(db.collection('crm_config').doc('objectifs'), {
     objectif_semaine: v, modifie_par: MY_NAME || ME,
-    modifie_le: localDateStr(new Date())
-  }).then(function() {
+    modifie_le: localDateStr(today)
+  });
+  // Historique semaine courante
+  batch.set(db.collection('crm_config').doc('objectifs_historique').collection('semaines').doc(weekKey), {
+    objectif: v, semaine: weekKey, defini_par: MY_NAME || ME, defini_le: localDateStr(today)
+  });
+  batch.commit().then(function() {
     goalWeek = v;
     document.getElementById('goal-display').innerText = v;
     closeGoalModal(); refreshAll();
   });
+  // Rétroactivement : remplir toutes les semaines passées à 10 si pas encore d'historique
+  seedObjectifHistorique(v);
+}
+
+function seedObjectifHistorique(defaultVal) {
+  // Créer historique pour les 52 dernières semaines si vide
+  var ref = db.collection('crm_config').doc('objectifs_historique').collection('semaines');
+  ref.limit(1).get().then(function(snap) {
+    if (!snap.empty) return; // Déjà initialisé
+    var batch = db.batch();
+    for (var w = 51; w >= 0; w--) {
+      var ws = wkStart(-w);
+      var wn2 = isoWk(ws);
+      var yr2 = ws.getFullYear();
+      var wk = yr2 + '-W' + String(wn2).padStart(2,'0');
+      batch.set(ref.doc(wk), { objectif: defaultVal || 10, semaine: wk, auto: true });
+    }
+    batch.commit();
+  });
+}
+
+var weekGoalCache = {};
+function loadWeekObjectif(off, callback) {
+  var ws = wkStart(off);
+  var wn = isoWk(ws);
+  var yr = ws.getFullYear();
+  var weekKey = yr + '-W' + String(wn).padStart(2,'0');
+  if (weekGoalCache[weekKey] !== undefined) { callback(weekGoalCache[weekKey]); return; }
+  db.collection('crm_config').doc('objectifs_historique').collection('semaines').doc(weekKey).get()
+    .then(function(doc) {
+      var val = doc.exists ? (doc.data().objectif || goalWeek) : goalWeek;
+      weekGoalCache[weekKey] = val;
+      callback(val);
+    }).catch(function() { callback(goalWeek); });
 }
 
 // ════════════════════════════════════════════════════════
