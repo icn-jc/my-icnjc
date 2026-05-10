@@ -792,17 +792,17 @@ function renderRankingOnly(wkGoal) {
       .then(function(doc) {
         var frozenGoal = doc.exists ? (doc.data().objectif || goalWeek) : goalWeek;
         if (goalCfgEl) goalCfgEl.innerHTML =
-          '<div style="display:flex;align-items:center;gap:10px">' +
-            '<div><div style="font-size:11px;color:var(--text-secondary)">Objectif fixé cette semaine-là</div>' +
-            '<div style="font-size:22px;font-weight:700;color:var(--navy)">' + frozenGoal + '</div></div>' +
-            '<div style="font-size:11px;color:var(--text-tertiary);background:#f1f5f9;padding:4px 10px;border-radius:99px">🔒 Figé</div>' +
-          '</div>';
+          '<div><div class="goal-cfg-lbl">Objectif semaine ' + wnCaGoal + ' (figé)</div>' +
+          '<div style="display:flex;align-items:center;gap:8px">' +
+            '<div class="goal-cfg-val">' + frozenGoal + '</div>' +
+            '<span style="font-size:11px;color:var(--text-tertiary);background:#f1f5f9;padding:3px 8px;border-radius:99px">🔒</span>' +
+          '</div></div>';
         if (btnEditGoal) btnEditGoal.style.display = 'none';
       });
   } else {
     if (goalCfgEl) goalCfgEl.innerHTML =
-      '<div><div style="font-size:11px;color:var(--text-secondary)">Objectif semaine en cours</div>' +
-      '<div style="font-size:22px;font-weight:700;color:var(--navy)" id="goal-display">' + goalWeek + '</div></div>';
+      '<div><div class="goal-cfg-lbl">Objectif semaine en cours</div>' +
+      '<div class="goal-cfg-val" id="goal-display">' + goalWeek + '</div></div>';
     if (btnEditGoal) btnEditGoal.style.display = IS_CA ? 'flex' : 'none';
   }
   var range = getRankingRange ? getRankingRange() : {from:wkStart(off),to:wkEnd(off)};
@@ -1159,17 +1159,17 @@ function renderCA() {
       .then(function(doc) {
         var frozenGoal = doc.exists ? (doc.data().objectif || goalWeek) : goalWeek;
         if (goalCfgEl) goalCfgEl.innerHTML =
-          '<div style="display:flex;align-items:center;gap:10px">' +
-            '<div><div style="font-size:11px;color:var(--text-secondary)">Objectif fixé cette semaine-là</div>' +
-            '<div style="font-size:22px;font-weight:700;color:var(--navy)">' + frozenGoal + '</div></div>' +
-            '<div style="font-size:11px;color:var(--text-tertiary);background:#f1f5f9;padding:4px 10px;border-radius:99px">🔒 Figé</div>' +
-          '</div>';
+          '<div><div class="goal-cfg-lbl">Objectif semaine ' + wnCaGoal + ' (figé)</div>' +
+          '<div style="display:flex;align-items:center;gap:8px">' +
+            '<div class="goal-cfg-val">' + frozenGoal + '</div>' +
+            '<span style="font-size:11px;color:var(--text-tertiary);background:#f1f5f9;padding:3px 8px;border-radius:99px">🔒</span>' +
+          '</div></div>';
         if (btnEditGoal) btnEditGoal.style.display = 'none';
       });
   } else {
     if (goalCfgEl) goalCfgEl.innerHTML =
-      '<div><div style="font-size:11px;color:var(--text-secondary)">Objectif semaine en cours</div>' +
-      '<div style="font-size:22px;font-weight:700;color:var(--navy)" id="goal-display">' + goalWeek + '</div></div>';
+      '<div><div class="goal-cfg-lbl">Objectif semaine en cours</div>' +
+      '<div class="goal-cfg-val" id="goal-display">' + goalWeek + '</div></div>';
     if (btnEditGoal) btnEditGoal.style.display = IS_CA ? 'flex' : 'none';
   }
   var inactiveEmails = allUsers.filter(function(u) { return !u.prospecte; }).map(function(u) { return u.email; });
@@ -2081,11 +2081,6 @@ function renderLineChart(cid, datasets, labels) {
   // Dataset lines + dots
   datasets.forEach(function(ds) {
     if (!ds.vals || ds.vals.length === 0) return;
-    // Area fill
-    var areaPath = 'M ' + px(0) + ' ' + py(ds.vals[0]);
-    ds.vals.forEach(function(v, i) { if (i > 0) areaPath += ' L ' + px(i) + ' ' + py(v); });
-    areaPath += ' L ' + px(ds.vals.length-1) + ' ' + (PT+gH) + ' L ' + px(0) + ' ' + (PT+gH) + ' Z';
-    svg += '<path d="' + areaPath + '" fill="' + ds.color + '" opacity="0.08"/>';
     // Line
     var linePath = 'M ' + px(0) + ' ' + py(ds.vals[0]);
     ds.vals.forEach(function(v, i) { if (i > 0) linePath += ' L ' + px(i) + ' ' + py(v); });
