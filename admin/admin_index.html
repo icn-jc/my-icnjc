@@ -121,7 +121,7 @@
       <div class="form-field full">
         <label class="input-label">Rôles (plusieurs possibles — le plus élevé définit les accès)</label>
         <div class="roles-checkboxes" id="add-roles-checks"></div>
-        <div class="hierarchy-note">Hiérarchie : Super Admin > Président > VP > Trésorier > Secrétaire > Resp. Commercial > Resp. Qualité > Resp. Marketing > Trésorerie > Auditeur > Marketing > Commercial > Intervenant</div>
+        <div class="hierarchy-note">Hiérarchie : Super Admin > Président > VP > Trésorier > Secrétaire > Resp. Commercial > Resp. Qualité > Resp. Marketing > Trésorerie > Auditeur > Marketing > Commercial > Intervenant > Membre COS</div>
       </div>
       <div class="form-field">
         <label class="input-label">Prospecte ?</label>
@@ -163,7 +163,7 @@
       <div class="form-field full">
         <label class="input-label">Rôles</label>
         <div class="roles-checkboxes" id="edit-roles-checks"></div>
-        <div class="hierarchy-note">Hiérarchie : Super Admin > Président > VP > Trésorier > Secrétaire > Resp. Commercial > Resp. Qualité > Resp. Marketing > Trésorerie > Auditeur > Marketing > Commercial > Intervenant</div>
+        <div class="hierarchy-note">Hiérarchie : Super Admin > Président > VP > Trésorier > Secrétaire > Resp. Commercial > Resp. Qualité > Resp. Marketing > Trésorerie > Auditeur > Marketing > Commercial > Intervenant > Membre COS</div>
       </div>
       <div class="form-field">
         <label class="input-label">Prospecte ?</label>
@@ -198,13 +198,14 @@ const ROLE_LABELS = {
   marketing:             'Marketing',
   commercial:            'Commercial',
   intervenant:           'Intervenant',
+  membre_cos:            'Membre COS',
 };
 
 // Ordre hiérarchique (index 0 = le plus élevé)
 const ROLE_HIERARCHY = [
   'super_admin','president','vice_president','tresorier','secretaire',
   'responsable_commercial','responsable_qualite','responsable_marketing',
-  'tresorerie','auditeur','marketing','commercial','intervenant'
+  'tresorerie','auditeur','marketing','commercial','intervenant','membre_cos'
 ];
 
 // Prend le rôle le plus élevé parmi un tableau de rôles
