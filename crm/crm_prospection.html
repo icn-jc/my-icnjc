@@ -149,6 +149,8 @@ tr:hover td{background:rgba(27,42,74,0.02);}
 .s-negociation{background:#fce7f3;color:#831843;}
 .s-signe{background:#dcfce7;color:#14532d;}
 .s-perdu{background:#fee2e2;color:#7f1d1d;}
+.s-pasreponse{background:#f1f5f9;color:#475569;}
+.s-rappeldemande{background:#fef3c7;color:#92400e;}
 select.cell-sel{border:1px solid var(--border);background:var(--white);font-family:'Sora',sans-serif;font-size:11px;cursor:pointer;border-radius:var(--radius-sm);padding:2px 4px;}
 td[contenteditable=true]:hover{background:rgba(163,33,95,0.04);border-radius:3px;cursor:text;}
 .del-btn{background:var(--danger-bg);color:var(--danger);padding:3px 7px;border-radius:var(--radius-sm);font-size:11px;border:none;cursor:pointer;}
@@ -158,6 +160,13 @@ td[contenteditable=true]:hover{background:rgba(163,33,95,0.04);border-radius:3px
 
 /* ── RDV grid ── */
 .rdv-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px;}
+.rdv-grid.compact{grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px;}
+.rdv-grid.compact .rdv-card{padding:10px 12px;}
+.rdv-grid.compact .rdv-field{display:none;}
+.rdv-grid.compact .rdv-reminder{display:none;}
+.rdv-grid.compact .rdv-owner{display:none;}
+.rdv-grid.compact .rdv-card-header{margin-bottom:4px;}
+.rdv-grid.compact .rdv-card-co{font-size:12px;}
 .rdv-card{background:var(--bg-card);border-radius:var(--radius-lg);padding:16px;border:1px solid var(--border);cursor:pointer;transition:box-shadow .15s;}
 .rdv-card:hover{box-shadow:var(--shadow-md);}
 .rdv-card.rdv-upcoming{border-left:3px solid #f59e0b;}
@@ -277,7 +286,7 @@ td[contenteditable=true]:hover{background:rgba(163,33,95,0.04);border-radius:3px
           <div id="wn-ca"></div>
           <div class="goal-cfg">
             <div><div class="goal-cfg-lbl">Objectif / semaine</div><div class="goal-cfg-by" id="goal-by">—</div></div>
-            <div><div class="goal-cfg-val" id="goal-display">10</div><div style="font-size:11px;color:var(--text-tertiary)">contacts valorisés</div></div>
+            <div><div class="goal-cfg-val" id="goal-display">10</div></div>
             <button class="goal-edit-btn" id="btn-edit-goal" onclick="openGoalModal()" style="display:none">✏ Modifier</button>
           </div>
         </div>
@@ -353,11 +362,26 @@ td[contenteditable=true]:hover{background:rgba(163,33,95,0.04);border-radius:3px
 
       <!-- ═══════════════ APRÈS RDV ═══════════════ -->
       <div class="tab-pane" id="pane-rdv">
-        <div class="flex justify-between items-center" style="margin-bottom:14px;flex-wrap:wrap;gap:8px;">
+        <div class="flex justify-between items-center" style="margin-bottom:10px;flex-wrap:wrap;gap:8px;">
           <div style="display:flex;gap:14px;font-size:12px;color:var(--text-tertiary);align-items:center;flex-wrap:wrap;">
-            <span>🟡 RDV à venir</span><span>🔴 En attente mise à jour</span><span>🟢 Mis à jour</span>
+            <span>🟡 À venir</span><span>🔴 En attente MAJ</span><span>🟢 Mis à jour</span>
           </div>
           <button class="btn btn-primary btn-sm" onclick="openAddRdv()">+ Ajouter manuellement</button>
+        </div>
+        <div class="toolbar" style="margin-bottom:12px">
+          <input type="text" id="f-rdv-search" placeholder="🔍 Entreprise, notes…" oninput="renderRdv()" style="padding:6px 10px;border-radius:var(--radius-md);border:1.5px solid var(--border-strong);font-family:'Sora',sans-serif;font-size:12px;background:var(--white);"/>
+          <select id="f-rdv-member" onchange="renderRdv()" style="padding:6px 10px;border-radius:var(--radius-md);border:1.5px solid var(--border-strong);font-family:'Sora',sans-serif;font-size:12px;background:var(--white);" class="ca-only" style="display:none"><option value="">Tous les membres</option></select>
+          <select id="f-rdv-status" onchange="renderRdv()" style="padding:6px 10px;border-radius:var(--radius-md);border:1.5px solid var(--border-strong);font-family:'Sora',sans-serif;font-size:12px;background:var(--white);">
+            <option value="">Tous statuts</option>
+            <option value="upcoming">🟡 À venir</option>
+            <option value="pending">🔴 En attente MAJ</option>
+            <option value="done">🟢 Mis à jour</option>
+          </select>
+          <input type="date" id="f-rdv-from" onchange="renderRdv()" style="padding:6px 10px;border-radius:var(--radius-md);border:1.5px solid var(--border-strong);font-size:12px;background:var(--white);" title="Date début"/>
+          <input type="date" id="f-rdv-to" onchange="renderRdv()" style="padding:6px 10px;border-radius:var(--radius-md);border:1.5px solid var(--border-strong);font-size:12px;background:var(--white);" title="Date fin"/>
+          <button class="btn btn-secondary btn-sm" onclick="clearRdvFilters()">Réinitialiser</button>
+          <button class="btn btn-secondary btn-sm" id="btn-compact-rdv" onclick="toggleCompactRdv()">⊟ Compact</button>
+          <span style="font-size:11px;color:var(--text-tertiary);font-style:italic" id="f-rdv-note"></span>
         </div>
         <div id="rdv-reminders" style="margin-bottom:14px"></div>
         <div class="rdv-grid" id="rdv-grid"></div>
@@ -484,7 +508,7 @@ td[contenteditable=true]:hover{background:rgba(163,33,95,0.04);border-radius:3px
   <div class="modal-box" style="max-width:380px">
     <div class="modal-header"><div class="modal-title">Objectif de prospection</div><button class="modal-close" onclick="closeGoalModal()">×</button></div>
     <div class="form-field" style="padding:8px 0">
-      <label class="input-label">Contacts valorisés / semaine<br><span style="font-size:10px;color:var(--text-tertiary)">"Contacté" ou plus — "À contacter" ne compte pas</span></label>
+      <label class="input-label">Objectif de contacts / semaine</label>
       <input class="input" type="number" id="goal-input" min="1" max="100" value="10"/>
     </div>
     <div class="modal-actions">
@@ -540,13 +564,14 @@ td[contenteditable=true]:hover{background:rgba(163,33,95,0.04);border-radius:3px
 var CRM_CA_ROLES = ['super_admin','president','vice_president','tresorier','responsable_commercial','responsable_qualite','secretaire'];
 
 // Statuts dans l'ordre logique du pipeline
-var STATUTS = ['À contacter','Contacté','RDV planifié','RDV effectué','Proposition envoyée','Négociation','Signé','Perdu'];
+var STATUTS = ['À contacter','Pas de réponse','Rappel demandé','Contacté','RDV planifié','RDV effectué','Proposition envoyée','Négociation','Signé','Perdu'];
 
 // Statuts qui comptent dans les KPI (valorisés)
-var STATUTS_VALORISES = ['Contacté','RDV planifié','RDV effectué','Proposition envoyée','Négociation','Signé'];
+var STATUTS_VALORISES = ['Contacté','Rappel demandé','RDV planifié','RDV effectué','Proposition envoyée','Négociation','Signé'];
 
 // Classes CSS par statut
 var ST_CSS = {
+  'Pas de réponse':'s-pasreponse','Rappel demandé':'s-rappeldemande',
   'À contacter':'s-acontacter','Contacté':'s-contacte',
   'RDV planifié':'s-rdvplanifie','RDV effectué':'s-rdveffectue',
   'Proposition envoyée':'s-proposition','Négociation':'s-negociation',
@@ -555,6 +580,8 @@ var ST_CSS = {
 
 // Couleurs kanban par statut
 var ST_COL = {
+  'Pas de réponse':{bg:'#f1f5f9',c:'#475569'},
+  'Rappel demandé':{bg:'#fef3c7',c:'#92400e'},
   'À contacter':{bg:'#e0f2fe',c:'#0c4a6e'},
   'Contacté':{bg:'#ede9fe',c:'#4c1d95'},
   'RDV planifié':{bg:'#fef3c7',c:'#78350f'},
@@ -656,6 +683,8 @@ function refreshAll() {
   renderAll();
   renderRdv();
   if (IS_CA) renderCA();
+  // Init RDV member filter once users loaded
+  if (allUsers.length > 0 && IS_CA) initRdvFilters();
   // Rafraîchir panel si ouvert
   if (curProspectId) {
     var p = allProspects.find(function(x) { return x.id === curProspectId; });
@@ -667,12 +696,16 @@ function refreshAll() {
 // HELPERS DATES / SEMAINE ISO
 // ════════════════════════════════════════════════════════
 function wkStart(off) {
-  var d = new Date(); var dy = d.getDay();
-  d.setDate(d.getDate() - dy + (dy === 0 ? -6 : 1) + off * 7);
-  d.setHours(0,0,0,0); return d;
+  // Semaine lundi→dimanche
+  var d = new Date(); d.setHours(0,0,0,0);
+  var dy = d.getDay(); // 0=dim,1=lun,...,6=sam
+  var diffToMonday = (dy === 0) ? -6 : 1 - dy; // nb jours pour revenir au lundi
+  d.setDate(d.getDate() + diffToMonday + off * 7);
+  return d;
 }
 function wkEnd(off) { var d = wkStart(off); d.setDate(d.getDate() + 7); return d; }
 function isoWk(d) {
+  // Numéro de semaine ISO 8601 (lundi = début de semaine)
   var dt = new Date(d); dt.setHours(0,0,0,0);
   dt.setDate(dt.getDate() + 3 - (dt.getDay() + 6) % 7);
   var w1 = new Date(dt.getFullYear(), 0, 4);
@@ -736,11 +769,16 @@ function switchApTab(key) {
 // LOGIQUE MÉTIER — OBJECTIFS
 // ════════════════════════════════════════════════════════
 function countVal(email, off) {
-  // Un contact est valorisé si statut != "À contacter" ET last_contact_at dans la semaine
+  // Valorisé = au moins une action cette semaine avec statut valorisable
+  // "Pas de réponse" ne compte jamais
+  // "Perdu" compte seulement si au moins un statut valorisable dans l'historique
   return allProspects.filter(function(p) {
-    return p.owner_email === email &&
-           STATUTS_VALORISES.includes(p.status) &&
-           inWk(p.last_contact_at, off);
+    if (p.owner_email !== email) return false;
+    if (!inWk(p.last_contact_at, off)) return false;
+    if (p.status === 'À contacter' || p.status === 'Pas de réponse') return false;
+    // Perdu : vérifier qu'il y a eu au moins un statut valorisable avant
+    if (p.status === 'Perdu') return p.had_valuable_contact === true;
+    return STATUTS_VALORISES.includes(p.status);
   }).length;
 }
 
@@ -842,9 +880,9 @@ function renderMine() {
   var bt = isPast ? (wkCnt >= goalWeek ? '✅ Objectif atteint' : '❌ Objectif manqué') : (wkCnt >= goalWeek ? '🎯 Objectif atteint !' : wkCnt >= goalWeek * 0.5 ? '⚡ Bon rythme' : '🔴 Accélère !');
   document.getElementById('mine-goal-hero').innerHTML =
     '<div class="goal-hero">' +
-      '<div class="gh-text"><div class="gh-title">Objectif semaine</div>' +
+      '<div class="gh-text"><div class="gh-title" style="display:flex;align-items:center;gap:6px">Objectif semaine <button onclick="openReglementModal()" style="background:rgba(255,255,255,0.2);border:none;border-radius:50%;width:18px;height:18px;font-size:11px;cursor:pointer;color:white;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-family:serif">ℹ</button></div>' +
       '<div class="gh-count">' + wkCnt + ' <span style="font-size:15px;opacity:.6">/ ' + goalWeek + '</span></div>' +
-      '<div class="gh-sub">contacts valorisés (statut ≥ Contacté)</div></div>' +
+      '<div class="gh-sub">contacts cette semaine</div></div>' +
       '<div class="gh-prog-wrap"><div style="font-size:10px;opacity:.6;text-align:right">' + pct + '%</div>' +
       '<div class="gh-prog-bg"><div class="gh-prog-fill" style="width:' + pct + '%"></div></div></div>' +
       '<div class="gh-badge ' + bc + '">' + bt + '</div>' +
@@ -961,34 +999,41 @@ function syncScrollAll() {
 // ════════════════════════════════════════════════════════
 function renderRdv() {
   var today = new Date(); today.setHours(0,0,0,0);
+  var canDelRdv = ['super_admin','president','vice_president','responsable_commercial'].includes(MY_ROLE);
 
-  // RDV auto-générés depuis prospects avec rdv_date
-  var autoRdvs = allProspects.filter(function(p) {
-    return p.rdv_date && (IS_CA || p.owner_email === ME);
-  }).map(function(p) {
-    return { id: 'auto_' + encId(p.id), entreprise: p.company_name, date: p.rdv_date,
-      signe: p.rdv_status || '', auto: true, prospect_id: p.id,
-      owner_name: p.owner_name, owner_email: p.owner_email };
-  });
+  // Source unique = prospects_rdv (plus d'auto-génération depuis rdv_date)
+  var all2 = IS_CA ? allRdvs : allRdvs.filter(function(r) { return r.owner_email === ME; });
+  all2 = all2.slice().sort(function(a, b) { return (a.date||'').localeCompare(b.date||''); });
 
-  // RDV manuels
-  var manRdvs = IS_CA ? allRdvs : allRdvs.filter(function(r) { return r.owner_email === ME; });
+  // Filtres
+  var fRdvSearch = (document.getElementById('f-rdv-search') ? document.getElementById('f-rdv-search').value || '' : '').toLowerCase();
+  var fRdvMember = document.getElementById('f-rdv-member') ? document.getElementById('f-rdv-member').value || '' : '';
+  var fRdvStatus = document.getElementById('f-rdv-status') ? document.getElementById('f-rdv-status').value || '' : '';
+  var fRdvFrom = document.getElementById('f-rdv-from') ? document.getElementById('f-rdv-from').value || '' : '';
+  var fRdvTo = document.getElementById('f-rdv-to') ? document.getElementById('f-rdv-to').value || '' : '';
+  if (fRdvSearch) all2 = all2.filter(function(r) { return (r.entreprise||'').toLowerCase().includes(fRdvSearch) || (r.demande||'').toLowerCase().includes(fRdvSearch) || (r.suite||'').toLowerCase().includes(fRdvSearch); });
+  if (fRdvMember) all2 = all2.filter(function(r) { return r.owner_email === fRdvMember; });
+  if (fRdvFrom) all2 = all2.filter(function(r) { return (r.date||'') >= fRdvFrom; });
+  if (fRdvTo) all2 = all2.filter(function(r) { return (r.date||'') <= fRdvTo; });
+  if (fRdvStatus === 'upcoming') all2 = all2.filter(function(r) { var rd=new Date(r.date);rd.setHours(0,0,0,0);return rd>=today; });
+  if (fRdvStatus === 'pending') all2 = all2.filter(function(r) { var rd=new Date(r.date);rd.setHours(0,0,0,0);return rd<today&&!r.signe; });
+  if (fRdvStatus === 'done') all2 = all2.filter(function(r) { return r.signe&&r.signe!==''; });
 
   // Reminders — RDV passés sans mise à jour
-  var reminders = autoRdvs.filter(function(r) {
+  var reminders = allRdvs.filter(function(r) {
+    if (!IS_CA && r.owner_email !== ME) return false;
     var rd = new Date(r.date); rd.setHours(0,0,0,0);
-    return rd < today && !r.signe;
+    return rd < today && (!r.signe || r.signe === '');
   });
   document.getElementById('rdv-reminders').innerHTML = reminders.length > 0 ?
     '<div class="alert-strip"><div class="alert-strip-title">🔔 ' + reminders.length + ' RDV passé(s) en attente de mise à jour</div><div class="alert-chips">' +
     reminders.map(function(r) { return '<div class="alert-chip">📅 ' + r.entreprise + ' (' + fmtD(r.date) + ')</div>'; }).join('') +
     '</div></div>' : '';
 
-  var all2 = autoRdvs.concat(manRdvs.map(function(r) { return Object.assign({}, r, {auto:false}); }));
-  all2.sort(function(a, b) { return (a.date||'').localeCompare(b.date||''); });
-
+  var fNote = document.getElementById('f-rdv-note');
+  if (fNote) fNote.innerText = all2.length < allRdvs.length ? 'Affichage de ' + all2.length + ' / ' + allRdvs.length : '';
   if (all2.length === 0) {
-    document.getElementById('rdv-grid').innerHTML = '<div style="color:var(--text-tertiary);font-size:13px">Aucun RDV planifié.</div>';
+    document.getElementById('rdv-grid').innerHTML = '<div style="color:var(--text-tertiary);font-size:13px">Aucun RDV pour ces filtres.</div>';
     return;
   }
 
@@ -1012,7 +1057,9 @@ function renderRdv() {
       (r.notes_apres ? '<div class="rdv-field"><div class="rdv-field-lbl">Notes après RDV</div><div class="rdv-field-val">' + r.notes_apres + '</div></div>' : '') +
       (r.next ? '<div class="rdv-field"><div class="rdv-field-lbl">Prochaine étape</div><div class="rdv-field-val">' + r.next + '</div></div>' : '') +
       (!isPast && rd ? '<div class="rdv-reminder">🔔 RDV dans ' + Math.ceil((rd-today)/864e5) + ' jour(s)</div>' : '') +
-      '<div class="rdv-owner">👤 ' + (r.owner_name||r.owner_email||'') + '</div>' +
+      '<div class="rdv-owner" style="display:flex;align-items:center;justify-content:space-between">👤 ' + (r.owner_name||r.owner_email||'') +
+      (canDelRdv ? ' <button class="del-btn" onclick="event.stopPropagation();delRdv(\''+encId(r.id)+'\')" style="font-size:10px;padding:2px 6px">✕</button>' : '') +
+      '</div>' +
     '</div>';
   }).join('');
 }
@@ -1166,6 +1213,10 @@ function saveAction() {
   db.collection('prospects').doc(curProspectId).collection('actions').add(actionEntry).then(function() {
     // Mettre à jour le prospect (statut dérivé de l'action)
     var prospUpdate = { last_contact_at: date, updated_at: firebase.firestore.FieldValue.serverTimestamp() };
+    // Marquer qu'il y a eu un contact valorisable si applicable
+    if (result && STATUTS_VALORISES.includes(result) && result !== 'Perdu') {
+      prospUpdate.had_valuable_contact = true;
+    }
     if (result) prospUpdate.status = result;
     if (priority) prospUpdate.priority = priority;
     if (rdvDate) { prospUpdate.rdv_date = rdvDate; prospUpdate.rdv_status = ''; }
@@ -1176,17 +1227,38 @@ function saveAction() {
       // Si RDV planifié → créer/MAJ entrée dans prospects_rdv
       if (result === 'RDV planifié' && rdvDate && curProspect) {
         var pid = curProspectId;
-        db.collection('prospects_rdv').where('prospect_id', '==', pid).get().then(function(snap) {
-          var rdvData = {
-            entreprise: curProspect.company_name || '',
-            date: rdvDate, prospect_id: pid,
-            owner_email: ME, owner_name: MY_NAME,
-            signe: '', rdv_status: '', auto_generated: true,
-            updated_at: firebase.firestore.FieldValue.serverTimestamp()
-          };
-          if (snap.empty) db.collection('prospects_rdv').add(rdvData);
-          else db.collection('prospects_rdv').doc(snap.docs[0].id).update(rdvData);
-        });
+        var rdvData = {
+          entreprise: curProspect.company_name || '',
+          date: rdvDate, prospect_id: pid,
+          owner_email: ME, owner_name: MY_NAME,
+          signe: '', rdv_status: '',
+          updated_at: firebase.firestore.FieldValue.serverTimestamp()
+        };
+        checkRdvConflict(pid, rdvDate,
+          function() {
+            // Pas de conflit — créer directement
+            db.collection('prospects_rdv').add(rdvData);
+          },
+          function(conflicts) {
+            // Conflit détecté
+            var conflictDate = fmtD(conflicts[0].date);
+            var choice = confirm(
+              '⚠️ Ce prospect a déjà un RDV planifié le ' + conflictDate + '.
+
+' +
+              'Cliquez OK pour conserver les DEUX rendez-vous.
+' +
+              'Cliquez Annuler pour REMPLACER l'ancien par le nouveau.'
+            );
+            if (choice) {
+              // Conserver les deux
+              db.collection('prospects_rdv').add(rdvData);
+            } else {
+              // Remplacer l'ancien
+              db.collection('prospects_rdv').doc(conflicts[0].id).update(rdvData);
+            }
+          }
+        );
       }
     });
 
@@ -1464,6 +1536,65 @@ function clearFilters() {
   renderAll();
 }
 
+// ── RDV helpers ──────────────────────────────────────────────────
+var rdvCompact = false;
+function toggleCompactRdv() {
+  rdvCompact = !rdvCompact;
+  document.getElementById('rdv-grid').classList.toggle('compact', rdvCompact);
+  document.getElementById('btn-compact-rdv').innerText = rdvCompact ? '⊞ Normal' : '⊟ Compact';
+}
+function clearRdvFilters() {
+  ['f-rdv-search','f-rdv-member','f-rdv-status','f-rdv-from','f-rdv-to'].forEach(function(id) {
+    var el = document.getElementById(id); if (el) el.value = '';
+  });
+  renderRdv();
+}
+function delRdv(id) {
+  if (!confirm('Supprimer ce compte-rendu RDV ?')) return;
+  db.collection('prospects_rdv').doc(id).delete();
+}
+
+// ── Populate RDV member filter (CA only) ──────────────────────────
+function initRdvFilters() {
+  if (!IS_CA) return;
+  var sel = document.getElementById('f-rdv-member');
+  if (!sel) return;
+  sel.style.display = '';
+  allUsers.forEach(function(u) {
+    var o = document.createElement('option');
+    o.value = u.email; o.text = (u.prenom||'') + ' ' + (u.nom||'');
+    sel.appendChild(o);
+  });
+}
+
+// ── Conflit RDV ───────────────────────────────────────────────────
+function checkRdvConflict(prospectId, newRdvDate, onNoConflict, onConflict) {
+  var today = new Date(); today.setHours(0,0,0,0);
+  var limitDate = new Date(today); limitDate.setDate(limitDate.getDate() + 30);
+  var newDate = new Date(newRdvDate); newDate.setHours(0,0,0,0);
+  // Chercher un RDV existant pour ce prospect dans les 30 prochains jours
+  db.collection('prospects_rdv').where('prospect_id','==',prospectId).get().then(function(snap) {
+    var conflicts = [];
+    snap.forEach(function(doc) {
+      var r = doc.data(); if (!r.date) return;
+      var rd = new Date(r.date); rd.setHours(0,0,0,0);
+      if (rd >= today && rd <= limitDate && r.date !== newRdvDate) {
+        conflicts.push({ id: doc.id, date: r.date, data: r });
+      }
+    });
+    if (conflicts.length === 0) { onNoConflict(); return; }
+    onConflict(conflicts);
+  }).catch(function() { onNoConflict(); });
+}
+
+// ── Règlement modal ────────────────────────────────────────────────
+function openReglementModal() {
+  document.getElementById('modal-reglement').classList.add('open');
+}
+function closeReglementModal() {
+  document.getElementById('modal-reglement').classList.remove('open');
+}
+
 function exportXLSX() {
   var data = IS_CA ? allProspects : allProspects.filter(function(p) { return p.owner_email === ME; });
   var rows = [['Entreprise','Contact','Poste','Email','Tél','Secteur','Source','Montant HT','Statut','Priorité','Tags','Responsable','Dernier contact','Prochaine relance','Notes']];
@@ -1479,5 +1610,36 @@ function exportXLSX() {
   XLSX.writeFile(wb, 'Prospection_ICN_JC.xlsx');
 }
 </script>
+
+<!-- MODAL RÈGLEMENT PROSPECTION -->
+<div class="modal-overlay" id="modal-reglement" onclick="if(event.target===this)closeReglementModal()">
+  <div class="modal-box" style="max-width:520px">
+    <div class="modal-header">
+      <div class="modal-title">📋 Règlement de prospection</div>
+      <button class="modal-close" onclick="closeReglementModal()">×</button>
+    </div>
+    <div style="font-size:13px;color:var(--text-secondary);line-height:1.7;padding:4px 0">
+      <p style="font-weight:600;color:var(--navy);margin-bottom:8px">🎯 Objectif hebdomadaire</p>
+      <p>Chaque membre prospecteur doit atteindre l'objectif fixé en contacts par semaine (lundi → dimanche).</p>
+      <p style="font-weight:600;color:var(--navy);margin-bottom:8px;margin-top:16px">✅ Qu'est-ce qu'un contact valorisable ?</p>
+      <p>Un contact compte dans l'objectif si tu as obtenu <strong>au moins une réponse</strong> du prospect cette semaine.</p>
+      <ul style="margin:8px 0 0 16px;display:flex;flex-direction:column;gap:4px">
+        <li>✅ <strong>Contacté</strong> — premier contact avec réponse</li>
+        <li>✅ <strong>Rappel demandé</strong> — le prospect a répondu et demande un rappel</li>
+        <li>✅ <strong>RDV planifié / effectué</strong></li>
+        <li>✅ <strong>Proposition envoyée / Négociation / Signé</strong></li>
+        <li>✅ <strong>Perdu</strong> — si au moins un contact valorisable a eu lieu avant</li>
+        <li>❌ <strong>À contacter</strong> — pas encore de contact</li>
+        <li>❌ <strong>Pas de réponse</strong> — tu as essayé mais pas de retour</li>
+      </ul>
+      <p style="font-weight:600;color:var(--navy);margin-bottom:8px;margin-top:16px">📅 Semaines</p>
+      <p>Les semaines vont du <strong>lundi au dimanche</strong> (semaine ISO). La navigation ← → permet de consulter les semaines précédentes.</p>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-primary" onclick="closeReglementModal()">Compris ✓</button>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>
