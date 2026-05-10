@@ -6,7 +6,7 @@
 function buildNavItems(role, basePath) {
   const ALL = ['super_admin','president','vice_president','tresorier','secretaire',
                'responsable_commercial','responsable_qualite','responsable_marketing',
-               'tresorerie','auditeur','marketing','commercial'];
+               'tresorerie','auditeur','marketing','commercial','membre_cos'];
   const all = [
     { section: null, key:'home', label:'Accueil', icon:'home',
       href: basePath + 'index.html', roles: ALL },
@@ -30,7 +30,10 @@ function buildNavItems(role, basePath) {
              'secretaire','marketing','responsable_marketing','auditeur','commercial'] },
 
     { section:'CRM', key:'crm_prospection', label:'Prospection', icon:'target',
-      href: basePath + 'crm/crm_prospection.html', roles: ALL },
+      href: basePath + 'crm/crm_prospection.html',
+      roles:['super_admin','president','vice_president','tresorier','secretaire',
+             'responsable_commercial','responsable_qualite','responsable_marketing',
+             'tresorerie','auditeur','marketing','commercial','membre_cos'] },
 
     { section:null, key:'crm_clients', label:'Clients', icon:'briefcase',
       href: basePath + 'crm/crm_clients.html',
@@ -58,6 +61,9 @@ function buildNavItems(role, basePath) {
     { section:'ADMIN', key:'admin', label:'Administration', icon:'settings',
       href: basePath + 'admin/admin_index.html',
       roles:['super_admin','president'] },
+    { section:null, key:'mandats', label:'Historique mandats', icon:'archive',
+      href: basePath + 'admin/mandats.html',
+      roles:['super_admin'] },
   ];
 
   return all.filter(item => item.roles.includes(role));
