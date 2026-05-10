@@ -122,7 +122,7 @@
 .chart-lbl{font-size:9px;color:var(--text-tertiary);margin-top:4px;white-space:nowrap;}
 /* Line chart SVG */
 .line-chart-wrap{width:100%;overflow-x:auto;}
-.line-chart-wrap svg{display:block;}
+.line-chart-wrap svg{display:block;width:100%;}
 .chart-legend{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;}
 .legend-item{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text-secondary);}
 .legend-dot{width:10px;height:10px;border-radius:2px;flex-shrink:0;}
@@ -381,7 +381,13 @@ td[contenteditable=true]:hover{background:rgba(163,33,95,0.04);border-radius:3px
           <button class="btn btn-secondary btn-sm" onclick="renderMineChart()">Afficher</button>
         </div>
         <div class="person-sel" id="person-sel-mine"></div>
-        <div class="chart-card" id="chart-mine" style="margin-bottom:20px"></div>
+        <div id="chart-mine-wrap" style="margin-bottom:20px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+            <span style="font-size:11px;font-weight:600;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:.08em">Évolution</span>
+            <button id="btn-toggle-chart-mine" onclick="toggleMineChart()" style="background:none;border:1px solid var(--border);border-radius:var(--radius-md);padding:3px 10px;font-size:11px;cursor:pointer;color:var(--text-secondary);font-family:'Sora',sans-serif">⊟ Rétracter</button>
+          </div>
+          <div class="chart-card" id="chart-mine" style="width:100%;box-sizing:border-box"></div>
+        </div>
         <div class="sec-title" style="flex-wrap:wrap;gap:8px">
           Mon portefeuille
           <button onclick="openNotice('notice-portefeuille')" style="background:none;border:none;cursor:pointer;font-size:13px;color:var(--text-tertiary);padding:0" title="À propos du portefeuille">ℹ️</button>
@@ -437,6 +443,12 @@ td[contenteditable=true]:hover{background:rgba(163,33,95,0.04);border-radius:3px
             <option>À contacter</option><option>Contacté</option><option>RDV planifié</option>
             <option>RDV effectué</option><option>Proposition envoyée</option>
             <option>Négociation</option><option>Signé</option><option>Perdu</option>
+          </select>
+          <select id="f-priority" onchange="renderAll()">
+            <option value="">Priorité</option>
+            <option value="Haute">🔴 Haute</option>
+            <option value="Normale">🟡 Normale</option>
+            <option value="Basse">🟢 Basse</option>
           </select>
           <select id="f-secteur" onchange="renderAll()">
             <option value="">Secteur</option>
@@ -1576,6 +1588,7 @@ function renderAll() {
   var srch = (document.getElementById('srch-all').value||'').toLowerCase();
   var fm = document.getElementById('f-member').value;
   var fs = document.getElementById('f-statut').value;
+  var fp = document.getElementById('f-priority') ? document.getElementById('f-priority').value : '';
   var fse = document.getElementById('f-secteur').value;
   var isMe = function(p) { return p.owner_email === ME; };
   var data = allProspects.filter(function(p) {
@@ -1583,6 +1596,7 @@ function renderAll() {
     if (srch && !(p.company_name||'').toLowerCase().includes(srch) && !(p.contact_name||'').toLowerCase().includes(srch)) return false;
     if (fm && p.owner_email !== fm) return false;
     if (fs && p.status !== fs) return false;
+    if (fp && p.priority !== fp) return false;
     if (fse && p.sector !== fse) return false;
     return true;
   });
@@ -2332,9 +2346,24 @@ function renderMineChart() {
 // FILTRES & EXPORT
 // ════════════════════════════════════════════════════════
 function clearFilters() {
-  ['srch-all','f-member','f-statut','f-secteur'].forEach(function(i) { document.getElementById(i).value = ''; });
+  ['srch-all','f-member','f-statut','f-priority','f-secteur'].forEach(function(i) { document.getElementById(i).value = ''; });
   renderAll();
 }
+var mineChartVisible = true;
+function toggleMineChart() {
+  mineChartVisible = !mineChartVisible;
+  var card = document.getElementById('chart-mine');
+  var btn = document.getElementById('btn-toggle-chart-mine');
+  var selDiv = document.getElementById('person-sel-mine');
+  var periodDiv = document.getElementById('period-mine');
+  var drDiv = document.getElementById('dr-mine');
+  if (card) card.style.display = mineChartVisible ? 'block' : 'none';
+  if (selDiv) selDiv.style.display = mineChartVisible ? '' : 'none';
+  if (periodDiv) periodDiv.style.display = mineChartVisible ? '' : 'none';
+  if (drDiv) drDiv.style.display = mineChartVisible && periodDiv && periodDiv.querySelector('.period-btn.active') && periodDiv.querySelector('.period-btn.active').textContent === 'Date à date' ? 'flex' : 'none';
+  if (btn) btn.innerText = mineChartVisible ? '⊟ Rétracter' : '⊞ Afficher graphique';
+}
+
 function clearPfFilters() {
   ['pf-filter-statut','pf-filter-priority','pf-search','pf-filter-period','pf-date-from','pf-date-to'].forEach(function(id) {
     var el = document.getElementById(id); if (el) el.value = '';
