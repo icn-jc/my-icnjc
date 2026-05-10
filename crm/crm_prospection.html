@@ -295,6 +295,8 @@ td[contenteditable=true]:hover{background:rgba(163,33,95,0.04);border-radius:3px
         <div class="stats-row" id="ca-stats-week"></div>
         <div class="sec-title" style="margin-top:4px">Pipeline global</div>
         <div class="stats-row" id="ca-stats-pipeline"></div>
+        <div class="sec-title" style="margin-top:4px">Pipeline — période sélectionnée</div>
+        <div class="stats-row" id="ca-stats-pipeline-period"></div>
         <div class="flex items-center gap-3" style="margin-top:4px;flex-wrap:wrap;margin-bottom:8px">
           <div class="sec-title" style="margin-bottom:0;flex:none">Classement & Pipeline période</div>
           <div style="display:flex;gap:4px;flex-wrap:wrap" id="period-ca-stats"></div>
@@ -642,7 +644,7 @@ initAuth('crm_prospection', function(user, role, profile) {
     switchTab('ca');
   }
 
-  document.getElementById('af-date').value = now.toISOString().split('T')[0];
+  document.getElementById('af-date').value = localDateStr(now);
   initPeriods();
   initCAStatsPeriod();
   loadData();
@@ -749,12 +751,12 @@ function encId(id) { return (id||'').replace(/['"<>&]/g, ''); }
 function buildWeekNav(containerId, key) {
   var off = key === 'ca' ? weekOffCA : weekOffMine;
   var ws = wkStart(off);
-  var we = new Date(wkEnd(off).getTime() - 864e5);
+  var we = new Date(ws.getFullYear(), ws.getMonth(), ws.getDate() + 6); // dimanche = lundi + 6
   document.getElementById(containerId).innerHTML =
     '<div class="week-nav">' +
       '<button class="wn-btn" onclick="changeWeek(\'' + key + '\',-1)">‹</button>' +
       '<div><div class="wn-label">' + wkLabel(off) + '</div>' +
-      '<div class="wn-sub">' + fmtD(ws.toISOString().split('T')[0]) + ' → ' + fmtD(we.toISOString().split('T')[0]) + '</div></div>' +
+      '<div class="wn-sub">' + fmtD(localDateStr(ws)) + ' → ' + fmtD(localDateStr(we)) + '</div></div>' +
       '<button class="wn-btn" onclick="changeWeek(\'' + key + '\',1)"' + (off >= 0 ? ' disabled' : '') + '>›</button>' +
       (off !== 0 ? '<button class="wn-today" onclick="changeWeek(\'' + key + '\',' + (-off) + ')">Aujourd\'hui</button>' : '') +
     '</div>';
@@ -799,6 +801,68 @@ function countVal(email, off) {
     // Tous les autres statuts = valorisés
     return STATUTS_VALORISES.includes(p.status);
   }).length;
+}
+
+
+// ── Période classement ─────────────────────────────────────────
+var periodRanking = 'Cette semaine';
+var PERIODS_RANKING = ['Cette semaine','Mois en cours','Trimestre','Semestre','Année','Date à date'];
+
+function setPeriodRanking(p) {
+  periodRanking = p;
+  var dr = document.getElementById('dr-ca-stats');
+  if (dr) dr.style.display = p === 'Date à date' ? 'flex' : 'none';
+  var el = document.getElementById('period-ca-stats');
+  if (el) el.querySelectorAll('.period-btn').forEach(function(b) { b.classList.toggle('active', b.textContent === p); });
+  if (p !== 'Date à date') renderCA();
+}
+
+function getRankingRange() {
+  var today = new Date(); today.setHours(0,0,0,0);
+  if (periodRanking === 'Cette semaine') return { from: wkStart(weekOffCA), to: wkEnd(weekOffCA) };
+  if (periodRanking === 'Mois en cours') {
+    return { from: new Date(today.getFullYear(), today.getMonth(), 1), to: new Date(today.getFullYear(), today.getMonth() + 1, 1) };
+  }
+  if (periodRanking === 'Trimestre') {
+    var qm = Math.floor(today.getMonth() / 3) * 3;
+    return { from: new Date(today.getFullYear(), qm, 1), to: new Date(today.getFullYear(), qm + 3, 1) };
+  }
+  if (periodRanking === 'Semestre') {
+    var sm = today.getMonth() < 6 ? 0 : 6;
+    return { from: new Date(today.getFullYear(), sm, 1), to: new Date(today.getFullYear(), sm + 6, 1) };
+  }
+  if (periodRanking === 'Année') {
+    return { from: new Date(today.getFullYear(), 0, 1), to: new Date(today.getFullYear() + 1, 0, 1) };
+  }
+  if (periodRanking === 'Date à date') {
+    var f = document.getElementById('dr-cas-from');
+    var t = document.getElementById('dr-cas-to');
+    var fd = f && f.value ? new Date(f.value) : today;
+    var td = t && t.value ? new Date(t.value) : today; td.setDate(td.getDate() + 1);
+    return { from: fd, to: td };
+  }
+  return { from: wkStart(weekOffCA), to: wkEnd(weekOffCA) };
+}
+
+function countValPeriod(email, range) {
+  return allProspects.filter(function(p) {
+    if (p.owner_email !== email || !p.last_contact_at) return false;
+    var d = new Date(p.last_contact_at);
+    if (d < range.from || d >= range.to) return false;
+    if (p.status === 'À contacter') return false;
+    if (p.status === 'Pas de réponse') return p.had_valuable_contact === true;
+    if (p.status === 'Perdu') return p.had_valuable_contact === true;
+    return STATUTS_VALORISES.includes(p.status);
+  }).length;
+}
+
+// ── Init period ranking buttons ───────────────────────────────
+function initPeriodRanking() {
+  var el = document.getElementById('period-ca-stats');
+  if (!el) return;
+  el.innerHTML = PERIODS_RANKING.map(function(p) {
+    return '<button class="period-btn' + (p === 'Cette semaine' ? ' active' : '') + '" style="font-size:10px;padding:3px 8px" onclick="setPeriodRanking('' + p + '')">' + p + '</button>';
+  }).join('');
 }
 
 // ════════════════════════════════════════════════════════
@@ -856,9 +920,31 @@ function renderCA() {
     document.getElementById('ca-alerts').innerHTML = '';
   }
 
-  // Classement
+  // Pipeline période sélectionnée
+  var range = getRankingRange();
+  var pipPeriod = allProspects.filter(function(p) {
+    if (p.status === 'Perdu' || p.status === 'À contacter') return false;
+    if (!p.last_contact_at) return false;
+    var d = new Date(p.last_contact_at); return d >= range.from && d < range.to;
+  }).reduce(function(a, p) { return a + (parseFloat(p.estimated_amount)||0); }, 0);
+  var pipPeriodFiable = allProspects.filter(function(p) {
+    if (p.status === 'Perdu' || p.status === 'À contacter') return false;
+    if (!p.last_contact_at || inactiveEmails.includes(p.owner_email)) return false;
+    var d = new Date(p.last_contact_at); return d >= range.from && d < range.to;
+  }).reduce(function(a, p) { return a + (parseFloat(p.estimated_amount)||0); }, 0);
+  var signesPeriod = allProspects.filter(function(p) {
+    if (p.status !== 'Signé' || !p.last_contact_at) return false;
+    var d = new Date(p.last_contact_at); return d >= range.from && d < range.to;
+  }).length;
+  var ppHtml = kpiCard('Pipeline période', fmtM(pipPeriod), '') +
+    kpiCard('Fiable période', fmtM(pipPeriodFiable), 'kc-success') +
+    kpiCard('Signés période', signesPeriod, 'kc-success');
+  var ppEl = document.getElementById('ca-stats-pipeline-period');
+  if (ppEl) ppEl.innerHTML = ppHtml;
+
+  // Classement — basé sur la période sélectionnée
   var ranked = activeProspectors.map(function(u) {
-    return { u: u, n: countVal(u.email, off), tot: allProspects.filter(function(p) { return p.owner_email === u.email; }).length };
+    return { u: u, n: countValPeriod(u.email, range), tot: allProspects.filter(function(p) { return p.owner_email === u.email; }).length };
   }).sort(function(a, b) { return b.n - a.n; });
 
   var medals = ['🥇','🥈','🥉'];
@@ -1123,7 +1209,7 @@ function openActionPanel(id) {
   document.getElementById('ap-co').innerText = p.company_name || '';
   document.getElementById('ap-ct').innerText = (p.contact_name||'') + (p.contact_poste ? ' · ' + p.contact_poste : '');
   updatePanelMeta();
-  document.getElementById('af-date').value = new Date().toISOString().split('T')[0];
+  document.getElementById('af-date').value = localDateStr(new Date());
   ['af-result','af-priority','af-note','af-next-date','af-montant','af-montant-rdv','af-rdv-date'].forEach(function(i) { document.getElementById(i).value = ''; });
   onResultChange();
   var canAct = p.owner_email === ME || IS_CA;
@@ -1341,7 +1427,7 @@ function confirmAddProspect() {
     owner_email: ME,
     owner_name: MY_NAME,
     actif_pipeline: st !== 'À contacter',
-    last_contact_at: st === 'Contacté' ? new Date().toISOString().split('T')[0] : null,
+    last_contact_at: st === 'Contacté' ? localDateStr(new Date()) : null,
     created_at: firebase.firestore.FieldValue.serverTimestamp(),
     updated_at: firebase.firestore.FieldValue.serverTimestamp()
   }).then(function() { closeAddProspect(); });
@@ -1363,7 +1449,7 @@ function openAddRdv() {
   document.getElementById('rdv-edit-id').value = '';
   ['rdv-co','rdv-raison','rdv-participants','rdv-next','rdv-notes-avant','rdv-notes-apres'].forEach(function(i) { document.getElementById(i).value = ''; });
   ['rdv-demande','rdv-suite'].forEach(function(i) { document.getElementById(i).value = ''; });
-  document.getElementById('rdv-date').value = new Date().toISOString().split('T')[0];
+  document.getElementById('rdv-date').value = localDateStr(new Date());
   document.getElementById('rdv-heure').value = '';
   document.getElementById('rdv-signe').value = '';
   document.getElementById('rdv-type').value = '';
@@ -1461,7 +1547,7 @@ function saveGoal() {
   var v = parseInt(document.getElementById('goal-input').value) || 10;
   db.collection('crm_config').doc('objectifs').set({
     objectif_semaine: v, modifie_par: MY_NAME || ME,
-    modifie_le: new Date().toISOString().split('T')[0]
+    modifie_le: localDateStr(new Date())
   }).then(function() {
     goalWeek = v;
     document.getElementById('goal-display').innerText = v;
