@@ -861,7 +861,7 @@ function initPeriodRanking() {
   var el = document.getElementById('period-ca-stats');
   if (!el) return;
   el.innerHTML = PERIODS_RANKING.map(function(p) {
-    return '<button class="period-btn' + (p === 'Cette semaine' ? ' active' : '') + '" style="font-size:10px;padding:3px 8px" onclick="setPeriodRanking(\'' + p + '\')">' + p + '</button>';
+    return '<button class="period-btn' + (p === 'Cette semaine' ? ' active' : '') + '" style="font-size:10px;padding:3px 8px" onclick="setPeriodRanking(this.textContent)">' + p + '</button>';
   }).join('');
 }
 
@@ -1681,7 +1681,7 @@ function initCAStatsPeriod() {
   if (!el) return;
   var periods = ['Semaine','Mois','Trimestre','Semestre','Année','Date à date'];
   el.innerHTML = periods.map(function(p) {
-    return '<button class="period-btn' + (p === 'Semaine' ? ' active' : '') + '" onclick="setCAStatsPeriod('' + p + '')">' + p + '</button>';
+    return '<button class="period-btn' + (p === 'Semaine' ? ' active' : '') + '" onclick="setCAStatsPeriod(this.textContent)">' + p + '</button>';
   }).join('');
 }
 function setCAStatsPeriod(p) {
