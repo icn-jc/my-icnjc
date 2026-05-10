@@ -103,6 +103,10 @@
 
 /* ── Period selector ── */
 .period-sel{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:12px;}
+.person-sel{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px;}
+.person-pill{padding:4px 10px;border-radius:99px;font-size:11px;font-weight:600;cursor:pointer;border:1px solid var(--border);background:var(--white);color:var(--text-secondary);font-family:'Sora',sans-serif;transition:all .15s;display:flex;align-items:center;gap:5px;}
+.person-pill.active{color:white;border-color:transparent;}
+.person-pill:hover:not(.active){border-color:var(--bordeaux);}
 .period-btn{padding:5px 12px;border-radius:var(--radius-md);font-size:11px;font-weight:600;cursor:pointer;border:1px solid var(--border);background:var(--white);color:var(--text-secondary);font-family:'Sora',sans-serif;transition:all .15s;}
 .period-btn.active{background:var(--navy);color:white;border-color:var(--navy);}
 .period-btn:hover:not(.active){border-color:var(--bordeaux);color:var(--bordeaux);}
@@ -297,8 +301,14 @@ td[contenteditable=true]:hover{background:rgba(163,33,95,0.04);border-radius:3px
         <div class="top-row">
           <div id="wn-ca"></div>
           <div class="goal-cfg" id="goal-cfg-block">
-            <div><div class="goal-cfg-lbl">Objectif / semaine</div><div class="goal-cfg-by" id="goal-by">—</div></div>
-            <div><div class="goal-cfg-val" id="goal-display">10</div></div>
+            <div>
+              <div class="goal-cfg-lbl" id="goal-lbl">Objectif / semaine</div>
+              <div class="goal-cfg-by" id="goal-by">—</div>
+            </div>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div class="goal-cfg-val" id="goal-display">10</div>
+              <span id="goal-lock" style="font-size:11px;color:var(--text-tertiary);display:none">🔒</span>
+            </div>
             <button class="goal-edit-btn" id="btn-edit-goal" onclick="openGoalModal()" style="display:none">✏ Modifier</button>
           </div>
         </div>
@@ -336,6 +346,7 @@ td[contenteditable=true]:hover{background:rgba(163,33,95,0.04);border-radius:3px
           <input type="date" class="input" id="dr-ca-to" style="font-size:12px;padding:5px;"/>
           <button class="btn btn-secondary btn-sm" onclick="renderCAChart()">Afficher</button>
         </div>
+        <div class="person-sel" id="person-sel-ca"></div>
         <div class="chart-card" id="chart-ca"></div>
         <div class="sec-title" style="margin-top:4px">
           Comparaison mandats
@@ -369,8 +380,48 @@ td[contenteditable=true]:hover{background:rgba(163,33,95,0.04);border-radius:3px
           <input type="date" class="input" id="dr-mine-to" style="font-size:12px;padding:5px;"/>
           <button class="btn btn-secondary btn-sm" onclick="renderMineChart()">Afficher</button>
         </div>
+        <div class="person-sel" id="person-sel-mine"></div>
         <div class="chart-card" id="chart-mine" style="margin-bottom:20px"></div>
-        <div class="sec-title">Mon portefeuille</div>
+        <div class="sec-title" style="flex-wrap:wrap;gap:8px">
+          Mon portefeuille
+          <button onclick="openNotice('notice-portefeuille')" style="background:none;border:none;cursor:pointer;font-size:13px;color:var(--text-tertiary);padding:0" title="À propos du portefeuille">ℹ️</button>
+          <div style="margin-left:auto;display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+            <select id="pf-filter-statut" onchange="renderMine()" style="padding:4px 8px;border-radius:var(--radius-md);border:1px solid var(--border);font-family:'Sora',sans-serif;font-size:11px;background:var(--white)">
+              <option value="">Tous les statuts</option>
+              <option>À contacter</option>
+              <option>Pas de réponse</option>
+              <option>Rappel demandé</option>
+              <option>Contacté</option>
+              <option>RDV planifié</option>
+              <option>RDV effectué</option>
+              <option>Proposition envoyée</option>
+              <option>Négociation</option>
+              <option>Signé</option>
+              <option>Perdu</option>
+            </select>
+            <select id="pf-filter-priority" onchange="renderMine()" style="padding:4px 8px;border-radius:var(--radius-md);border:1px solid var(--border);font-family:'Sora',sans-serif;font-size:11px;background:var(--white)">
+              <option value="">Toutes priorités</option>
+              <option>Haute</option>
+              <option>Normale</option>
+              <option>Basse</option>
+            </select>
+            <input type="text" id="pf-search" placeholder="🔍 Rechercher…" oninput="renderMine()" style="padding:4px 8px;border-radius:var(--radius-md);border:1px solid var(--border);font-family:'Sora',sans-serif;font-size:11px;width:130px"/>
+            <select id="pf-filter-period" onchange="renderMine()" style="padding:4px 8px;border-radius:var(--radius-md);border:1px solid var(--border);font-family:'Sora',sans-serif;font-size:11px;background:var(--white)">
+              <option value="">Toute période</option>
+              <option value="week">Cette semaine</option>
+              <option value="month">Ce mois</option>
+              <option value="quarter">Ce trimestre</option>
+              <option value="custom">Date à date</option>
+            </select>
+            <span id="pf-date-range" style="display:none;gap:4px;align-items:center">
+              <input type="date" id="pf-date-from" onchange="renderMine()" style="padding:3px 6px;border-radius:var(--radius-sm);border:1px solid var(--border);font-size:11px;"/>
+              <span style="font-size:10px;color:var(--text-tertiary)">→</span>
+              <input type="date" id="pf-date-to" onchange="renderMine()" style="padding:3px 6px;border-radius:var(--radius-sm);border:1px solid var(--border);font-size:11px;"/>
+            </span>
+            <button onclick="clearPfFilters()" style="padding:4px 8px;border-radius:var(--radius-md);border:1px solid var(--border);font-family:'Sora',sans-serif;font-size:11px;background:var(--white);cursor:pointer;color:var(--text-tertiary)">✕</button>
+            <span id="pf-count" style="font-size:10px;color:var(--text-tertiary);font-style:italic"></span>
+          </div>
+        </div>
         <div class="scroll-sync-top" id="sst-mine"><div class="scroll-sync-inner" id="ssi-mine"></div></div>
         <div class="kanban-outer" id="ko-mine"><div class="kanban" id="kanban-mine"></div></div>
       </div>
@@ -682,6 +733,8 @@ var allProspects = [], allRdvs = [], allUsers = [], allMandats = [], goalWeek = 
 var curProspectId = null, curProspect = null;
 var weekOffCA = 0, weekOffMine = 0;
 var currentMandatFilter = ''; // '' = mandat actif uniquement
+var selectedPersonsCA = null;   // null = all prospecte=true
+var selectedPersonsMine = [ME]; // default = soi-même
 var periodCA = 'Semaine', periodMine = 'Semaine', periodCAStats = 'Semaine';
 
 // ════════════════════════════════════════════════════════
@@ -748,6 +801,8 @@ function loadData() {
       o.value = u.email; o.text = (u.prenom||'') + ' ' + (u.nom||'');
       sel.appendChild(o);
     });
+    selectedPersonsMine = [ME]; // init with self
+    initPersonSelectors();
   });
 
   // Prospects (temps réel)
@@ -763,6 +818,7 @@ function loadData() {
     snap.forEach(function(doc) { allMandats.push(Object.assign({id:doc.id},doc.data())); });
     allMandats.sort(function(a,b) { return (b.date_debut||'').localeCompare(a.date_debut||''); });
     populateMandatFilter();
+    initPersonSelectors();
     initMandatCompare();
     renderMandatCompare();
   });
@@ -782,8 +838,10 @@ function renderRankingOnly(wkGoal) {
   var activeProspectors = allUsers.filter(function(u) { return u.prospecte; });
 
   // Afficher l'objectif figé de la semaine sélectionnée
-  var goalCfgEl = document.getElementById('goal-cfg-block');
   var btnEditGoal = document.getElementById('btn-edit-goal');
+  var goalLbl = document.getElementById('goal-lbl');
+  var goalLock = document.getElementById('goal-lock');
+  var goalDisp = document.getElementById('goal-display');
   if (isPast) {
     var wsCaGoal = wkStart(off);
     var wnCaGoal = isoWk(wsCaGoal);
@@ -791,18 +849,15 @@ function renderRankingOnly(wkGoal) {
     db.collection('crm_config').doc('objectifs_historique').collection('semaines').doc(wkKeyCaGoal).get()
       .then(function(doc) {
         var frozenGoal = doc.exists ? (doc.data().objectif || goalWeek) : goalWeek;
-        if (goalCfgEl) goalCfgEl.innerHTML =
-          '<div><div class="goal-cfg-lbl">Objectif semaine ' + wnCaGoal + ' (figé)</div>' +
-          '<div style="display:flex;align-items:center;gap:8px">' +
-            '<div class="goal-cfg-val">' + frozenGoal + '</div>' +
-            '<span style="font-size:11px;color:var(--text-tertiary);background:#f1f5f9;padding:3px 8px;border-radius:99px">🔒</span>' +
-          '</div></div>';
+        if (goalLbl) goalLbl.innerText = 'Objectif S' + wnCaGoal + ' (passée)';
+        if (goalDisp) goalDisp.innerText = frozenGoal;
+        if (goalLock) goalLock.style.display = 'inline';
         if (btnEditGoal) btnEditGoal.style.display = 'none';
       });
   } else {
-    if (goalCfgEl) goalCfgEl.innerHTML =
-      '<div><div class="goal-cfg-lbl">Objectif semaine en cours</div>' +
-      '<div class="goal-cfg-val" id="goal-display">' + goalWeek + '</div></div>';
+    if (goalLbl) goalLbl.innerText = 'Objectif semaine en cours';
+    if (goalDisp) { goalDisp.innerText = goalWeek; goalDisp.id = 'goal-display'; }
+    if (goalLock) goalLock.style.display = 'none';
     if (btnEditGoal) btnEditGoal.style.display = IS_CA ? 'flex' : 'none';
   }
   var range = getRankingRange ? getRankingRange() : {from:wkStart(off),to:wkEnd(off)};
@@ -833,6 +888,80 @@ function renderRankingOnly(wkGoal) {
   if (rankingCompact && document.getElementById('ranking-grid')) {
     document.getElementById('ranking-grid').classList.add('compact');
   }
+}
+
+function initPersonSelectors() {
+  // Vue CA: tous les prospecte=true par défaut
+  var caContainer = document.getElementById('person-sel-ca');
+  if (!caContainer) return;
+  var prosp = allUsers.filter(function(u){ return u.prospecte; });
+  if (selectedPersonsCA === null) selectedPersonsCA = prosp.map(function(u){ return u.email; });
+  
+  caContainer.innerHTML = prosp.map(function(u, i) {
+    var active = selectedPersonsCA.includes(u.email);
+    var color = COLORS[i % COLORS.length];
+    var ini = ((u.prenom||'?')[0]+(u.nom||'?')[0]).toUpperCase();
+    return '<button class="person-pill' + (active?' active':'') + '"' +
+      (active ? ' style="background:'+color+';border-color:'+color+'"' : '') +
+      ' data-email="'+u.email+'" data-color="'+color+'" onclick="togglePersonCA(this)">' +
+      ini + ' ' + (u.prenom||u.email.split('@')[0]) +
+    '</button>';
+  }).join('');
+
+  // Vue Mine: soi-même par défaut
+  var mineContainer = document.getElementById('person-sel-mine');
+  if (!mineContainer) return;
+  if (selectedPersonsMine.length === 0) selectedPersonsMine = [ME];
+  
+  // Mine: afficher soi-même + les autres (CA peut en voir d'autres)
+  var mineUsers = IS_CA
+    ? allUsers.filter(function(u){ return u.prospecte; })
+    : allUsers.filter(function(u){ return u.email === ME; });
+  
+  mineContainer.innerHTML = mineUsers.map(function(u, i) {
+    var active = selectedPersonsMine.includes(u.email);
+    var color = u.email === ME ? COLORS[0] : COLORS[(i+1) % COLORS.length];
+    var ini = ((u.prenom||'?')[0]+(u.nom||'?')[0]).toUpperCase();
+    return '<button class="person-pill' + (active?' active':'') + '"' +
+      (active ? ' style="background:'+color+';border-color:'+color+'"' : '') +
+      ' data-email="'+u.email+'" data-color="'+color+'" onclick="togglePersonMine(this)">' +
+      ini + ' ' + (u.prenom||u.email.split('@')[0]) +
+    '</button>';
+  }).join('');
+}
+
+function togglePersonCA(btn) {
+  var email = btn.dataset.email;
+  var color = btn.dataset.color;
+  if (selectedPersonsCA.includes(email)) {
+    selectedPersonsCA = selectedPersonsCA.filter(function(e){ return e !== email; });
+    btn.classList.remove('active');
+    btn.style.background = '';
+    btn.style.borderColor = '';
+  } else {
+    selectedPersonsCA.push(email);
+    btn.classList.add('active');
+    btn.style.background = color;
+    btn.style.borderColor = color;
+  }
+  renderCAChart();
+}
+
+function togglePersonMine(btn) {
+  var email = btn.dataset.email;
+  var color = btn.dataset.color;
+  if (selectedPersonsMine.includes(email)) {
+    selectedPersonsMine = selectedPersonsMine.filter(function(e){ return e !== email; });
+    btn.classList.remove('active');
+    btn.style.background = '';
+    btn.style.borderColor = '';
+  } else {
+    selectedPersonsMine.push(email);
+    btn.classList.add('active');
+    btn.style.background = color;
+    btn.style.borderColor = color;
+  }
+  renderMineChart();
 }
 
 function populateMandatFilter() {
@@ -1149,8 +1278,10 @@ function renderCA() {
   var activeProspectors = allUsers.filter(function(u) { return u.prospecte; });
 
   // Afficher l'objectif figé de la semaine sélectionnée
-  var goalCfgEl = document.getElementById('goal-cfg-block');
   var btnEditGoal = document.getElementById('btn-edit-goal');
+  var goalLbl = document.getElementById('goal-lbl');
+  var goalLock = document.getElementById('goal-lock');
+  var goalDisp = document.getElementById('goal-display');
   if (isPast) {
     var wsCaGoal = wkStart(off);
     var wnCaGoal = isoWk(wsCaGoal);
@@ -1158,18 +1289,15 @@ function renderCA() {
     db.collection('crm_config').doc('objectifs_historique').collection('semaines').doc(wkKeyCaGoal).get()
       .then(function(doc) {
         var frozenGoal = doc.exists ? (doc.data().objectif || goalWeek) : goalWeek;
-        if (goalCfgEl) goalCfgEl.innerHTML =
-          '<div><div class="goal-cfg-lbl">Objectif semaine ' + wnCaGoal + ' (figé)</div>' +
-          '<div style="display:flex;align-items:center;gap:8px">' +
-            '<div class="goal-cfg-val">' + frozenGoal + '</div>' +
-            '<span style="font-size:11px;color:var(--text-tertiary);background:#f1f5f9;padding:3px 8px;border-radius:99px">🔒</span>' +
-          '</div></div>';
+        if (goalLbl) goalLbl.innerText = 'Objectif S' + wnCaGoal + ' (passée)';
+        if (goalDisp) goalDisp.innerText = frozenGoal;
+        if (goalLock) goalLock.style.display = 'inline';
         if (btnEditGoal) btnEditGoal.style.display = 'none';
       });
   } else {
-    if (goalCfgEl) goalCfgEl.innerHTML =
-      '<div><div class="goal-cfg-lbl">Objectif semaine en cours</div>' +
-      '<div class="goal-cfg-val" id="goal-display">' + goalWeek + '</div></div>';
+    if (goalLbl) goalLbl.innerText = 'Objectif semaine en cours';
+    if (goalDisp) { goalDisp.innerText = goalWeek; goalDisp.id = 'goal-display'; }
+    if (goalLock) goalLock.style.display = 'none';
     if (btnEditGoal) btnEditGoal.style.display = IS_CA ? 'flex' : 'none';
   }
   var inactiveEmails = allUsers.filter(function(u) { return !u.prospecte; }).map(function(u) { return u.email; });
@@ -1358,13 +1486,42 @@ function renderMineWithGoal(off, isPast, wkCnt, wkGoal) {
   renderMineChart();
 
   // Kanban
-  // Kanban = portefeuille complet, pas filtré par période
+  // Kanban = portefeuille complet (pas filtré par période)
+  var pfStatut = document.getElementById('pf-filter-statut') ? document.getElementById('pf-filter-statut').value : '';
+  var pfPriority = document.getElementById('pf-filter-priority') ? document.getElementById('pf-filter-priority').value : '';
+  var pfSearch = (document.getElementById('pf-search') ? document.getElementById('pf-search').value : '').toLowerCase();
   var mine = allProspects.filter(function(p) {
     if (p.owner_email !== ME) return false;
-    // Filtrer par mandat si filtre actif (mais pas par période)
     if (currentMandatFilter && p.mandat_id !== currentMandatFilter) return false;
+    if (pfStatut && p.status !== pfStatut) return false;
+    if (pfPriority && p.priority !== pfPriority) return false;
+    if (pfSearch && !(p.company_name||'').toLowerCase().includes(pfSearch) && !(p.contact_name||'').toLowerCase().includes(pfSearch)) return false;
+    // Filtre période sur last_contact_at
+    var pfPeriod = document.getElementById('pf-filter-period') ? document.getElementById('pf-filter-period').value : '';
+    if (pfPeriod && pfPeriod !== 'custom') {
+      var today2 = new Date(); today2.setHours(0,0,0,0);
+      var from2, to2 = new Date(today2.getTime() + 864e5);
+      if (pfPeriod === 'week') { from2 = wkStart(0); }
+      else if (pfPeriod === 'month') { from2 = new Date(today2.getFullYear(), today2.getMonth(), 1); }
+      else if (pfPeriod === 'quarter') { var qm = Math.floor(today2.getMonth()/3)*3; from2 = new Date(today2.getFullYear(), qm, 1); }
+      if (from2 && (!p.last_contact_at || new Date(p.last_contact_at) < from2)) return false;
+    } else if (pfPeriod === 'custom') {
+      var fromEl = document.getElementById('pf-date-from');
+      var toEl = document.getElementById('pf-date-to');
+      if (fromEl && fromEl.value && p.last_contact_at && p.last_contact_at < fromEl.value) return false;
+      if (toEl && toEl.value && p.last_contact_at && p.last_contact_at > toEl.value) return false;
+    }
     return true;
   });
+  // Afficher le compteur
+  var totalMine = allProspects.filter(function(p){return p.owner_email===ME;}).length;
+  // Show/hide custom date range
+  var pfPeriodEl = document.getElementById('pf-filter-period');
+  var pfDateRange = document.getElementById('pf-date-range');
+  if (pfDateRange) pfDateRange.style.display = (pfPeriodEl && pfPeriodEl.value === 'custom') ? 'flex' : 'none';
+
+  var pfCountEl = document.getElementById('pf-count');
+  if (pfCountEl) pfCountEl.innerText = mine.length < totalMine ? mine.length + ' / ' + totalMine + ' prospects' : totalMine + ' prospects';
   var today = new Date(); today.setHours(0,0,0,0);
   document.getElementById('kanban-mine').innerHTML = STATUTS.map(function(s) {
     var cards = mine.filter(function(p) { return p.status === s; });
@@ -2126,11 +2283,15 @@ function renderBarChart(cid, datasets, labels) {
 
 function renderCAChart() {
   var cols = getCols(periodCA, 'dr-ca-from', 'dr-ca-to');
-  var prosp = allUsers.filter(function(u) { return u.prospecte; });
-  renderLineChart('chart-ca', prosp.slice(0, 6).map(function(u, i) {
+  var prosp = allUsers.filter(function(u) {
+    return u.prospecte && (!selectedPersonsCA || selectedPersonsCA.length === 0 || selectedPersonsCA.includes(u.email));
+  });
+  var allProsp = allUsers.filter(function(u){ return u.prospecte; });
+  renderLineChart('chart-ca', prosp.map(function(u) {
+    var colorIdx = allProsp.findIndex(function(x){ return x.email === u.email; });
     return {
       label: (u.prenom || u.email.split('@')[0]),
-      color: COLORS[i % COLORS.length],
+      color: COLORS[colorIdx % COLORS.length],
       vals: cols.map(function(col) {
         return allProspects.filter(function(p) {
           if (p.owner_email !== u.email || !p.last_contact_at) return false;
@@ -2144,27 +2305,27 @@ function renderCAChart() {
 
 function renderMineChart() {
   var cols = getCols(periodMine, 'dr-mine-from', 'dr-mine-to');
-  renderLineChart('chart-mine', [
-    {
-      label: 'Contacts valorisés', color: COLORS[0],
+  var persons = selectedPersonsMine.length > 0 ? selectedPersonsMine : [ME];
+  var allProspUsers = allUsers.filter(function(u){ return u.prospecte; });
+  var datasets = [];
+  persons.forEach(function(email) {
+    var u = allUsers.find(function(x){ return x.email === email; });
+    var colorIdx = allProspUsers.findIndex(function(x){ return x.email === email; });
+    var color = email === ME ? COLORS[0] : COLORS[(colorIdx >= 0 ? colorIdx : 1) % COLORS.length];
+    var name = u ? (u.prenom || email.split('@')[0]) : email.split('@')[0];
+    datasets.push({
+      label: name + ' (contacts)',
+      color: color,
       vals: cols.map(function(col) {
         return allProspects.filter(function(p) {
-          if (p.owner_email !== ME || !p.last_contact_at) return false;
+          if (p.owner_email !== email || !p.last_contact_at) return false;
           if (!STATUTS_VALORISES.includes(p.status)) return false;
           var d = new Date(p.last_contact_at); return d >= col.from && d < col.to;
         }).length;
       })
-    },
-    {
-      label: 'Signés', color: COLORS[3],
-      vals: cols.map(function(col) {
-        return allProspects.filter(function(p) {
-          if (p.owner_email !== ME || !p.last_contact_at || p.status !== 'Signé') return false;
-          var d = new Date(p.last_contact_at); return d >= col.from && d < col.to;
-        }).length;
-      })
-    }
-  ], cols.map(function(c) { return c.label; }));
+    });
+  });
+  renderLineChart('chart-mine', datasets, cols.map(function(col) { return col.label; }));
 }
 
 // ════════════════════════════════════════════════════════
@@ -2173,6 +2334,12 @@ function renderMineChart() {
 function clearFilters() {
   ['srch-all','f-member','f-statut','f-secteur'].forEach(function(i) { document.getElementById(i).value = ''; });
   renderAll();
+}
+function clearPfFilters() {
+  ['pf-filter-statut','pf-filter-priority','pf-search','pf-filter-period','pf-date-from','pf-date-to'].forEach(function(id) {
+    var el = document.getElementById(id); if (el) el.value = '';
+  });
+  renderMine();
 }
 
 // ── CA Stats period helpers ───────────────────────────────────────
@@ -2296,6 +2463,30 @@ function exportXLSX() {
   XLSX.writeFile(wb, 'Prospection_ICN_JC.xlsx');
 }
 </script>
+
+<!-- MODAL PORTEFEUILLE -->
+<div class="modal-overlay" id="notice-portefeuille" onclick="if(event.target===this)closeNotice('notice-portefeuille')">
+  <div class="modal-box" style="max-width:480px">
+    <div class="modal-header">
+      <div class="modal-title">💼 Ton portefeuille client</div>
+      <button class="modal-close" onclick="closeNotice('notice-portefeuille')">×</button>
+    </div>
+    <div style="font-size:13px;color:var(--text-secondary);line-height:1.7">
+      <p>Le portefeuille regroupe <strong>l'ensemble de tes prospects actifs</strong>, indépendamment de la semaine affichée. C'est ta base de travail au quotidien.</p>
+      <p style="margin-top:10px">Chaque colonne représente une étape du cycle de vente. L'objectif est de faire avancer les prospects vers la droite — de <em>À contacter</em> jusqu'à <em>Signé</em>.</p>
+      <p style="margin-top:10px"><strong>Quelques repères :</strong></p>
+      <ul style="margin:6px 0 0 16px;display:flex;flex-direction:column;gap:4px">
+        <li>📅 <strong>RDV planifié</strong> — une date est affichée sur la carte, passe en rouge si le RDV est passé sans mise à jour</li>
+        <li>⏰ <strong>Relance</strong> — apparaît sur la carte si la date de relance est dépassée</li>
+        <li>🔴 <strong>Priorité haute</strong> — visible directement sur la carte</li>
+      </ul>
+      <p style="margin-top:10px">Clique sur une carte pour accéder à la <strong>timeline complète</strong> et enregistrer une nouvelle action.</p>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-primary" onclick="closeNotice('notice-portefeuille')">Compris ✓</button>
+    </div>
+  </div>
+</div>
 
 <!-- MODAL RÈGLEMENT PROSPECTION -->
 <div class="modal-overlay" id="modal-reglement" onclick="if(event.target===this)closeReglementModal()">
