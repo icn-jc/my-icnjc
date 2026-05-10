@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Historique mandats — My-ICN-JC</title>
+<link rel="stylesheet" href="../assets/css/global.css"/>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script src="../assets/js/firebase.js"></script>
+<script src="../assets/js/auth.js"></script>
+<script src="../assets/js/sidebar.js"></script>
+<style>
+.mandat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:16px;margin-bottom:24px;}
+.mandat-card{background:var(--bg-card);border-radius:var(--radius-lg);border:1px solid var(--border);box-shadow:var(--shadow-sm);overflow:hidden;}
+.mandat-card.actif{border-top:3px solid var(--bordeaux);}
+.mandat-card.clos{border-top:3px solid var(--success);}
+.mandat-card.archive{border-top:3px solid var(--text-tertiary);opacity:.7;}
+.mc-header{padding:16px 18px;border-bottom:1px solid var(--border);display:flex;align-items:flex-start;justify-content:space-between;gap:8px;}
+.mc-title{font-family:'Playfair Display',serif;font-size:17px;color:var(--navy);}
+.mc-dates{font-size:11px;color:var(--text-tertiary);margin-top:3px;}
+.mc-badge{font-size:11px;font-weight:700;padding:3px 9px;border-radius:99px;flex-shrink:0;}
+.mc-badge-actif{background:rgba(163,33,95,0.12);color:var(--bordeaux);}
+.mc-badge-clos{background:#dcfce7;color:#14532d;}
+.mc-badge-archive{background:#f1f5f9;color:#64748b;}
+.mc-body{padding:16px 18px;}
+.mc-section{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--text-tertiary);margin-bottom:10px;margin-top:14px;display:flex;align-items:center;gap:8px;}
+.mc-section::after{content:'';flex:1;height:1px;background:var(--border);}
+.mc-section:first-child{margin-top:0;}
+.kpi-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;}
+.kpi-field{display:flex;flex-direction:column;gap:3px;}
+.kpi-field label{font-size:10px;color:var(--text-tertiary);font-weight:600;text-transform:uppercase;letter-spacing:.06em;}
+.kpi-field input{padding:6px 8px;border:1px solid var(--border);border-radius:var(--radius-sm);font-family:'Sora',sans-serif;font-size:12px;background:var(--white);color:var(--text-primary);}
+.kpi-field input:focus{outline:none;border-color:var(--bordeaux);}
+.kpi-field input:disabled{background:var(--bg);color:var(--text-tertiary);}
+.kpi-field.full{grid-column:1/-1;}
+.custom-kpi-row{display:flex;gap:8px;align-items:center;margin-bottom:6px;}
+.custom-kpi-row input{flex:1;padding:6px 8px;border:1px solid var(--border);border-radius:var(--radius-sm);font-family:'Sora',sans-serif;font-size:12px;}
+.custom-kpi-row input:focus{outline:none;border-color:var(--bordeaux);}
+.btn-del-custom{background:var(--danger-bg);color:var(--danger);border:none;border-radius:var(--radius-sm);padding:4px 8px;cursor:pointer;font-size:12px;flex-shrink:0;}
+.mc-footer{padding:12px 18px;border-top:1px solid var(--border);display:flex;gap:8px;flex-wrap:wrap;background:#fafafa;}
+.snapshot-info{font-size:11px;color:var(--text-tertiary);margin-top:6px;font-style:italic;}
+.president-row{display:flex;gap:8px;align-items:center;margin-bottom:12px;}
+.president-row select{flex:1;padding:6px 8px;border:1px solid var(--border);border-radius:var(--radius-sm);font-family:'Sora',sans-serif;font-size:12px;}
+.auto-badge{background:#dbeafe;color:#1e3a5f;font-size:10px;font-weight:600;padding:2px 7px;border-radius:99px;margin-left:4px;}
+</style>
+</head>
+<body>
+<div class="login-page" id="login-page">
+  <div class="login-box">
+    <div class="login-logo"><img src="../assets/images/ICN-Junior-Conseil_logo.png" style="height:54px;object-fit:contain"/></div>
+    <div class="login-title">Connexion</div>
+    <div class="login-sub">Accès réservé — Super Admin uniquement.</div>
+    <button class="google-btn" onclick="doGoogleLogin()">
+      <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google"/>Se connecter avec Google
+    </button>
+    <div class="denied-box" id="denied-box"><strong>Accès refusé</strong><p id="denied-msg"></p></div>
+    <div class="login-error" id="login-error"></div>
+  </div>
+</div>
+
+<div class="app-page" id="app-page">
+  <div id="sidebar-container"></div>
+  <div class="app-content">
+    <div class="page-header">
+      <div class="flex justify-between items-center" style="flex-wrap:wrap;gap:10px;">
+        <div>
+          <div class="page-title">Historique mandats</div>
+          <div class="page-subtitle">Gestion des mandats, saisie des KPI historiques — Super Admin uniquement</div>
+        </div>
+        <button class="btn btn-primary" onclick="openNewMandat()">+ Nouveau mandat</button>
+      </div>
+    </div>
+    <div class="page-body">
+      <div class="mandat-grid" id="mandat-grid">
+        <div style="color:var(--text-tertiary);font-size:13px">Chargement…</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL NOUVEAU MANDAT -->
+<div class="modal-overlay" id="modal-new-mandat" onclick="if(event.target===this)closeNewMandat()">
+  <div class="modal-box" style="max-width:500px">
+    <div class="modal-header"><div class="modal-title">Créer un mandat</div><button class="modal-close" onclick="closeNewMandat()">×</button></div>
+    <div class="form-grid">
+      <div class="form-field full"><label class="input-label">Identifiant *</label><input class="input" id="nm-id" placeholder="Ex : 2026-2027"/></div>
+      <div class="form-field full"><label class="input-label">Label *</label><input class="input" id="nm-label" placeholder="Ex : Mandat 2026-2027"/></div>
+      <div class="form-field"><label class="input-label">Date de début *</label><input class="input" type="date" id="nm-debut"/></div>
+      <div class="form-field"><label class="input-label">Date de fin</label><input class="input" type="date" id="nm-fin"/></div>
+      <div class="form-field full">
+        <label class="input-label">Président(e) du mandat</label>
+        <select class="select-field" id="nm-president"><option value="">— Choisir —</option></select>
+      </div>
+      <div class="form-field full">
+        <label class="input-label">Statut</label>
+        <select class="select-field" id="nm-statut">
+          <option value="actif">Actif (mandat en cours)</option>
+          <option value="clos">Clôturé (données figées)</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeNewMandat()">Annuler</button>
+      <button class="btn btn-primary" onclick="confirmNewMandat()">Créer →</button>
+    </div>
+  </div>
+</div>
+
+<script>
+var allMandats = [], allUsers = [];
+var ME = '', MY_NAME = '';
+
+initAuth('mandats', function(user, role, profile) {
+  ME = user.email;
+  MY_NAME = ((profile.prenom||'') + ' ' + (profile.nom||'')).trim();
+  renderSidebar(role, profile, user, 'mandats');
+  showAppPage(user, role, profile);
+  updateHealthIndicator();
+  loadData();
+});
+
+function loadData() {
+  db.collection('users').get().then(function(snap) {
+    allUsers = [];
+    snap.forEach(function(doc) { allUsers.push(Object.assign({email: doc.id}, doc.data())); });
+    populatePresidentSelect('nm-president');
+  });
+  db.collection('mandats').orderBy('date_debut', 'desc').onSnapshot(function(snap) {
+    allMandats = [];
+    snap.forEach(function(doc) { allMandats.push(Object.assign({id: doc.id}, doc.data())); });
+    // Si aucun mandat, créer les mandats initiaux
+    if (allMandats.length === 0) seedMandats();
+    else renderMandats();
+  });
+}
+
+function seedMandats() {
+  var batch = db.batch();
+  var mandatsInitiaux = [
+    { id: '2025-2026', label: 'Mandat 2025-2026', date_debut: '2025-06-15', date_fin: '2026-06-14',
+      statut: 'actif', president_email: '', kpi_treso: {}, kpi_commercial: {}, kpi_custom: [], locked: false },
+    { id: '2024-2025', label: 'Mandat 2024-2025', date_debut: '2024-06-15', date_fin: '2025-06-14',
+      statut: 'clos', president_email: '', kpi_treso: {}, kpi_commercial: {}, kpi_custom: [], locked: true },
+    { id: '2023-2024', label: 'Mandat 2023-2024', date_debut: '2023-06-15', date_fin: '2024-06-14',
+      statut: 'clos', president_email: '', kpi_treso: {}, kpi_commercial: {}, kpi_custom: [], locked: true },
+  ];
+  mandatsInitiaux.forEach(function(m) {
+    batch.set(db.collection('mandats').doc(m.id), m);
+  });
+  batch.commit();
+}
+
+function populatePresidentSelect(selectId) {
+  var sel = document.getElementById(selectId);
+  if (!sel) return;
+  var pres = allUsers.filter(function(u) { return ['president','super_admin'].includes(u.role || (u.roles&&u.roles[0])); });
+  pres.forEach(function(u) {
+    var o = document.createElement('option');
+    o.value = u.email; o.text = (u.prenom||'') + ' ' + (u.nom||'');
+    sel.appendChild(o);
+  });
+}
+
+// ── RENDER MANDATS ────────────────────────────────────────────
+function renderMandats() {
+  var html = '';
+  allMandats.forEach(function(m) {
+    html += renderMandatCard(m);
+  });
+  document.getElementById('mandat-grid').innerHTML = html || '<div style="color:var(--text-tertiary)">Aucun mandat.</div>';
+}
+
+function renderMandatCard(m) {
+  var isActif = m.statut === 'actif';
+  var isClos  = m.statut === 'clos';
+  var isArch  = m.statut === 'archive';
+  var badgeCls = isActif ? 'mc-badge-actif' : isClos ? 'mc-badge-clos' : 'mc-badge-archive';
+  var badgeTxt = isActif ? '🟢 Actif' : isClos ? '✅ Clôturé' : '📁 Archivé';
+  var locked = m.locked === true;
+  var mid = m.id;
+
+  // KPI fields tréso
+  var kpiTreso = [
+    {key:'ca_signe', label:'CA signé (€)', type:'number'},
+    {key:'ca_encaisse', label:'CA encaissé + cotisations (€)', type:'number'},
+    {key:'nb_intervenants', label:'Nb intervenants', type:'number'},
+    {key:'nb_etudes', label:'Nb études', type:'number'},
+    {key:'marge_nette_moy', label:'Marge nette moyenne (%)', type:'number'},
+    {key:'taux_ouverture', label:"Taux d'ouverture études (%)", type:'number'},
+    {key:'panier_moyen', label:'Panier moyen (€)', type:'number'},
+    {key:'cash_disponible', label:'Cash disponible (€)', type:'number'},
+    {key:'taux_transformation', label:'Taux transformation CA signé→encaissé (%)', type:'number'},
+    {key:'taux_impayes', label:"Taux d'impayés (%)", type:'number'},
+    {key:'cout_moyen_etude', label:'Coût moyen par étude (€)', type:'number'},
+  ];
+  var kpiComm = [
+    {key:'ca_signe', label:'CA total signé (€)', type:'number'},
+    {key:'nb_etudes_signees', label:'Nb études signées', type:'number'},
+    {key:'nb_prospects', label:'Nb prospects contactés', type:'number'},
+    {key:'taux_conversion', label:'Taux de conversion (%)', type:'number'},
+    {key:'nb_intervenants', label:'Nb intervenants', type:'number'},
+    {key:'nb_membres_ca', label:'Nb membres CA', type:'number'},
+    {key:'taux_prospection', label:'Taux de prospection (%)', type:'number'},
+  ];
+
+  var autoNote = isActif ? '<div class="snapshot-info">📊 Mandat actif — KPI calculés automatiquement depuis Firestore. Saisie manuelle possible pour ajustement.</div>' : '';
+
+  var tresoCols = kpiTreso.map(function(k, i) {
+    var val = (m.kpi_treso && m.kpi_treso[k.key] !== undefined) ? m.kpi_treso[k.key] : '';
+    var autoVal = isActif ? 'placeholder="Auto depuis Firestore"' : '';
+    return '<div class="kpi-field' + (i % 2 === 0 && kpiTreso[i+1] ? '' : '') + '">' +
+      '<label>' + k.label + (isActif ? ' <span class="auto-badge">Auto</span>' : '') + '</label>' +
+      '<input type="' + k.type + '" value="' + (val||'') + '" ' + autoVal +
+      (locked ? ' disabled' : '') +
+      ' onblur="saveKpi(\'' + mid + '\',\'treso\',\'' + k.key + '\',this.value)"/>' +
+    '</div>';
+  });
+  var commCols = kpiComm.map(function(k) {
+    var val = (m.kpi_commercial && m.kpi_commercial[k.key] !== undefined) ? m.kpi_commercial[k.key] : '';
+    return '<div class="kpi-field">' +
+      '<label>' + k.label + (isActif ? ' <span class="auto-badge">Auto</span>' : '') + '</label>' +
+      '<input type="' + k.type + '" value="' + (val||'') + '"' +
+      (locked ? ' disabled' : '') +
+      ' onblur="saveKpi(\'' + mid + '\',\'commercial\',\'' + k.key + '\',this.value)"/>' +
+    '</div>';
+  });
+
+  // Custom KPI
+  var customHtml = '';
+  var customs = m.kpi_custom || [];
+  customs.forEach(function(c2, ci) {
+    customHtml += '<div class="custom-kpi-row" id="cr-' + mid + '-' + ci + '">' +
+      '<input type="text" value="' + (c2.label||'') + '" placeholder="Nom du KPI"' + (locked?' disabled':'') +
+      ' onblur="saveCustomLabel(\'' + mid + '\',' + ci + ',this.value)"/>' +
+      '<input type="number" value="' + (c2.valeur||'') + '" placeholder="Valeur"' + (locked?' disabled':'') +
+      ' onblur="saveCustomVal(\'' + mid + '\',' + ci + ',this.value)"/>' +
+      (!locked ? '<button class="btn-del-custom" onclick="delCustomKpi(\'' + mid + '\',' + ci + ')">✕</button>' : '') +
+    '</div>';
+  });
+
+  var footerBtns = '';
+  if (!locked) {
+    footerBtns += '<button class="btn btn-secondary btn-sm" onclick="addCustomKpi(\'' + mid + '\')">+ KPI personnalisé</button>';
+    footerBtns += '<button class="btn btn-secondary btn-sm" onclick="saveMandat(\'' + mid + '\')">💾 Sauvegarder</button>';
+  }
+  if (isActif) {
+    footerBtns += '<button class="btn btn-secondary btn-sm" onclick="snapshotMandat(\'' + mid + '\')" style="background:#fff7ed;color:#c2410c;border-color:#fed7aa">📸 Snapshot maintenant</button>';
+    footerBtns += '<button class="btn btn-secondary btn-sm" onclick="cloreMandat(\'' + mid + '\')">🔒 Clôturer ce mandat</button>';
+  }
+  if (!isArch) {
+    footerBtns += '<button class="btn btn-secondary btn-sm" onclick="archiveMandat(\'' + mid + '\')">📁 Archiver</button>';
+  } else {
+    footerBtns += '<button class="btn btn-secondary btn-sm" onclick="unarchiveMandat(\'' + mid + '\')">↩ Désarchiver</button>';
+  }
+
+  // Edit dates/president
+  var editInfo = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">' +
+    '<div class="kpi-field"><label>Date début</label><input type="date" value="' + (m.date_debut||'') + '"' +
+    ' onblur="updateMandatField(\'' + mid + '\',\'date_debut\',this.value)"/></div>' +
+    '<div class="kpi-field"><label>Date fin</label><input type="date" value="' + (m.date_fin||'') + '"' +
+    ' onblur="updateMandatField(\'' + mid + '\',\'date_fin\',this.value)"/></div>' +
+    '</div>' +
+    '<div class="president-row"><select id="pres-sel-' + mid + '" onchange="updateMandatField(\'' + mid + '\',\'president_email\',this.value)">' +
+    '<option value="">— Président du mandat —</option>' +
+    allUsers.filter(function(u){return ['president','super_admin','vice_president'].includes(u.role||'');}).map(function(u){
+      return '<option value="' + u.email + '"' + (m.president_email===u.email?' selected':'') + '>' + (u.prenom||'') + ' ' + (u.nom||'') + '</option>';
+    }).join('') +
+    '</select></div>';
+
+  return '<div class="mandat-card ' + m.statut + '" id="mc-' + mid + '">' +
+    '<div class="mc-header">' +
+      '<div><div class="mc-title">' + m.label + '</div>' +
+      '<div class="mc-dates">' + fmtD(m.date_debut) + ' → ' + (m.date_fin ? fmtD(m.date_fin) : 'Non définie') + '</div>' +
+      (m.snapshot_at ? '<div class="mc-dates">Snapshot : ' + fmtD(m.snapshot_at) + '</div>' : '') +
+      '</div>' +
+      '<span class="mc-badge ' + badgeCls + '">' + badgeTxt + '</span>' +
+    '</div>' +
+    '<div class="mc-body">' +
+      editInfo + autoNote +
+      '<div class="mc-section">Trésorerie</div>' +
+      '<div class="kpi-row">' + tresoCols.join('') + '</div>' +
+      '<div class="mc-section">Commercial</div>' +
+      '<div class="kpi-row">' + commCols.join('') + '</div>' +
+      (customHtml ? '<div class="mc-section">KPI personnalisés</div>' + customHtml : '') +
+    '</div>' +
+    '<div class="mc-footer">' + footerBtns + '</div>' +
+  '</div>';
+}
+
+// ── ACTIONS ────────────────────────────────────────────────────
+function saveKpi(mandatId, type, key, val) {
+  var update = {};
+  var field = type === 'treso' ? 'kpi_treso.' + key : 'kpi_commercial.' + key;
+  update[field] = parseFloat(val) || 0;
+  db.collection('mandats').doc(mandatId).update(update);
+}
+
+function updateMandatField(mandatId, field, val) {
+  var u = {}; u[field] = val;
+  db.collection('mandats').doc(mandatId).update(u);
+}
+
+function saveMandat(mandatId) {
+  // Trigger a full save by reading all inputs
+  var card = document.getElementById('mc-' + mandatId);
+  if (!card) return;
+  // Already saved via onblur — just show feedback
+  var btn = card.querySelector('.mc-footer .btn');
+  if (btn) { var orig = btn.innerText; btn.innerText = '✅ Sauvegardé'; setTimeout(function(){btn.innerText=orig;},1500); }
+}
+
+function addCustomKpi(mandatId) {
+  var m = allMandats.find(function(x){return x.id===mandatId;});
+  if (!m) return;
+  var customs = m.kpi_custom || [];
+  customs.push({label:'', valeur:0, type:'autre'});
+  db.collection('mandats').doc(mandatId).update({kpi_custom: customs});
+}
+
+function saveCustomLabel(mandatId, idx, val) {
+  var m = allMandats.find(function(x){return x.id===mandatId;});
+  if (!m) return;
+  var customs = JSON.parse(JSON.stringify(m.kpi_custom||[]));
+  if (customs[idx]) { customs[idx].label = val; db.collection('mandats').doc(mandatId).update({kpi_custom:customs}); }
+}
+
+function saveCustomVal(mandatId, idx, val) {
+  var m = allMandats.find(function(x){return x.id===mandatId;});
+  if (!m) return;
+  var customs = JSON.parse(JSON.stringify(m.kpi_custom||[]));
+  if (customs[idx]) { customs[idx].valeur = parseFloat(val)||0; db.collection('mandats').doc(mandatId).update({kpi_custom:customs}); }
+}
+
+function delCustomKpi(mandatId, idx) {
+  var m = allMandats.find(function(x){return x.id===mandatId;});
+  if (!m) return;
+  var customs = JSON.parse(JSON.stringify(m.kpi_custom||[]));
+  customs.splice(idx, 1);
+  db.collection('mandats').doc(mandatId).update({kpi_custom:customs});
+}
+
+function snapshotMandat(mandatId) {
+  if (!confirm('Prendre un snapshot des KPI actuels depuis Firestore pour le mandat ' + mandatId + ' ?')) return;
+  var today = new Date();
+  var snap = localDateStr(today);
+  // Calculer les KPI depuis Firestore (prospects + études)
+  var kpiComm = {};
+  db.collection('prospects').where('mandat_id','==',mandatId).get().then(function(pSnap){
+    var prospects = [];
+    pSnap.forEach(function(doc){prospects.push(doc.data());});
+    var signes = prospects.filter(function(p){return p.status==='Signé';});
+    var contactes = prospects.filter(function(p){return p.status!=='À contacter';});
+    kpiComm.nb_prospects = contactes.length;
+    kpiComm.nb_etudes_signees = signes.length;
+    kpiComm.taux_conversion = prospects.length > 0 ? Math.round(signes.length/prospects.length*100) : 0;
+    kpiComm.ca_signe = signes.reduce(function(a,p){return a+(parseFloat(p.estimated_amount)||0);},0);
+    return db.collection('mandats').doc(mandatId).update({
+      'kpi_commercial.nb_prospects': kpiComm.nb_prospects,
+      'kpi_commercial.nb_etudes_signees': kpiComm.nb_etudes_signees,
+      'kpi_commercial.taux_conversion': kpiComm.taux_conversion,
+      'kpi_commercial.ca_signe': kpiComm.ca_signe,
+      snapshot_at: snap
+    });
+  }).then(function(){
+    alert('Snapshot pris le ' + snap + '. Tu peux maintenant ajuster manuellement les valeurs.');
+  });
+}
+
+function cloreMandat(mandatId) {
+  if (!confirm('Clôturer le mandat ' + mandatId + ' ? Les données seront figées (ajustables par super_admin et président du mandat).')) return;
+  snapshotMandat(mandatId);
+  db.collection('mandats').doc(mandatId).update({statut:'clos', locked:true, date_cloture:localDateStr(new Date())});
+}
+
+function archiveMandat(mandatId) {
+  if (!confirm('Archiver ce mandat ? Il ne sera plus visible dans le CRM.')) return;
+  db.collection('mandats').doc(mandatId).update({statut:'archive'});
+}
+
+function unarchiveMandat(mandatId) {
+  db.collection('mandats').doc(mandatId).update({statut:'clos'});
+}
+
+// ── NOUVEAU MANDAT ─────────────────────────────────────────────
+function openNewMandat() {
+  document.getElementById('nm-id').value = '';
+  document.getElementById('nm-label').value = '';
+  document.getElementById('nm-debut').value = '';
+  document.getElementById('nm-fin').value = '';
+  document.getElementById('nm-statut').value = 'actif';
+  populatePresidentSelect('nm-president');
+  document.getElementById('modal-new-mandat').classList.add('open');
+}
+function closeNewMandat() { document.getElementById('modal-new-mandat').classList.remove('open'); }
+function confirmNewMandat() {
+  var id = document.getElementById('nm-id').value.trim();
+  var label = document.getElementById('nm-label').value.trim();
+  var debut = document.getElementById('nm-debut').value;
+  if (!id || !label || !debut) { alert('ID, label et date de début sont obligatoires.'); return; }
+  db.collection('mandats').doc(id).set({
+    id: id, label: label, date_debut: debut,
+    date_fin: document.getElementById('nm-fin').value || null,
+    statut: document.getElementById('nm-statut').value,
+    president_email: document.getElementById('nm-president').value || '',
+    kpi_treso: {}, kpi_commercial: {}, kpi_custom: [], locked: false,
+    created_at: firebase.firestore.FieldValue.serverTimestamp()
+  }).then(function(){ closeNewMandat(); });
+}
+
+// ── HELPERS ────────────────────────────────────────────────────
+function localDateStr(d) {
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+function fmtD(s) {
+  if (!s) return '—';
+  var p = s.split('-');
+  return p.length === 3 ? p[2]+'/'+p[1]+'/'+p[0] : s;
+}
+</script>
+</body>
+</html>
