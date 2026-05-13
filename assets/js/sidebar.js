@@ -52,7 +52,7 @@ function buildNavItems(role, basePath) {
       href: basePath+'crm/crm_partenariats.html',
       roles:['super_admin','president','vice_president','responsable_commercial',
              'responsable_marketing','responsable_qualite','secretaire','tresorerie','commercial'] },
-    { section:null, key:'crm_compta', label:'💼 Comptabilité', icon:'dollar-sign',
+    { section:null, key:'crm_compta', label:'Comptabilité', icon:'dollar-sign',
       href: basePath+'crm/crm_compta.html',
       roles:['super_admin','president','vice_president','tresorier','tresorerie','responsable_qualite'] },
 
