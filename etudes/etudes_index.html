@@ -393,7 +393,7 @@ function addAvenant(id) {
   var debut = document.getElementById('av-debut').value;
   var fin = document.getElementById('av-fin').value;
   var note = document.getElementById('av-note') ? document.getElementById('av-note').value.trim() : '';
-  if (!debut || !fin) { alert('Merci de renseigner les deux dates de l'avenant.'); return; }
+  if (!debut || !fin) { alert('Merci de renseigner les deux dates de l\'avenant.'); return; }
   var e = allEtudes.find(function(x){return x.id===id;});
   if (!e) return;
   var avenants = JSON.parse(JSON.stringify(e.avenants||[]));
