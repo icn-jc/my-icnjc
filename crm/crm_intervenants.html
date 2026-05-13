@@ -68,6 +68,7 @@
       <div class="flex justify-between items-center" style="flex-wrap:wrap;gap:10px">
         <div><div class="page-title">Intervenants</div><div class="page-subtitle" id="page-subtitle"></div></div>
         <div class="flex gap-2">
+          <button class="btn btn-secondary btn-sm" id="btn-fix-emails" onclick="fixEmails()" style="display:none" title="Renseigner les emails manquants">🔧 Corriger emails</button>
           <button class="btn btn-primary btn-sm" id="btn-add" onclick="openAdd()" style="display:none">+ Intervenant</button>
           <button class="btn btn-secondary btn-sm" onclick="exportXLSX()">⬇ Excel</button>
         </div>
@@ -165,7 +166,7 @@
         <select class="select-field" id="ni-statut">
           <option value="Actif">Actif</option>
           <option value="Inactif">Inactif</option>
-          <option value="Ancien membre">Ancien membre</option>
+          <option value="Externe">Externe</option>
         </select></div>
       <div class="form-field"><label class="input-label">Situation actuelle</label>
         <select class="select-field" id="ni-situation">
@@ -174,6 +175,12 @@
           <option value="En recherche d'emploi">En recherche d'emploi</option>
           <option value="En poste">En poste</option><option value="Autre">Autre</option>
         </select></div>
+      <div class="form-field full">
+        <label class="input-label">Mandats <span style="font-size:10px;color:var(--text-tertiary);font-weight:400">— sélection multiple</span></label>
+        <select class="select-field" id="ni-mandats" multiple style="height:80px">
+          <option value="externe">Externe (aucun mandat)</option>
+        </select>
+      </div>
       <div class="form-field full"><label class="input-label">Compétences (séparées par virgules)</label><input class="input" id="ni-comp" placeholder="Excel, Python, Marketing digital…"/></div>
       <div class="form-field full"><label class="input-label">Langues (séparées par virgules)</label><input class="input" id="ni-langues" placeholder="Français, Anglais…"/></div>
       <div class="form-field full"><label class="input-label">IBAN</label><input class="input" id="ni-iban" placeholder="FR76…" autocomplete="off"/></div>
@@ -243,6 +250,7 @@ initAuth('crm_intervenants', function(user, role, profile) {
   showAppPage(user, role, profile);
   updateHealthIndicator();
   if (CAN_EDIT) document.getElementById('btn-add').style.display = 'flex';
+  if (MY_ROLE === 'super_admin') document.getElementById('btn-fix-emails').style.display = 'flex';
   var now = new Date();
   var M=['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
   document.getElementById('page-subtitle').innerText = now.getDate()+' '+M[now.getMonth()]+' '+now.getFullYear();
@@ -250,6 +258,25 @@ initAuth('crm_intervenants', function(user, role, profile) {
 });
 
 function loadData() {
+  // Charger les mandats pour les filtres et le formulaire
+  db.collection('mandats').where('statut','in',['actif','clos']).orderBy('date_debut','desc').get().then(function(snap) {
+    var mandats = [];
+    snap.forEach(function(doc){mandats.push(Object.assign({id:doc.id},doc.data()));});
+    // Filter select
+    var fSel = document.getElementById('f-mandat-iv');
+    mandats.forEach(function(m){
+      var o=document.createElement('option');o.value=m.id;o.text=m.label+(m.statut==='actif'?' (actif)':'');
+      fSel.appendChild(o);
+    });
+    // Add form select
+    var niSel = document.getElementById('ni-mandats');
+    niSel.innerHTML = '<option value="externe">Externe (aucun mandat)</option>';
+    mandats.forEach(function(m){
+      var o=document.createElement('option');o.value=m.id;o.text=m.label;
+      niSel.appendChild(o);
+    });
+  });
+
   db.collection('etudes').onSnapshot(function(snap) {
     allEtudes = [];
     snap.forEach(function(doc){allEtudes.push(Object.assign({id:doc.id},doc.data()));});
@@ -272,10 +299,10 @@ function seedIntervenants() {
       tel:'',ville:'',adresse:'',date_naissance:'',nationalite:'Française',
       ecole:'ICN Business School',niveau_etudes:'',specialite:'',
       iban:'',competences:[],langues:['Français'],
-      disponibilite:'Disponible',statut:'Actif',situation:'Étudiant',
+      disponibilite:'Disponible',statut:'Actif',situation:'Étudiant',mandats_ids:[],
       nb_missions:0,ca_genere:0,notes:'',
       created_at:firebase.firestore.FieldValue.serverTimestamp()
-    }, iv));
+    }, iv));  // iv APRÈS pour que email/prenom/nom écrasent les valeurs par défaut
   });
   batch.commit();
 }
@@ -374,6 +401,8 @@ function render() {
               '<div class="iv-role">'+(iv.specialite||iv.ecole||'—')+
                 (iv.ville?' <span style="opacity:.7">· 📍'+iv.ville+'</span>':'')+'</div>' +
               (iv.situation?'<div style="font-size:10px;color:var(--text-tertiary);margin-top:1px">'+iv.situation+'</div>':'') +
+              (iv.mandats_ids&&iv.mandats_ids.length?'<div style="font-size:10px;color:var(--bordeaux);margin-top:1px;font-weight:600">'+iv.mandats_ids.join(', ')+'</div>':
+               iv.statut==='Externe'?'<div style="font-size:10px;color:var(--text-tertiary);margin-top:1px">Intervenant externe</div>':'') +
             '</div>' +
             '<span class="dispo-badge dispo-'+dc+'">'+(iv.disponibilite||'—')+'</span>' +
           '</div>' +
@@ -455,6 +484,7 @@ function renderIvInfos(iv) {
     '<div class="sec" style="margin-top:16px">Finances</div>' +
     fld('IBAN', iv.iban ? iv.iban.slice(0,8)+'…'+iv.iban.slice(-4) : '—') +
     fld('CA généré', fmtM(iv.ca_genere)) +
+    fld('Mandats', (iv.mandats_ids&&iv.mandats_ids.length) ? iv.mandats_ids.join(', ') : (iv.statut==='Externe'?'Externe':'Aucun mandat assigné')) +
     (iv.dispo_debut||iv.dispo_fin ? fld('Période dispo', fmtD(iv.dispo_debut)+' → '+fmtD(iv.dispo_fin)) : '') +
     (iv.notes?'<div class="sec" style="margin-top:16px">Notes</div><div style="font-size:13px;color:var(--text-secondary);line-height:1.6">'+iv.notes+'</div>':'');
 }
@@ -559,6 +589,7 @@ function renderIvEdit(iv) {
     ef('Statut','select:'+statOpts,iv.statut||'','statut',id)+
     ef('Compétences','text',(iv.competences||[]).join(', '),'competences_str',id)+
     ef('Langues','text',(iv.langues||[]).join(', '),'langues_str',id)+
+    '<div><label class="input-label">Mandats</label><select class="select-field" id="ev-mandats-'+id+'" multiple style="height:80px;font-size:12px"></select><button class="btn btn-secondary btn-sm" style="margin-top:4px" onclick="saveMandatsIv(''+id+'')">Enregistrer mandats</button></div>'+
     ef('Dispo — date début','date',iv.dispo_debut||'','dispo_debut',id)+
     ef('Dispo — date fin','date',iv.dispo_fin||'','dispo_fin',id)+
     ef('IBAN','text',iv.iban||'','iban',id)+
@@ -576,6 +607,16 @@ function ef(label, type, val, field, id) {
     input = '<input class="input" type="'+type+'" value="'+val+'" style="font-size:12px" onblur="saveIvField(\''+id+'\',\''+field+'\',this.value)"/>';
   }
   return '<div><label class="input-label">'+label+'</label>'+input+'</div>';
+}
+
+function saveMandatsIv(id) {
+  var sel = document.getElementById('ev-mandats-'+id);
+  if (!sel) return;
+  var selected = Array.from(sel.selectedOptions).map(function(o){return o.value;}).filter(function(v){return v!=='externe';});
+  db.collection('intervenants').doc(id).update({mandats_ids: selected}).then(function(){
+    var btn = sel.nextElementSibling;
+    if (btn) { var orig=btn.innerText; btn.innerText='Saved'; setTimeout(function(){btn.innerText=orig;},1500); }
+  });
 }
 
 function saveIvField(id, field, val) {
@@ -610,11 +651,67 @@ function confirmAdd() {
     competences:document.getElementById('ni-comp').value.split(',').map(function(s){return s.trim();}).filter(Boolean),
     langues:document.getElementById('ni-langues').value.split(',').map(function(s){return s.trim();}).filter(Boolean),
     situation:document.getElementById('ni-situation').value,
+    mandats_ids:Array.from(document.getElementById('ni-mandats').selectedOptions).map(function(o){return o.value;}).filter(function(v){return v!=='externe';}),
     iban:document.getElementById('ni-iban').value.trim(),
     notes:document.getElementById('ni-notes').value.trim(),
     nb_missions:0, ca_genere:0,
     created_at:firebase.firestore.FieldValue.serverTimestamp()
   }).then(function(){closeAdd();});
+}
+
+function fixEmails() {
+  if (!confirm('Mettre à jour les emails des intervenants depuis la liste prédéfinie ?')) return;
+  var EMAIL_MAP = {
+    'FERNANDES':'antoine.fernandes@icnjuniorconseil.com',
+    'GRANDIN':'maeline.grandin@icnjuniorconseil.com',
+    'FORTUNATO':'enzo.fortunato@icnjuniorconseil.com',
+    'KANESALINGAM':'suhirthan.kanesalingam@icnjuniorconseil.com',
+    'BOUVIER':'eliott.bouvier@icnjuniorconseil.com',
+    'DESMOND':'nicolas.desmond@icnjuniorconseil.com',
+    'CORNET':'olivier.cornet@icnjuniorconseil.com',
+    'BOUTARFA':'mathis.boutarfa@icnjuniorconseil.com',
+    'NEIFAR':'taoufik.neifar@icnjuniorconseil.com',
+    'RENARD':'julia.renard@icnjuniorconseil.com',
+    'SERS':'raoul.sers@icnjuniorconseil.com',
+    'DA CUNHA':'jb.dacunha@icnjuniorconseil.com',
+    'AMELINE':'julie.ameline@icnjuniorconseil.com',
+    'GERNET':'cecil.gernet@icnjuniorconseil.com',
+    'BAHMED':'gwilherm.bahmed@icnjuniorconseil.com',
+    'YATHE':'stella.yathe@icnjuniorconseil.com',
+    'LI':'sophia.li@icnjuniorconseil.com',
+    'ETIENNE':'oceane.etienne@icnjuniorconseil.com',
+    'CISSOKHO':'maryama.cissokho@icnjuniorconseil.com',
+    'CAVERY':'djalil.cavery@icnjuniorconseil.com',
+    'NYAZI':'bilal.nyazi@icnjuniorconseil.com',
+    'TRUFFO':'nathan.truffo@icnjuniorconseil.com',
+    'BANGOURA':'mamet.bangoura@icnjuniorconseil.com',
+    'LOPES':'diego.lopes@icnjuniorconseil.com',
+    'WELLENREITER':'tom.wellenreiter@icnjuniorconseil.com',
+    'DELABARRE':'oriane.delabarre@icnjuniorconseil.com',
+    'CHARRIER':'arthur.charrier@icnjuniorconseil.com',
+    'ARUDCHELVAN':'pagesan.arudchelvan@icnjuniorconseil.com',
+    'MARGOSSIAN':'jorys.margossian@icnjuniorconseil.com',
+    'RAMADAN':'celine.ramadan@icnjuniorconseil.com',
+    'ABIDI':'roua.abidi@icnjuniorconseil.com',
+    'SAMUEL':'victor.samuel@icnjuniorconseil.com',
+    'TOUAITI':'amen.touaiti@icnjuniorconseil.com',
+    'LHOME':'leo.lhome@icnjuniorconseil.com',
+    'DOYEN':'antoine.doyen@icnjuniorconseil.com'
+  };
+  var batch = db.batch();
+  var count = 0;
+  allIntervenants.forEach(function(iv) {
+    var nomKey = (iv.nom||'').toUpperCase().replace(/[^A-Z]/g,'');
+    var email = EMAIL_MAP[nomKey] || EMAIL_MAP[iv.nom.toUpperCase()];
+    if (email && (!iv.email || iv.email !== email)) {
+      batch.update(db.collection('intervenants').doc(iv.id), {email: email});
+      count++;
+    }
+  });
+  batch.commit().then(function(){
+    alert(count + ' email(s) mis a jour.');
+    document.getElementById('btn-fix-emails').style.display = 'none';
+  });
 }
 
 function exportXLSX() {
