@@ -185,7 +185,7 @@
 <script>
 var ME='',MY_ROLE='',MY_NAME='',IS_CA=false;
 var allEvents=[],allProps=[],calY,calM,today=new Date(),curEvId=null;
-var CA_ROLES=['super_admin','president','vice_president','tresorier','secretaire','responsable_commercial','responsable_qualite','responsable_marketing','tresorerie','auditeur','marketing'];
+var EV_CA_ROLES=['super_admin','president','vice_president','tresorier','secretaire','responsable_commercial','responsable_qualite','responsable_marketing','tresorerie','auditeur','marketing'];
 var MOIS=['Janvier','Fevrier','Mars','Avril','Mai','Juin','Juillet','Aout','Septembre','Octobre','Novembre','Decembre'];
 var MOIS_S=['jan','fev','mar','avr','mai','jun','jul','aou','sep','oct','nov','dec'];
 function esc(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
@@ -195,7 +195,7 @@ function todayStr(){return today.getFullYear()+'-'+String(today.getMonth()+1).pa
 
 initAuth('evenements',function(user,role,profile){
   ME=user.email;MY_ROLE=role;MY_NAME=((profile.prenom||'')+' '+(profile.nom||'')).trim();
-  IS_CA=CA_ROLES.includes(role);
+  IS_CA=EV_CA_ROLES.includes(role);
   renderSidebar(role,profile,user,'evenements');
   showAppPage(user,role,profile);
   updateHealthIndicator();
