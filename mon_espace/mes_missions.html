@@ -12,44 +12,54 @@
 <script src="../assets/js/auth.js"></script>
 <script src="../assets/js/sidebar.js"></script>
 <style>
-.mission-tabs{display:flex;gap:3px;background:var(--bg);border-radius:var(--radius-lg);padding:4px;border:1px solid var(--border);width:fit-content;margin-bottom:20px;flex-wrap:wrap;}
-.mt-btn{padding:8px 16px;border-radius:var(--radius-md);font-size:13px;font-weight:500;cursor:pointer;border:none;background:transparent;color:var(--text-secondary);font-family:'Sora',sans-serif;transition:all .2s;}
-.mt-btn.active{background:var(--white);color:var(--bordeaux);box-shadow:var(--shadow-sm);font-weight:600;}
-.mt-pane{display:none;}
-.mt-pane.active{display:block;}
-/* Mission card */
-.mission-card{background:var(--bg-card);border-radius:var(--radius-lg);padding:18px 20px;border:1px solid var(--border);box-shadow:var(--shadow-sm);margin-bottom:14px;}
-.mission-card.active{border-left:3px solid var(--bordeaux);}
-.mission-card.done{border-left:3px solid var(--success);}
-.mc-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;flex-wrap:wrap;gap:8px;}
-.mc-ref{font-family:monospace;font-size:12px;font-weight:700;color:var(--bordeaux);}
-.mc-title{font-family:'Playfair Display',serif;font-size:16px;color:var(--navy);margin-top:3px;}
-.mc-client{font-size:12px;color:var(--text-tertiary);margin-top:2px;}
-.mc-stats{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px;margin-top:12px;}
-.mc-stat{background:var(--bg);border-radius:var(--radius-md);padding:8px 12px;}
-.mc-stat-val{font-size:16px;font-weight:700;color:var(--navy);}
+.mm-tabs{display:flex;gap:3px;background:var(--bg);border-radius:var(--radius-lg);padding:4px;border:1px solid var(--border);width:fit-content;margin-bottom:24px;flex-wrap:wrap;}
+.mm-tab{padding:8px 18px;border-radius:var(--radius-md);font-size:13px;font-weight:500;cursor:pointer;border:none;background:transparent;color:var(--text-secondary);font-family:'Sora',sans-serif;transition:all .2s;}
+.mm-tab.active{background:var(--white);color:var(--bordeaux);box-shadow:var(--shadow-sm);font-weight:600;}
+.mm-pane{display:none;}.mm-pane.active{display:block;}
+.mc{background:var(--bg-card);border-radius:var(--radius-lg);border:1px solid var(--border);box-shadow:var(--shadow-sm);overflow:hidden;margin-bottom:16px;}
+.mc.active-mc{border-top:3px solid var(--bordeaux);}.mc.done-mc{border-top:3px solid var(--success);}
+.mc-top{padding:18px 20px;display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap;}
+.mc-date-box{background:var(--bg);border-radius:var(--radius-md);padding:10px 14px;text-align:center;min-width:56px;flex-shrink:0;}
+.mc-date-day{font-size:22px;font-weight:800;color:var(--navy);line-height:1;}
+.mc-date-mo{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--text-tertiary);}
+.mc-info{flex:1;min-width:0;}
+.mc-ref{font-family:monospace;font-size:11px;font-weight:700;color:var(--bordeaux);}
+.mc-title{font-family:'Playfair Display',serif;font-size:17px;color:var(--navy);margin-top:2px;}
+.mc-type-badge{font-size:10px;font-weight:700;padding:3px 10px;border-radius:99px;margin-top:6px;display:inline-block;}
+.type-marche{background:#e0f2fe;color:#0c4a6e;}.type-marketing{background:#fce7f3;color:#831843;}
+.type-finance{background:#dcfce7;color:#14532d;}.type-affaires{background:#fef3c7;color:#78350f;}
+.mc-stats{display:flex;gap:12px;padding:12px 20px;border-top:1px solid var(--border);background:#fafafa;flex-wrap:wrap;}
+.mc-stat-val{font-size:15px;font-weight:700;color:var(--navy);}
 .mc-stat-lbl{font-size:10px;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:.06em;}
-.badge{padding:2px 8px;border-radius:99px;font-size:11px;font-weight:600;}
-.s-encours{background:#fef3c7;color:#78350f;}
-.s-livre{background:#dbeafe;color:#1e3a5f;}
-.s-cloture{background:#f1f5f9;color:#475569;}
-.s-signe{background:#dcfce7;color:#14532d;}
-/* Lien card */
-.lien-card{background:var(--bg-card);border-radius:var(--radius-lg);padding:16px 18px;border:1px solid var(--border);margin-bottom:12px;display:flex;align-items:center;gap:14px;transition:box-shadow .15s;}
-.lien-card:hover{box-shadow:var(--shadow-md);}
-.lien-card.nouveau{border-left:3px solid var(--bordeaux);background:linear-gradient(135deg,rgba(163,33,95,0.03),var(--white));}
-.lien-icon{width:40px;height:40px;border-radius:var(--radius-md);background:var(--bordeaux-bg);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;}
-.lien-info{flex:1;min-width:0;}
-.lien-name{font-weight:600;font-size:13px;color:var(--navy);}
-.lien-ref{font-size:11px;color:var(--text-tertiary);font-family:monospace;}
+.phase-track{padding:16px 20px;border-top:1px solid var(--border);}
+.phase-title{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--text-tertiary);margin-bottom:10px;}
+.phases-bar{display:flex;gap:2px;margin-bottom:14px;height:6px;}
+.phase-seg{flex:1;border-radius:99px;background:var(--border);transition:background .3s;}
+.phase-seg.done{background:var(--bordeaux);}.phase-seg.current{background:#f9a8d4;}
+.phase-item{display:flex;gap:12px;align-items:flex-start;padding:8px 0;border-bottom:1px solid var(--border);}
+.phase-item:last-child{border-bottom:none;}
+.phase-check{width:24px;height:24px;border-radius:50%;border:2px solid var(--border);display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;transition:all .2s;font-size:12px;}
+.phase-check.done{background:var(--bordeaux);border-color:var(--bordeaux);color:white;}
+.phase-check.current{border-color:var(--bordeaux);}
+.phase-name{font-size:13px;font-weight:600;color:var(--navy);}
+.phase-sub{font-size:11px;color:var(--text-tertiary);margin-top:1px;}
+.phase-expand{font-size:11px;color:var(--bordeaux);cursor:pointer;margin-top:3px;}
+.phase-extra{display:none;margin-top:8px;}
+.phase-extra.open{display:block;}
+.phase-note{width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:var(--radius-sm);font-family:'Sora',sans-serif;font-size:12px;resize:vertical;min-height:48px;}
+.phase-note:focus{outline:none;border-color:var(--bordeaux);}
+.lien-card{background:var(--bg-card);border-radius:var(--radius-lg);padding:16px 18px;border:1px solid var(--border);margin-bottom:12px;display:flex;align-items:center;gap:14px;}
+.lien-card.nouveau{border-left:3px solid var(--bordeaux);background:rgba(163,33,95,0.02);}
+.lien-icon{width:44px;height:44px;border-radius:var(--radius-md);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;}
+.lien-icon.rm{background:#fce7f3;}.lien-icon.ce{background:#e0f2fe;}.lien-icon.bv{background:#dcfce7;}
 .new-badge{background:var(--bordeaux);color:white;font-size:10px;font-weight:700;padding:2px 8px;border-radius:99px;}
-/* Questionnaire */
-.q-field{margin-bottom:16px;}
-.q-label{font-size:13px;font-weight:600;color:var(--navy);margin-bottom:6px;}
-.q-sub{font-size:11px;color:var(--text-tertiary);margin-bottom:6px;}
-.star-rating{display:flex;gap:6px;}
-.star{font-size:24px;cursor:pointer;color:#d1d5db;transition:color .1s;}
-.star.active{color:#f59e0b;}
+.empty-state{text-align:center;padding:60px 20px;}
+.empty-icon{font-size:48px;margin-bottom:12px;opacity:.4;}
+.empty-title{font-size:15px;font-weight:600;color:var(--navy);margin-bottom:6px;}
+.empty-sub{font-size:13px;color:var(--text-tertiary);max-width:360px;margin:0 auto;line-height:1.5;}
+.badge{padding:3px 10px;border-radius:99px;font-size:11px;font-weight:600;}
+.s-signe{background:#dcfce7;color:#14532d;}.s-encours{background:#fef3c7;color:#78350f;}
+.s-livre{background:#dbeafe;color:#1e3a5f;}.s-cloture{background:#f1f5f9;color:#475569;}
 </style>
 </head>
 <body>
@@ -65,305 +75,350 @@
     <div class="login-error" id="login-error"></div>
   </div>
 </div>
-
 <div class="app-page" id="app-page">
   <div id="sidebar-container"></div>
   <div class="app-content">
     <div class="page-header">
       <div class="page-title">Mes missions</div>
-      <div class="page-subtitle" id="page-subtitle"></div>
+      <div class="page-subtitle" id="page-sub"></div>
     </div>
     <div class="page-body">
-      <div class="mission-tabs">
-        <button class="mt-btn active" onclick="switchTab('actives')" id="mtt-actives">🎯 En cours</button>
-        <button class="mt-btn" onclick="switchTab('historique')" id="mtt-historique">📋 Historique</button>
-        <button class="mt-btn" onclick="switchTab('liens')" id="mtt-liens">📂 Mes liens <span id="new-count" style="display:none;background:var(--bordeaux);color:white;border-radius:99px;padding:1px 6px;font-size:10px;margin-left:4px"></span></button>
+      <div class="mm-tabs">
+        <button class="mm-tab active" onclick="switchTab('actives')" id="mmt-actives">🎯 En cours</button>
+        <button class="mm-tab" onclick="switchTab('historique')" id="mmt-historique">📋 Historique</button>
+        <button class="mm-tab" onclick="switchTab('liens')" id="mmt-liens">📂 Mes liens <span id="new-badge" style="display:none;background:var(--bordeaux);color:white;border-radius:99px;padding:1px 7px;font-size:10px;margin-left:4px"></span></button>
       </div>
-
-      <!-- MISSIONS EN COURS -->
-      <div class="mt-pane active" id="mtp-actives">
-        <div id="actives-list"><div style="color:var(--text-tertiary)">Chargement…</div></div>
-      </div>
-
-      <!-- HISTORIQUE -->
-      <div class="mt-pane" id="mtp-historique">
-        <div id="historique-list"><div style="color:var(--text-tertiary)">Chargement…</div></div>
-      </div>
-
-      <!-- MES LIENS (documents) -->
-      <div class="mt-pane" id="mtp-liens">
-        <div id="liens-list"><div style="color:var(--text-tertiary)">Chargement…</div></div>
-      </div>
+      <div class="mm-pane active" id="mmp-actives"><div class="empty-state"><div class="empty-icon">⏳</div><div class="empty-title">Chargement…</div></div></div>
+      <div class="mm-pane" id="mmp-historique"><div class="empty-state"><div class="empty-icon">📋</div><div class="empty-title">Chargement…</div></div></div>
+      <div class="mm-pane" id="mmp-liens"><div class="empty-state"><div class="empty-icon">📂</div><div class="empty-title">Chargement…</div></div></div>
     </div>
   </div>
 </div>
-
-<!-- MODAL SUIVI MISSION -->
-<div class="modal-overlay" id="modal-suivi" onclick="if(event.target===this)closeSuivi()">
-  <div class="modal-box" style="max-width:560px">
-    <div class="modal-header"><div class="modal-title" id="suivi-title">Suivi de mission</div><button class="modal-close" onclick="closeSuivi()">×</button></div>
-    <div id="suivi-content"></div>
-    <div class="modal-actions">
-      <button class="btn btn-secondary" onclick="closeSuivi()">Fermer</button>
-      <button class="btn btn-primary" onclick="saveSuivi()">Sauvegarder</button>
-    </div>
-  </div>
-</div>
-
-<!-- MODAL QUESTIONNAIRE -->
-<div class="modal-overlay" id="modal-questionnaire" onclick="if(event.target===this)closeQuestionnaire()">
+<div class="modal-overlay" id="modal-q" onclick="if(event.target===this)closeQ()">
   <div class="modal-box" style="max-width:600px">
-    <div class="modal-header"><div class="modal-title">Questionnaire de fin d'étude</div><button class="modal-close" onclick="closeQuestionnaire()">×</button></div>
-    <div id="questionnaire-content"></div>
+    <div class="modal-header"><div class="modal-title">Questionnaire de fin d\'étude</div><button class="modal-close" onclick="closeQ()">x</button></div>
+    <div id="q-content"></div>
     <div class="modal-actions">
-      <button class="btn btn-secondary" onclick="closeQuestionnaire()">Annuler</button>
-      <button class="btn btn-primary" onclick="submitQuestionnaire()">Soumettre ✓</button>
+      <button class="btn btn-secondary" onclick="closeQ()">Annuler</button>
+      <button class="btn btn-primary" onclick="submitQ()">Soumettre</button>
     </div>
   </div>
 </div>
-
 <script>
-var ME = '', MY_ROLE = '', MY_IV_ID = null;
-var myMissions = [], myDocs = [], questionnaire = null;
-var curSuiviId = null, curQuestId = null;
+var STUDY_TYPES = {
+  marche:{label:'Marché & Stratégie',badge:'type-marche',icon:'📊',
+    subtypes:['Étude de marché','Étude de lancement','Benchmark','Veille stratégique'],
+    phases:[
+      {id:'cadrage',label:'Cadrage',sub:'Objectifs, problématique, périmètre'},
+      {id:'conception',label:'Conception',sub:'Méthodologie, questionnaires, guides'},
+      {id:'collecte',label:'Collecte',sub:'Enquêtes terrain, interviews, recherche doc'},
+      {id:'analyse',label:'Analyse',sub:'Traitement données, segmentation, insights'},
+      {id:'recommandations',label:'Recommandations',sub:'Opportunités, positionnement, axes de dev'},
+      {id:'restitution',label:'Restitution',sub:'Rapport détaillé, présentation client'}
+    ]},
+  marketing:{label:'Marketing & Communication',badge:'type-marketing',icon:'📣',
+    subtypes:['Étude de notoriété','Plan de communication','Étude de satisfaction'],
+    phases:[
+      {id:'cadrage',label:'Cadrage',sub:'KPIs, identification des cibles'},
+      {id:'conception',label:'Conception',sub:'Questionnaires, sondages, choix canaux'},
+      {id:'collecte',label:'Collecte',sub:'Diffusion enquêtes, feedback clients'},
+      {id:'analyse',label:'Analyse',sub:'Indicateurs, analyse qualitative des retours'},
+      {id:'recommandations',label:'Recommandations',sub:'Actions marketing, stratégie com'},
+      {id:'restitution',label:'Restitution',sub:'Synthèse opérationnelle, plan d\'actions'}
+    ]},
+  finance:{label:'Finance & Audit',badge:'type-finance',icon:'💰',
+    subtypes:['Business plan','Diagnostic RSE','Visite mystère'],
+    phases:[
+      {id:'cadrage',label:'Cadrage',sub:'Analyse des besoins'},
+      {id:'collecte',label:'Collecte',sub:'Données financières, documents internes'},
+      {id:'analyse',label:'Analyse',sub:'Diagnostic, calculs de rentabilité'},
+      {id:'construction',label:'Construction',sub:'Business plan, scénarios financiers'},
+      {id:'recommandations',label:'Recommandations',sub:'Décisions investissement, optimisation'},
+      {id:'restitution',label:'Restitution',sub:'Livrables structurés, projections'}
+    ]},
+  affaires:{label:'Affaires Publiques',badge:'type-affaires',icon:'🏛️',
+    subtypes:['Sondage d\'opinion'],
+    phases:[
+      {id:'cadrage',label:'Cadrage',sub:'Public cible, objectif du sondage'},
+      {id:'conception',label:'Conception',sub:'Création du questionnaire'},
+      {id:'collecte',label:'Collecte',sub:'Diffusion à l\'échantillon'},
+      {id:'analyse',label:'Analyse',sub:'Traitement statistique, interprétation'},
+      {id:'recommandations',label:'Recommandations',sub:'Aide à la décision'},
+      {id:'restitution',label:'Restitution',sub:'Rapport + synthèse décisionnelle'}
+    ]}
+};
 
+function getTypeKey(t){
+  if(!t)return 'marche';
+  var tl=t.toLowerCase();
+  if(tl.includes('march')||tl.includes('strat')||tl.includes('bench')||tl.includes('veille')||tl.includes('lancement'))return 'marche';
+  if(tl.includes('market')||tl.includes('not')||tl.includes('satisf')||tl.includes('com'))return 'marketing';
+  if(tl.includes('finan')||tl.includes('audit')||tl.includes('business')||tl.includes('rse')||tl.includes('myst'))return 'finance';
+  if(tl.includes('public')||tl.includes('sondage'))return 'affaires';
+  return 'marche';
+}
+
+var ME='',MY_ROLE='',MY_NAME='',MY_IV_ID=null;
+var myMissions=[],myDocs=[],questionnaire=null,questionnaireId=null,curQId=null;
+var MOIS_S=['jan','fév','mar','avr','mai','jun','jul','aoû','sep','oct','nov','déc'];
 function fmtD(s){if(!s)return'—';var p=s.split('-');return p.length===3?p[2]+'/'+p[1]+'/'+p[0]:s;}
 function fmtM(n){return Number(n||0).toLocaleString('fr-FR',{minimumFractionDigits:0,maximumFractionDigits:0})+' €';}
+function esc(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 
-initAuth('mes_missions', function(user, role, profile) {
-  ME = user.email; MY_ROLE = role;
-  renderSidebar(role, profile, user, 'mes_missions');
-  showAppPage(user, role, profile);
+initAuth('mes_missions',function(user,role,profile){
+  ME=user.email;MY_ROLE=role;
+  MY_NAME=((profile.prenom||'')+' '+(profile.nom||'')).trim();
+  renderSidebar(role,profile,user,'mes_missions');
+  showAppPage(user,role,profile);
   updateHealthIndicator();
-  var now = new Date();
+  var now=new Date();
   var M=['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
-  document.getElementById('page-subtitle').innerText = (profile.prenom||user.displayName||'') + ' · ' + now.getDate()+' '+M[now.getMonth()]+' '+now.getFullYear();
-  loadData(user.email);
+  document.getElementById('page-sub').innerText=(profile.prenom||'')+' · '+now.getDate()+' '+M[now.getMonth()]+' '+now.getFullYear();
+  loadData();
 });
 
-function loadData(email) {
-  // Trouver l'intervenant lié à cet email
-  db.collection('intervenants').where('email','==',email).get().then(function(snap){
-    if (!snap.empty) {
-      MY_IV_ID = snap.docs[0].id;
-    }
-    // Charger les études où l'utilisateur est intervenant
+function loadData(){
+  db.collection('questionnaires').where('actif','==',true).limit(1).get().then(function(snap){
+    if(!snap.empty){questionnaireId=snap.docs[0].id;questionnaire=Object.assign({id:snap.docs[0].id},snap.docs[0].data());}
+  });
+  // Find intervenant by email
+  db.collection('intervenants').get().then(function(snap){
+    snap.forEach(function(doc){
+      var d=doc.data();
+      if((d.email||'').toLowerCase()===ME.toLowerCase())MY_IV_ID=doc.id;
+    });
+    // Load études
     db.collection('etudes').onSnapshot(function(snap2){
-      myMissions = [];
+      myMissions=[];
       snap2.forEach(function(doc){
-        var e = Object.assign({id:doc.id},doc.data());
-        var isIv = (e.intervenants||[]).some(function(i){
-          return i.intervenant_id === MY_IV_ID || i.email === email;
+        var e=Object.assign({id:doc.id},doc.data());
+        var isMe=(e.intervenants||[]).some(function(i){
+          return i.intervenant_id===MY_IV_ID||(i.email||'').toLowerCase()===ME.toLowerCase();
         });
-        if (isIv) myMissions.push(e);
+        if(isMe)myMissions.push(e);
       });
       renderMissions();
     });
-  });
-
-  // Documents
-  if (MY_IV_ID) {
-    db.collection('documents').where('intervenant_id','==',MY_IV_ID).onSnapshot(function(snap3){
-      myDocs = [];
+    // Load docs
+    var q=MY_IV_ID
+      ?db.collection('documents').where('intervenant_id','==',MY_IV_ID)
+      :db.collection('documents').where('intervenant_email','==',ME);
+    q.onSnapshot(function(snap3){
+      myDocs=[];
       snap3.forEach(function(doc){myDocs.push(Object.assign({id:doc.id},doc.data()));});
       renderLiens();
     });
-  } else {
-    db.collection('documents').where('intervenant_email','==',email).onSnapshot(function(snap3){
-      myDocs = [];
-      snap3.forEach(function(doc){myDocs.push(Object.assign({id:doc.id},doc.data()));});
-      renderLiens();
-    });
-  }
-
-  // Questionnaire actif
-  db.collection('questionnaires').where('actif','==',true).limit(1).get().then(function(snap4){
-    if (!snap4.empty) questionnaire = Object.assign({id:snap4.docs[0].id},snap4.docs[0].data());
   });
 }
 
-function switchTab(key) {
-  ['actives','historique','liens'].forEach(function(k){
-    document.getElementById('mtt-'+k).classList.toggle('active',k===key);
-    document.getElementById('mtp-'+k).classList.toggle('active',k===key);
+function switchTab(k){
+  ['actives','historique','liens'].forEach(function(t){
+    document.getElementById('mmt-'+t).classList.toggle('active',t===k);
+    document.getElementById('mmp-'+t).classList.toggle('active',t===k);
   });
 }
 
-function renderMissions() {
-  var actives = myMissions.filter(function(e){return ['Signé','En cours'].includes(e.statut);});
-  var done = myMissions.filter(function(e){return ['Livré','Facturé','Clôturé'].includes(e.statut);});
-  renderMissionList(actives, 'actives-list', true);
-  renderMissionList(done, 'historique-list', false);
+function renderMissions(){
+  var act=myMissions.filter(function(e){return['Signé','En cours'].includes(e.statut);});
+  var done=myMissions.filter(function(e){return['Livré','Facturé','Clôturé'].includes(e.statut);});
+  renderList(act,'mmp-actives',true);
+  renderList(done,'mmp-historique',false);
 }
 
-function renderMissionList(list, containerId, isActive) {
-  if (list.length === 0) {
-    document.getElementById(containerId).innerHTML = '<div style="color:var(--text-tertiary);font-size:13px;text-align:center;padding:30px">'+
-      (isActive?'Aucune mission en cours.':'Aucune mission terminée.')+'</div>';
+function renderList(list,cid,isActive){
+  if(!list.length){
+    document.getElementById(cid).innerHTML='<div class="empty-state"><div class="empty-icon">'+(isActive?'🎯':'✅')+'</div><div class="empty-title">'+(isActive?'Aucune mission en cours':'Aucune mission terminée')+'</div><div class="empty-sub">'+(isActive?'Tu seras notifié dès qu\'une mission t\'est assignée.':'Tes missions terminées apparaîtront ici.')+'</div></div>';
     return;
   }
-  var STATUT_CSS = {Signé:'s-signe','En cours':'s-encours',Livré:'s-livre',Clôturé:'s-cloture',Facturé:'s-livre'};
-  document.getElementById(containerId).innerHTML = list.map(function(e){
-    var myIv = (e.intervenants||[]).find(function(i){return i.intervenant_id===MY_IV_ID;}) || {};
-    var sc = STATUT_CSS[e.statut]||'';
-    var canQ = e.statut==='Livré' && questionnaire;
-    return '<div class="mission-card '+(isActive?'active':'done')+'">' +
-      '<div class="mc-header">' +
-        '<div>' +
-          '<div class="mc-ref">'+(e.reference||'—')+'</div>' +
-          '<div class="mc-title">'+(e.title||'Sans titre')+'</div>' +
-          '<div class="mc-client">🏢 '+(e.client_name||'—')+'</div>' +
-        '</div>' +
-        '<span class="badge '+sc+'">'+(e.statut||'—')+'</span>' +
-      '</div>' +
-      '<div class="mc-stats">' +
-        '<div class="mc-stat"><div class="mc-stat-val">'+fmtD(e.date_debut)+'</div><div class="mc-stat-lbl">Début</div></div>' +
-        '<div class="mc-stat"><div class="mc-stat-val">'+fmtD(e.date_fin)+'</div><div class="mc-stat-lbl">Fin prévue</div></div>' +
-        (myIv.montant_brut?'<div class="mc-stat"><div class="mc-stat-val">'+fmtM(myIv.montant_brut)+'</div><div class="mc-stat-lbl">Rémunération brute</div></div>':'') +
-      '</div>' +
-      '<div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">' +
-        '<button class="btn btn-secondary btn-sm" onclick="openSuivi(\''+e.id+'\')">📝 Suivi d\'avancement</button>' +
-        (canQ?'<button class="btn btn-primary btn-sm" onclick="openQuestionnaire(\''+e.id+'\')">📋 Questionnaire fin d\'étude</button>':'') +
-      '</div>' +
+  var SC={Signé:'s-signe','En cours':'s-encours',Livré:'s-livre',Clôturé:'s-cloture',Facturé:'s-livre'};
+  document.getElementById(cid).innerHTML=list.map(function(e){
+    var myIv=(e.intervenants||[]).find(function(i){return i.intervenant_id===MY_IV_ID||(i.email||'').toLowerCase()===ME.toLowerCase();})||{};
+    var tk=getTypeKey(e.type_etude||'');var td=STUDY_TYPES[tk];
+    var p=e.date_debut?e.date_debut.split('-'):null;
+    var day=p?p[2]:'—';var mo=p?MOIS_S[parseInt(p[1])-1]:'';
+    var phases=td.phases;
+    var pd=myIv.phases_done||[];
+    var pct=Math.round(pd.length/phases.length*100);
+    var canQ=e.statut==='Livré'&&questionnaire&&!myIv.questionnaire_soumis;
+    var bar=phases.map(function(ph,i){
+      return '<div class="phase-seg '+(pd.includes(ph.id)?'done':i===pd.length?'current':'')+'" style="background:'+(pd.includes(ph.id)?'var(--bordeaux)':i===pd.length?'#f9a8d4':'var(--border)')+'"></div>';
+    }).join('');
+    var phList=phases.map(function(ph,i){
+      var isDone=pd.includes(ph.id);var isCur=i===pd.length;
+      var pNote=(myIv.phase_notes||{})[ph.id]||'';
+      var pLiv=(myIv.phase_livrables||{})[ph.id]||'';
+      var pDate=(myIv.phase_dates||{})[ph.id]||'';
+      return '<div class="phase-item">'+
+        '<div class="phase-check '+(isDone?'done':isCur?'current':'')+'" onclick="togglePhase(\''+e.id+'\',\''+ph.id+'\','+i+','+phases.length+')">'+(isDone?'✓':'')+'</div>'+
+        '<div style="flex:1;min-width:0">'+
+          '<div class="phase-name">'+ph.label+(pDate?' <span style="font-size:10px;color:var(--text-tertiary);font-weight:400">· '+fmtD(pDate)+'</span>':'')+'</div>'+
+          '<div class="phase-sub">'+ph.sub+'</div>'+
+          '<div class="phase-expand" onclick="toggleExtra(\'pe-'+e.id+'-'+ph.id+'\')">+ Notes & livrables</div>'+
+          '<div class="phase-extra '+(pNote||pLiv?'open':'')+'" id="pe-'+e.id+'-'+ph.id+'">'+
+            '<textarea class="phase-note" placeholder="Notes sur cette phase…" onblur="savePN(\''+e.id+'\',\''+ph.id+'\',this.value)">'+esc(pNote)+'</textarea>'+
+            '<input style="margin-top:4px;width:100%;padding:5px 8px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:12px;font-family:\'Sora\',sans-serif;box-sizing:border-box" placeholder="Livrables produits…" value="'+esc(pLiv)+'" onblur="savePL(\''+e.id+'\',\''+ph.id+'\',this.value)"/>'+
+          '</div>'+
+        '</div>'+
+      '</div>';
+    }).join('');
+    return '<div class="mc '+(isActive?'active-mc':'done-mc')+'">'+
+      '<div class="mc-top">'+
+        '<div class="mc-date-box"><div class="mc-date-day">'+day+'</div><div class="mc-date-mo">'+mo+'</div></div>'+
+        '<div class="mc-info">'+
+          '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">'+
+            '<span class="mc-ref">'+esc(e.reference||'—')+'</span>'+
+            '<span class="badge '+(SC[e.statut]||'')+'">'+e.statut+'</span>'+
+            '<span class="mc-type-badge '+td.badge+'">'+td.icon+' '+td.label+'</span>'+
+          '</div>'+
+          '<div class="mc-title">'+esc(e.title||'Sans titre')+'</div>'+
+          '<div style="font-size:12px;color:var(--text-tertiary);margin-top:3px">'+esc(e.client_name||'—')+'</div>'+
+          (e.description?'<div style="font-size:13px;color:var(--text-secondary);margin-top:6px;line-height:1.5">'+esc(e.description)+'</div>':'')+
+          (e.type_etude?'<div style="font-size:11px;color:var(--text-tertiary);margin-top:4px">📌 '+esc(e.type_etude)+'</div>':'')+
+        '</div>'+
+        '<div style="text-align:right;flex-shrink:0">'+
+          '<div style="font-size:26px;font-weight:800;color:var(--bordeaux)">'+pct+'%</div>'+
+          '<div style="font-size:10px;color:var(--text-tertiary)">avancement</div>'+
+          (myIv.montant_brut?'<div style="font-size:13px;font-weight:700;color:var(--navy);margin-top:6px">'+fmtM(myIv.montant_brut)+'</div><div style="font-size:10px;color:var(--text-tertiary)">brut</div>':'')+
+        '</div>'+
+      '</div>'+
+      '<div class="mc-stats">'+
+        '<div class="mc-stat"><div class="mc-stat-val">'+fmtD(e.date_debut)+'</div><div class="mc-stat-lbl">Début</div></div>'+
+        '<div class="mc-stat"><div class="mc-stat-val">'+fmtD(e.date_fin)+'</div><div class="mc-stat-lbl">Fin prévue</div></div>'+
+        '<div class="mc-stat"><div class="mc-stat-val">'+pd.length+' / '+phases.length+'</div><div class="mc-stat-lbl">Phases</div></div>'+
+        (myIv.montant_brut?'':'<div class="mc-stat"><div class="mc-stat-val">'+esc(e.mandat_id||'—')+'</div><div class="mc-stat-lbl">Mandat</div></div>')+
+      '</div>'+
+      '<div class="phase-track">'+
+        '<div class="phase-title">Suivi des phases — '+td.label+'</div>'+
+        '<div class="phases-bar">'+bar+'</div>'+
+        phases.map(function(ph,i){return phList.split('</div></div></div>')[i]||'';}).join('')+
+        phList+
+        (canQ?'<div style="margin-top:12px"><button class="btn btn-primary btn-sm" onclick="openQ(\''+e.id+'\')">📋 Questionnaire de fin d\'étude</button></div>':'')+
+        (myIv.questionnaire_soumis?'<div style="margin-top:8px;font-size:12px;color:var(--success);font-weight:600">✅ Questionnaire soumis</div>':'')+
+      '</div>'+
     '</div>';
   }).join('');
 }
 
-// ── Suivi avancement ──────────────────────────────────────────
-function openSuivi(etudeId) {
-  curSuiviId = etudeId;
-  var e = myMissions.find(function(x){return x.id===etudeId;});
-  if (!e) return;
-  document.getElementById('suivi-title').innerText = 'Suivi — '+(e.reference||e.title||'');
-  var myIv = (e.intervenants||[]).find(function(i){return i.intervenant_id===MY_IV_ID;}) || {};
-  document.getElementById('suivi-content').innerHTML =
-    '<div class="form-field"><label class="input-label">Avancement général (%)</label>' +
-      '<input class="input" type="number" id="sv-pct" min="0" max="100" value="'+(myIv.avancement||0)+'" placeholder="0 à 100"/></div>' +
-    '<div class="form-field"><label class="input-label">Commentaire / points d\'avancement</label>' +
-      '<textarea class="input" id="sv-note" rows="4" style="resize:vertical" placeholder="Décris l\'avancement de ta mission, les difficultés éventuelles…">'+(myIv.suivi_note||'')+'</textarea></div>' +
-    '<div class="form-field"><label class="input-label">Date dernière mise à jour</label>' +
-      '<input class="input" type="date" id="sv-date" value="'+(myIv.suivi_date||new Date().toISOString().split('T')[0])+'"/></div>';
-  document.getElementById('modal-suivi').classList.add('open');
-}
+function toggleExtra(id){var el=document.getElementById(id);if(el)el.classList.toggle('open');}
 
-function closeSuivi() { document.getElementById('modal-suivi').classList.remove('open'); curSuiviId = null; }
-
-function saveSuivi() {
-  if (!curSuiviId) return;
-  var e = myMissions.find(function(x){return x.id===curSuiviId;});
-  if (!e) return;
-  var ivs = JSON.parse(JSON.stringify(e.intervenants||[]));
-  var idx = ivs.findIndex(function(i){return i.intervenant_id===MY_IV_ID;});
-  if (idx>=0){
-    ivs[idx].avancement = parseInt(document.getElementById('sv-pct').value)||0;
-    ivs[idx].suivi_note = document.getElementById('sv-note').value.trim();
-    ivs[idx].suivi_date = document.getElementById('sv-date').value;
-  }
-  db.collection('etudes').doc(curSuiviId).update({intervenants:ivs}).then(function(){
-    closeSuivi();
+function getIvIdx(e){
+  return(e.intervenants||[]).findIndex(function(i){
+    return i.intervenant_id===MY_IV_ID||(i.email||'').toLowerCase()===ME.toLowerCase();
   });
 }
 
-// ── Questionnaire ─────────────────────────────────────────────
-function openQuestionnaire(etudeId) {
-  if (!questionnaire) { alert('Aucun questionnaire actif.'); return; }
-  curQuestId = etudeId;
-  var questions = questionnaire.questions || [];
-  document.getElementById('questionnaire-content').innerHTML =
-    '<p style="font-size:13px;color:var(--text-secondary);margin-bottom:16px">Questionnaire de fin d\'étude. Tes réponses seront transmises au responsable qualité.</p>' +
-    questions.map(function(q,i){
-      var input = '';
-      if (q.type === 'texte') {
-        input = '<textarea class="input" id="q-'+i+'" rows="3" style="resize:vertical" placeholder="Ta réponse…"></textarea>';
-      } else if (q.type === 'note') {
-        input = '<div class="star-rating" id="q-'+i+'">' +
-          [1,2,3,4,5].map(function(n){return '<span class="star" onclick="setStar('+i+','+n+')">★</span>';}).join('') +
-          '</div>';
-      } else if (q.type === 'oui_non') {
-        input = '<div style="display:flex;gap:10px">' +
-          '<label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="radio" name="q'+i+'" id="q-'+i+'-oui" value="Oui"/> Oui</label>' +
-          '<label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="radio" name="q'+i+'" id="q-'+i+'-non" value="Non"/> Non</label>' +
-          '</div>';
-      } else if (q.type === 'choix') {
-        input = (q.options||[]).map(function(opt){
-          return '<label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;margin-bottom:4px"><input type="checkbox" name="q'+i+'" value="'+opt+'"/> '+opt+'</label>';
-        }).join('');
-      }
-      return '<div class="q-field">' +
-        '<div class="q-label">'+(i+1)+'. '+q.question+'</div>' +
-        (q.description?'<div class="q-sub">'+q.description+'</div>':'') +
-        input+'</div>';
+function togglePhase(eid,pid,idx,total){
+  var e=myMissions.find(function(x){return x.id===eid;});if(!e)return;
+  var ivs=JSON.parse(JSON.stringify(e.intervenants||[]));
+  var ii=getIvIdx(e);if(ii<0)return;
+  var pd=ivs[ii].phases_done||[];
+  var dates=ivs[ii].phase_dates||{};
+  if(pd.includes(pid)){pd=pd.filter(function(p){return p!==pid;});delete dates[pid];}
+  else{pd.push(pid);dates[pid]=new Date().toISOString().split('T')[0];}
+  ivs[ii].phases_done=pd;ivs[ii].phase_dates=dates;
+  ivs[ii].avancement=Math.round(pd.length/total*100);
+  var updates={intervenants:ivs};
+  if(pd.length>0&&e.statut==='Signé')updates.statut='En cours';
+  db.collection('etudes').doc(eid).update(updates);
+}
+
+function savePN(eid,pid,val){
+  var e=myMissions.find(function(x){return x.id===eid;});if(!e)return;
+  var ivs=JSON.parse(JSON.stringify(e.intervenants||[]));
+  var ii=getIvIdx(e);if(ii<0)return;
+  if(!ivs[ii].phase_notes)ivs[ii].phase_notes={};
+  ivs[ii].phase_notes[pid]=val;
+  db.collection('etudes').doc(eid).update({intervenants:ivs});
+}
+
+function savePL(eid,pid,val){
+  var e=myMissions.find(function(x){return x.id===eid;});if(!e)return;
+  var ivs=JSON.parse(JSON.stringify(e.intervenants||[]));
+  var ii=getIvIdx(e);if(ii<0)return;
+  if(!ivs[ii].phase_livrables)ivs[ii].phase_livrables={};
+  ivs[ii].phase_livrables[pid]=val;
+  db.collection('etudes').doc(eid).update({intervenants:ivs});
+}
+
+function renderLiens(){
+  var nCount=myDocs.filter(function(d){return!d.vu_par_intervenant&&d.lien_gdrive;}).length;
+  var nb=document.getElementById('new-badge');
+  if(nCount>0){nb.style.display='';nb.innerText=nCount;}else{nb.style.display='none';}
+  if(!myDocs.length){
+    document.getElementById('mmp-liens').innerHTML='<div class="empty-state"><div class="empty-icon">📂</div><div class="empty-title">Aucun document disponible</div><div class="empty-sub">Tes documents apparaîtront ici dès qu\'ils sont mis en ligne.</div></div>';
+    return;
+  }
+  var ICONS={RM:{ico:'📄',cls:'rm'},CE:{ico:'📋',cls:'ce'},BV:{ico:'💰',cls:'bv'}};
+  document.getElementById('mmp-liens').innerHTML=myDocs.map(function(d){
+    var isNew=!d.vu_par_intervenant&&d.lien_gdrive;
+    var ic=ICONS[d.type]||{ico:'📎',cls:'rm'};
+    return '<div class="lien-card '+(isNew?'nouveau':'')+'">'+
+      '<div class="lien-icon '+ic.cls+'">'+ic.ico+'</div>'+
+      '<div style="flex:1;min-width:0">'+
+        '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">'+
+          '<div style="font-weight:600;font-size:13px;color:var(--navy)">'+esc(d.nom_affiche||d.type||'Document')+'</div>'+
+          (isNew?'<span class="new-badge">Nouveau</span>':'')+
+        '</div>'+
+        '<div style="font-size:11px;color:var(--text-tertiary);font-family:monospace;margin-top:2px">'+esc(d.etude_ref||'')+'</div>'+
+        (!d.lien_gdrive?'<div style="font-size:11px;color:var(--text-tertiary);margin-top:3px;font-style:italic">En attente de mise en ligne…</div>':'')+
+      '</div>'+
+      (d.lien_gdrive?'<a href="'+d.lien_gdrive+'" target="_blank" onclick="markVu(\''+d.id+'\')" class="btn btn-primary btn-sm">📥 Ouvrir</a>':'')+
+    '</div>';
+  }).join('');
+}
+
+function markVu(id){db.collection('documents').doc(id).update({vu_par_intervenant:true});}
+
+function openQ(eid){
+  if(!questionnaire){alert('Aucun questionnaire actif.');return;}
+  curQId=eid;
+  var qs=questionnaire.questions||[];
+  document.getElementById('q-content').innerHTML='<p style="font-size:13px;color:var(--text-secondary);margin-bottom:14px;line-height:1.6">Ce questionnaire est transmis au responsable qualité. Tes retours sont précieux.</p>'+
+    qs.map(function(q,i){
+      var inp='';
+      if(q.type==='texte')inp='<textarea class="input" id="qa-'+i+'" rows="3" style="resize:vertical" placeholder="Ta réponse…"></textarea>';
+      else if(q.type==='note')inp='<div id="qa-'+i+'" data-val="0" style="display:flex;gap:8px">'+[1,2,3,4,5].map(function(n){return'<span style="font-size:24px;cursor:pointer;color:#d1d5db" onclick="setQS('+i+','+n+')">&#9733;</span>';}).join('')+'</div>';
+      else if(q.type==='oui_non')inp='<div style="display:flex;gap:16px"><label style="cursor:pointer;font-size:13px;display:flex;align-items:center;gap:6px"><input type="radio" name="qa'+i+'" value="Oui"/> Oui</label><label style="cursor:pointer;font-size:13px;display:flex;align-items:center;gap:6px"><input type="radio" name="qa'+i+'" value="Non"/> Non</label></div>';
+      else if(q.type==='choix')inp=(q.options||[]).map(function(o){return'<label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;margin-bottom:4px"><input type="checkbox" name="qa'+i+'" value="'+esc(o)+'"/> '+esc(o)+'</label>';}).join('');
+      return'<div style="margin-bottom:18px"><div style="font-size:13px;font-weight:600;color:var(--navy);margin-bottom:4px">'+(i+1)+'. '+esc(q.question||'')+'</div>'+(q.description?'<div style="font-size:11px;color:var(--text-tertiary);margin-bottom:6px">'+esc(q.description)+'</div>':'')+inp+'</div>';
     }).join('');
-  document.getElementById('modal-questionnaire').classList.add('open');
+  document.getElementById('modal-q').classList.add('open');
 }
 
-function closeQuestionnaire() { document.getElementById('modal-questionnaire').classList.remove('open'); curQuestId = null; }
-
-function setStar(qIdx, n) {
-  var stars = document.querySelectorAll('#q-'+qIdx+' .star');
-  stars.forEach(function(s,i){s.classList.toggle('active',i<n);});
-  document.getElementById('q-'+qIdx).dataset.val = n;
+function setQS(i,n){
+  var el=document.getElementById('qa-'+i);if(!el)return;
+  el.dataset.val=n;
+  el.querySelectorAll('span').forEach(function(s,si){s.style.color=si<n?'#f59e0b':'#d1d5db';});
 }
 
-function submitQuestionnaire() {
-  if (!curQuestId || !questionnaire) return;
-  var questions = questionnaire.questions || [];
-  var reponses = questions.map(function(q,i){
-    var val = '';
-    if (q.type==='texte') { var el=document.getElementById('q-'+i); val=el?el.value.trim():''; }
-    else if (q.type==='note') { var el2=document.getElementById('q-'+i); val=el2?el2.dataset.val||0:0; }
-    else if (q.type==='oui_non') { var oui=document.getElementById('q-'+i+'-oui'); val=oui&&oui.checked?'Oui':'Non'; }
-    else if (q.type==='choix') {
-      var checked = document.querySelectorAll('input[name="q'+i+'"]:checked');
-      val = Array.from(checked).map(function(c){return c.value;}).join(', ');
-    }
-    return {question:q.question,reponse:val};
+function closeQ(){document.getElementById('modal-q').classList.remove('open');curQId=null;}
+
+function submitQ(){
+  if(!curQId||!questionnaire)return;
+  var qs=questionnaire.questions||[];
+  var rep=qs.map(function(q,i){
+    var v='';
+    if(q.type==='texte'){var el=document.getElementById('qa-'+i);v=el?el.value.trim():'';}
+    else if(q.type==='note'){var el2=document.getElementById('qa-'+i);v=el2?el2.dataset.val||0:0;}
+    else if(q.type==='oui_non'){var ck=document.querySelector('input[name="qa'+i+'"]:checked');v=ck?ck.value:'';}
+    else if(q.type==='choix'){v=Array.from(document.querySelectorAll('input[name="qa'+i+'"]:checked')).map(function(c){return c.value;}).join(', ');}
+    return{question:q.question,reponse:v};
   });
   db.collection('questionnaire_reponses').add({
-    questionnaire_id: questionnaire.id,
-    etude_id: curQuestId,
-    intervenant_id: MY_IV_ID,
-    intervenant_email: ME,
-    reponses: reponses,
-    soumis_le: new Date().toISOString().split('T')[0],
-    created_at: firebase.firestore.FieldValue.serverTimestamp()
+    questionnaire_id:questionnaire.id,etude_id:curQId,
+    intervenant_id:MY_IV_ID,intervenant_email:ME,intervenant_nom:MY_NAME,
+    reponses:rep,soumis_le:new Date().toISOString().split('T')[0],
+    created_at:firebase.firestore.FieldValue.serverTimestamp()
   }).then(function(){
-    closeQuestionnaire();
-    alert('✅ Questionnaire soumis. Merci !');
+    var e=myMissions.find(function(x){return x.id===curQId;});
+    if(e){
+      var ivs=JSON.parse(JSON.stringify(e.intervenants||[]));
+      var ii=getIvIdx(e);
+      if(ii>=0){ivs[ii].questionnaire_soumis=true;db.collection('etudes').doc(curQId).update({intervenants:ivs});}
+    }
+    closeQ();
+    alert('Merci, ton questionnaire a été soumis.');
   });
-}
-
-// ── Mes liens (documents) ─────────────────────────────────────
-function renderLiens() {
-  var newCount = myDocs.filter(function(d){return !d.vu_par_intervenant && d.lien_gdrive;}).length;
-  var nc = document.getElementById('new-count');
-  if (newCount > 0) { nc.style.display=''; nc.innerText=newCount; } else { nc.style.display='none'; }
-
-  var ICONS = {RM:'📄',CE:'📋',BV:'💰',questionnaire:'📝'};
-  if (myDocs.length === 0) {
-    document.getElementById('liens-list').innerHTML = '<div style="color:var(--text-tertiary);font-size:13px;text-align:center;padding:30px">Aucun document disponible pour le moment.</div>';
-    return;
-  }
-  document.getElementById('liens-list').innerHTML = myDocs.map(function(d){
-    var isNew = !d.vu_par_intervenant && d.lien_gdrive;
-    var haslien = !!d.lien_gdrive;
-    return '<div class="lien-card '+(isNew?'nouveau':'')+'">' +
-      '<div class="lien-icon">'+(ICONS[d.type]||'📎')+'</div>' +
-      '<div class="lien-info">' +
-        '<div style="display:flex;align-items:center;gap:8px">' +
-          '<div class="lien-name">'+(d.nom_affiche||d.type||'Document')+'</div>' +
-          (isNew?'<span class="new-badge">Nouveau</span>':'') +
-        '</div>' +
-        '<div class="lien-ref">'+(d.etude_ref||'')+'</div>' +
-        (!haslien?'<div style="font-size:11px;color:var(--text-tertiary);margin-top:2px">En attente de mise en ligne par le responsable qualité</div>':'') +
-      '</div>' +
-      (haslien?'<a href="'+d.lien_gdrive+'" target="_blank" onclick="markVu(\''+d.id+'\')" class="btn btn-primary btn-sm">📥 Ouvrir</a>':'') +
-    '</div>';
-  }).join('');
-}
-
-function markVu(docId) {
-  db.collection('documents').doc(docId).update({vu_par_intervenant:true});
 }
 </script>
 </body>
