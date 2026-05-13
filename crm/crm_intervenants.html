@@ -502,7 +502,7 @@ function renderIvEdit(iv) {
     ef('École','text',iv.ecole||'','ecole',id)+
     ef('Niveau','select:'+niveauOpts,iv.niveau_etudes||'','niveau_etudes',id)+
     ef('Spécialité','text',iv.specialite||'','specialite',id)+
-    ef('Situation','select:<option value="">—</option><option'+(iv.situation==='Étudiant'?' selected':'')+'>Étudiant</option><option'+(iv.situation==='Alternance'?' selected':'')+'>Alternance</option><option'+(iv.situation==='Stage'?' selected':'')+'>Stage</option><option'+(iv.situation==='Diplômé'?' selected':'')+'>Diplômé</option><option'+(iv.situation==='En recherche d'emploi'?' selected':'')+'>En recherche d'emploi</option><option'+(iv.situation==='En poste'?' selected':'')+'>En poste</option><option'+(iv.situation==='Autre'?' selected':'')+'>Autre</option>',iv.situation||'','situation',id)+
+    ef('Situation','select:<option value="">—</option><option'+(iv.situation==='Étudiant'?' selected':'')+'>Étudiant</option><option'+(iv.situation==='Alternance'?' selected':'')+'>Alternance</option><option'+(iv.situation==='Stage'?' selected':'')+'>Stage</option><option'+(iv.situation==='Diplômé'?' selected':'')+'>Diplômé</option><option'+(iv.situation==="En recherche d'emploi"?' selected':'')+">En recherche d'emploi</option><option"+(iv.situation==='En poste'?' selected':'')+'>En poste</option><option'+(iv.situation==='Autre'?' selected':'')+'>Autre</option>',iv.situation||'','situation',id)+
     ef('Disponibilité','select:'+dispoOpts,iv.disponibilite||'','disponibilite',id)+
     ef('Statut','select:'+statOpts,iv.statut||'','statut',id)+
     ef('Compétences','text',(iv.competences||[]).join(', '),'competences_str',id)+
