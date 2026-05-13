@@ -74,6 +74,9 @@
       </div>
     </div>
     <div class="page-body">
+      <!-- Dashboard récap -->
+      <div id="iv-dashboard" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;margin-bottom:20px"></div>
+
       <div class="toolbar">
         <input type="text" id="srch" placeholder="🔍 Nom, compétence…" oninput="render()"/>
         <select id="f-dispo" onchange="render()">
@@ -87,6 +90,11 @@
           <option value="Actif">Actif</option>
           <option value="Inactif">Inactif</option>
           <option value="Ancien membre">Ancien membre</option>
+        </select>
+        <select id="f-situation" onchange="render()" style="padding:6px 10px;border-radius:var(--radius-md);border:1.5px solid var(--border-strong);font-family:'Sora',sans-serif;font-size:12px;background:var(--white)">
+          <option value="">Situation</option>
+          <option>Étudiant</option><option>Alternance</option><option>Stage</option>
+          <option>Diplômé</option><option>En recherche d'emploi</option><option>En poste</option><option>Autre</option>
         </select>
         <button class="btn btn-secondary btn-sm" onclick="clearFilters()">Réinitialiser</button>
         <span style="font-size:11px;color:var(--text-tertiary);font-style:italic" id="f-note"></span>
@@ -155,6 +163,13 @@
           <option value="Inactif">Inactif</option>
           <option value="Ancien membre">Ancien membre</option>
         </select></div>
+      <div class="form-field"><label class="input-label">Situation actuelle</label>
+        <select class="select-field" id="ni-situation">
+          <option value="Étudiant">Étudiant</option><option value="Alternance">Alternance</option>
+          <option value="Stage">Stage</option><option value="Diplômé">Diplômé</option>
+          <option value="En recherche d'emploi">En recherche d'emploi</option>
+          <option value="En poste">En poste</option><option value="Autre">Autre</option>
+        </select></div>
       <div class="form-field full"><label class="input-label">Compétences (séparées par virgules)</label><input class="input" id="ni-comp" placeholder="Excel, Python, Marketing digital…"/></div>
       <div class="form-field full"><label class="input-label">Langues (séparées par virgules)</label><input class="input" id="ni-langues" placeholder="Français, Anglais…"/></div>
       <div class="form-field full"><label class="input-label">IBAN</label><input class="input" id="ni-iban" placeholder="FR76…" autocomplete="off"/></div>
@@ -214,9 +229,10 @@ initAuth('crm_intervenants', function(user, role, profile) {
 });
 
 function loadData() {
-  db.collection('etudes').get().then(function(snap) {
+  db.collection('etudes').onSnapshot(function(snap) {
     allEtudes = [];
     snap.forEach(function(doc){allEtudes.push(Object.assign({id:doc.id},doc.data()));});
+    render(); // refresh cards avec missions à jour
   });
 
   db.collection('intervenants').onSnapshot(function(snap) {
@@ -235,7 +251,7 @@ function seedIntervenants() {
       email:'',tel:'',ville:'',adresse:'',date_naissance:'',nationalite:'Française',
       ecole:'ICN Business School',niveau_etudes:'',specialite:'',
       iban:'',competences:[],langues:['Français'],
-      disponibilite:'Disponible',statut:'Actif',
+      disponibilite:'Disponible',statut:'Actif',situation:'Étudiant',
       nb_missions:0,ca_genere:0,notes:'',
       created_at:firebase.firestore.FieldValue.serverTimestamp()
     }, iv));
@@ -243,7 +259,30 @@ function seedIntervenants() {
   batch.commit();
 }
 
+function renderDashboard() {
+  var total = allIntervenants.length;
+  var dispo = allIntervenants.filter(function(iv){return iv.disponibilite==='Disponible';}).length;
+  var mission = allIntervenants.filter(function(iv){return iv.disponibilite==='En mission';}).length;
+  var indispo = allIntervenants.filter(function(iv){return iv.disponibilite==='Indisponible';}).length;
+  var actifs = allIntervenants.filter(function(iv){return iv.statut==='Actif';}).length;
+  var el = document.getElementById('iv-dashboard');
+  if (!el) return;
+  el.innerHTML = [
+    {label:'Total', val:total, color:'var(--navy)', bg:'rgba(27,42,74,0.07)'},
+    {label:'Disponibles', val:dispo, color:'#14532d', bg:'#dcfce7'},
+    {label:'En mission', val:mission, color:'#78350f', bg:'#fef3c7'},
+    {label:'Indisponibles', val:indispo, color:'#991b1b', bg:'#fee2e2'},
+    {label:'Actifs', val:actifs, color:'var(--bordeaux)', bg:'rgba(163,33,95,0.08)'},
+  ].map(function(k){
+    return '<div style="background:'+k.bg+';border-radius:var(--radius-lg);padding:14px 16px;">' +
+      '<div style="font-size:24px;font-weight:800;color:'+k.color+'">'+k.val+'</div>' +
+      '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:'+k.color+';opacity:.7;margin-top:3px">'+k.label+'</div>' +
+    '</div>';
+  }).join('');
+}
+
 function render() {
+  renderDashboard();
   var srch = (document.getElementById('srch').value||'').toLowerCase();
   var fd = document.getElementById('f-dispo').value;
   var fs = document.getElementById('f-statut').value;
@@ -253,6 +292,8 @@ function render() {
     if (srch && !name.includes(srch) && !comp.includes(srch)) return false;
     if (fd && iv.disponibilite !== fd) return false;
     if (fs && iv.statut !== fs) return false;
+    var fsi = document.getElementById('f-situation') ? document.getElementById('f-situation').value : '';
+    if (fsi && iv.situation !== fsi) return false;
     return true;
   }).sort(function(a,b){return (a.nom||'').localeCompare(b.nom||'');});
   document.getElementById('f-note').innerText = data.length < allIntervenants.length ? data.length+' / '+allIntervenants.length : '';
@@ -282,6 +323,7 @@ function render() {
               '<div class="iv-name">'+(iv.prenom||'')+' '+(iv.nom||'')+'</div>' +
               '<div class="iv-role">'+(iv.specialite||iv.ecole||'—')+
                 (iv.ville?' <span style="opacity:.7">· 📍'+iv.ville+'</span>':'')+'</div>' +
+              (iv.situation?'<div style="font-size:10px;color:var(--text-tertiary);margin-top:1px">'+iv.situation+'</div>':'') +
             '</div>' +
             '<span class="dispo-badge dispo-'+dc+'">'+(iv.disponibilite||'—')+'</span>' +
           '</div>' +
@@ -294,7 +336,7 @@ function render() {
 }
 
 function clearFilters() {
-  ['srch','f-dispo','f-statut'].forEach(function(id){document.getElementById(id).value='';});
+  ['srch','f-dispo','f-statut','f-situation'].forEach(function(id){document.getElementById(id).value='';});
   render();
 }
 
@@ -460,6 +502,7 @@ function renderIvEdit(iv) {
     ef('École','text',iv.ecole||'','ecole',id)+
     ef('Niveau','select:'+niveauOpts,iv.niveau_etudes||'','niveau_etudes',id)+
     ef('Spécialité','text',iv.specialite||'','specialite',id)+
+    ef('Situation','select:<option value="">—</option><option'+(iv.situation==='Étudiant'?' selected':'')+'>Étudiant</option><option'+(iv.situation==='Alternance'?' selected':'')+'>Alternance</option><option'+(iv.situation==='Stage'?' selected':'')+'>Stage</option><option'+(iv.situation==='Diplômé'?' selected':'')+'>Diplômé</option><option'+(iv.situation==='En recherche d'emploi'?' selected':'')+'>En recherche d'emploi</option><option'+(iv.situation==='En poste'?' selected':'')+'>En poste</option><option'+(iv.situation==='Autre'?' selected':'')+'>Autre</option>',iv.situation||'','situation',id)+
     ef('Disponibilité','select:'+dispoOpts,iv.disponibilite||'','disponibilite',id)+
     ef('Statut','select:'+statOpts,iv.statut||'','statut',id)+
     ef('Compétences','text',(iv.competences||[]).join(', '),'competences_str',id)+
@@ -514,6 +557,7 @@ function confirmAdd() {
     statut:document.getElementById('ni-statut').value,
     competences:document.getElementById('ni-comp').value.split(',').map(function(s){return s.trim();}).filter(Boolean),
     langues:document.getElementById('ni-langues').value.split(',').map(function(s){return s.trim();}).filter(Boolean),
+    situation:document.getElementById('ni-situation').value,
     iban:document.getElementById('ni-iban').value.trim(),
     notes:document.getElementById('ni-notes').value.trim(),
     nb_missions:0, ca_genere:0,
