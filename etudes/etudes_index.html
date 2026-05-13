@@ -225,11 +225,13 @@ function loadData() {
 function renderKPIs() {
   var total = allEtudes.length;
   var encours = allEtudes.filter(function(e){return e.statut==='En cours';}).length;
-  var signes = allEtudes.filter(function(e){return ['Signé','En cours','Livré','Facturé'].includes(e.statut);}).length;
-  var ca = allEtudes.reduce(function(a,e){return a+(parseFloat(e.montant_ht)||0);},0);
+  var signes = allEtudes.filter(function(e){return e.statut==='Signé';}).length;
+  var actives = allEtudes.filter(function(e){return ['Signé','En cours','Livré'].includes(e.statut);}).length;
+  var ca = allEtudes.filter(function(e){return ['Signé','En cours','Livré','Facturé','Clôturé'].includes(e.statut);})
+    .reduce(function(a,e){return a+(parseFloat(e.montant_ht)||0);},0);
   document.getElementById('kpi-strip').innerHTML =
-    kpi('Études total',total)+kpi('En cours',encours,'kc-warn')+
-    kpi('Signées',signes,'kc-success')+kpi('CA total',fmtM(ca),'kc-bordeaux');
+    kpi('Études total',total)+kpi('Signées',signes,'kc-bordeaux')+
+    kpi('En cours',encours,'kc-warn')+kpi('CA total',fmtM(ca),'kc-success');
 }
 function kpi(l,v,cls){ return '<div class="kpi-mini '+(cls||'')+'"><div class="kpi-mini-val">'+v+'</div><div class="kpi-mini-lbl">'+l+'</div></div>'; }
 
@@ -303,28 +305,62 @@ function openEtude(id) {
   }).join('');
 
   var canEdit = EDIT_ROLES_E.includes(MY_ROLE);
+  var isSA = MY_ROLE === 'super_admin';
   var statOpts = ['Prospection','Signé','En cours','Livré','Facturé','Clôturé'].map(function(s){
     return '<option'+(e.statut===s?' selected':'')+'>'+s+'</option>';
   }).join('');
+
+  // Avenant history
+  var avenants = e.avenants || [];
+  var avenantHtml = '';
+  if (avenants.length > 0) {
+    avenantHtml = '<div class="ep-section" style="margin-top:16px">Historique avenants</div>' +
+      '<div style="display:flex;flex-direction:column;gap:6px">' +
+      avenants.map(function(av,i){
+        return '<div style="background:var(--bg);border-radius:var(--radius-sm);padding:8px 10px;font-size:12px;border:1px solid var(--border)">' +
+          '<div style="font-weight:600;color:var(--navy)">Avenant '+(i+1)+(av.date_avenant?' · '+fmtD(av.date_avenant):'')+'</div>' +
+          '<div style="color:var(--text-tertiary);margin-top:2px">'+fmtD(av.date_debut)+' → '+fmtD(av.date_fin)+'</div>' +
+          (av.note?'<div style="color:var(--text-secondary);font-style:italic;margin-top:2px">'+av.note+'</div>':'') +
+        '</div>';
+      }).join('') + '</div>';
+  }
 
   document.getElementById('ep-body').innerHTML =
     '<div class="ep-section">Informations</div>' +
     epField('Client', e.client_name||'—') +
     epField('Responsable', respName) +
     epField('Date signature', fmtD(e.date_signature)) +
-    epField('Période', fmtD(e.date_debut)+' → '+fmtD(e.date_fin)) +
+    epField('Période actuelle', fmtD(e.date_debut)+' → '+fmtD(e.date_fin)) +
     epField('Mandat', e.mandat_id||'—') +
-    (canEdit ? '<div class="ep-section" style="margin-top:16px">Modifier</div>' +
+    avenantHtml +
+    (canEdit ?
+      '<div class="ep-section" style="margin-top:16px">Modifier</div>' +
       '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">' +
-      '<div><label class="input-label">Statut</label><select class="select-field" style="font-size:12px" onchange="updEtude(\''+id+'\',\'statut\',this.value)">'+statOpts+'</select></div>' +
-      '<div><label class="input-label">Montant HT (€)</label><input class="input" type="number" value="'+(e.montant_ht||'')+'" style="font-size:12px" onblur="updEtude(\''+id+'\',\'montant_ht\',parseFloat(this.value)||0)"/></div>' +
-      '<div><label class="input-label">Date début</label><input class="input" type="date" value="'+(e.date_debut||'')+'" style="font-size:12px" onchange="updEtude(\''+id+'\',\'date_debut\',this.value)"/></div>' +
-      '<div><label class="input-label">Date fin</label><input class="input" type="date" value="'+(e.date_fin||'')+'" style="font-size:12px" onchange="updEtude(\''+id+'\',\'date_fin\',this.value)"/></div>' +
+        '<div><label class="input-label">Statut</label><select class="select-field" style="font-size:12px" onchange="updEtude(\''+id+'\',\'statut\',this.value)">'+statOpts+'</select></div>' +
+        '<div><label class="input-label">Montant HT (€)</label><input class="input" type="number" value="'+(e.montant_ht||'')+'" style="font-size:12px" onblur="updEtude(\''+id+'\',\'montant_ht\',parseFloat(this.value)||0)"/></div>' +
       '</div>' +
-      '<div><label class="input-label">Notes</label><textarea class="input" rows="3" style="font-size:12px;resize:vertical;width:100%" onblur="updEtude(\''+id+'\',\'notes\',this.value)">'+(e.notes||'')+'</textarea></div>' : '') +
+      '<div><label class="input-label">Notes</label><textarea class="input" rows="2" style="font-size:12px;resize:vertical;width:100%;margin-bottom:12px" onblur="updEtude(\''+id+'\',\'notes\',this.value)">'+(e.notes||'')+'</textarea></div>'
+    : '') +
+    (isSA ?
+      '<div class="ep-section" style="margin-top:4px">🔒 Super Admin</div>' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">' +
+        '<div><label class="input-label">Référence</label><input class="input" value="'+(e.reference||'')+'" style="font-size:12px" onblur="updEtude(\''+id+'\',\'reference\',this.value)"/></div>' +
+        '<div><label class="input-label">Titre</label><input class="input" value="'+(e.title||'')+'" style="font-size:12px" onblur="updEtude(\''+id+'\',\'title\',this.value)"/></div>' +
+        '<div><label class="input-label">Date signature</label><input class="input" type="date" value="'+(e.date_signature||'')+'" style="font-size:12px" onchange="updEtude(\''+id+'\',\'date_signature\',this.value)"/></div>' +
+        '<div><label class="input-label">Client</label><select class="select-field" style="font-size:12px" onchange="updEtudeClient(\''+id+'\',this.value)">' +
+          allClients.map(function(cl){return '<option value="'+cl.id+'"'+(e.client_id===cl.id?' selected':'')+'>'+cl.company_name+'</option>';}).join('') +
+        '</select></div>' +
+      '</div>'
+    : '') +
+    '<div class="ep-section" style="margin-top:4px">Avenant</div>' +
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">' +
+      '<div><label class="input-label">Nouvelle date début</label><input class="input" type="date" id="av-debut" style="font-size:12px"/></div>' +
+      '<div><label class="input-label">Nouvelle date fin</label><input class="input" type="date" id="av-fin" style="font-size:12px"/></div>' +
+      '<div style="grid-column:1/-1"><label class="input-label">Motif / note</label><input class="input" id="av-note" placeholder="Prolongation, modification de périmètre…" style="font-size:12px"/></div>' +
+    '</div>' +
+    '<button class="btn btn-secondary btn-sm" onclick="addAvenant(\''+id+'\')">+ Enregistrer l\'avenant</button>' +
     (intervenants ? '<div class="ep-section" style="margin-top:16px">Intervenants</div><div>'+intervenants+'</div>' : '') +
-    (e.notes && !canEdit ? '<div class="ep-section" style="margin-top:16px">Notes</div><div style="font-size:13px;color:var(--text-secondary);line-height:1.6">'+e.notes+'</div>' : '') +
-    (canEdit ? '<div style="margin-top:16px"><button class="btn btn-secondary btn-sm" style="background:#fee2e2;color:#991b1b;border-color:#fca5a5" onclick="deleteEtude(\''+id+'\')">🗑 Supprimer</button></div>' : '');
+    (isSA ? '<div style="margin-top:16px"><button class="btn btn-secondary btn-sm" style="background:#fee2e2;color:#991b1b;border-color:#fca5a5" onclick="deleteEtude(\''+id+'\')">🗑 Supprimer</button></div>' : '');
 
   document.getElementById('etude-panel').classList.add('open');
   document.getElementById('overlay').classList.add('open');
@@ -342,8 +378,41 @@ function updEtude(id, field, val) {
 }
 
 function deleteEtude(id) {
+  if (MY_ROLE !== 'super_admin') { alert('Suppression réservée au Super Admin.'); return; }
   if (!confirm('Supprimer cette étude ?')) return;
   db.collection('etudes').doc(id).delete().then(function(){closePanel();});
+}
+
+function updEtudeClient(id, clientId) {
+  var client = allClients.find(function(c){return c.id===clientId;});
+  if (!client) return;
+  db.collection('etudes').doc(id).update({client_id:clientId, client_name:client.company_name||''});
+}
+
+function addAvenant(id) {
+  var debut = document.getElementById('av-debut').value;
+  var fin = document.getElementById('av-fin').value;
+  var note = document.getElementById('av-note') ? document.getElementById('av-note').value.trim() : '';
+  if (!debut || !fin) { alert('Merci de renseigner les deux dates de l'avenant.'); return; }
+  var e = allEtudes.find(function(x){return x.id===id;});
+  if (!e) return;
+  var avenants = JSON.parse(JSON.stringify(e.avenants||[]));
+  avenants.push({
+    date_avenant: new Date().toISOString().split('T')[0],
+    date_debut: debut, date_fin: fin, note: note
+  });
+  db.collection('etudes').doc(id).update({
+    avenants: avenants,
+    date_debut: debut,
+    date_fin: fin,
+    statut: 'En cours'  // avenant → repasse En cours automatiquement
+  }).then(function(){
+    document.getElementById('av-debut').value = '';
+    document.getElementById('av-fin').value = '';
+    if (document.getElementById('av-note')) document.getElementById('av-note').value = '';
+    alert('✅ Avenant enregistré. Statut repassé à "En cours".');
+    openEtude(id); // refresh panel
+  });
 }
 
 function closePanel() {
@@ -382,6 +451,8 @@ function confirmAdd() {
   var ref = document.getElementById('ne-ref').value.trim();
   if (!clientId) { alert('Merci de choisir un client.'); return; }
   if (!title) { alert('Merci de renseigner un titre.'); return; }
+  var montantVal = parseFloat(document.getElementById('ne-montant').value);
+  if (!montantVal || montantVal <= 0) { alert('Le montant HT est obligatoire.'); return; }
   if (!ref) { genRef(); ref = document.getElementById('ne-ref').value.trim(); }
 
   var client = allClients.find(function(c){return c.id===clientId;});
