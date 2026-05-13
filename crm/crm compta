@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Comptabilité — My-ICN-JC</title>
+<link rel="stylesheet" href="../assets/css/global.css"/>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+<script src="../assets/js/firebase.js"></script>
+<script src="../assets/js/auth.js"></script>
+<script src="../assets/js/sidebar.js"></script>
+<style>
+.coming-soon-wrap {
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  min-height:60vh;text-align:center;gap:16px;
+}
+.coming-soon-icon {
+  font-size:64px;opacity:.5;
+}
+.coming-soon-title {
+  font-family:'Playfair Display',serif;font-size:26px;color:var(--navy);
+}
+.coming-soon-sub {
+  font-size:14px;color:var(--text-tertiary);max-width:420px;line-height:1.6;
+}
+.feature-list {
+  display:flex;flex-direction:column;gap:10px;margin-top:8px;text-align:left;
+  background:var(--bg-card);border-radius:var(--radius-lg);padding:20px 24px;
+  border:1px solid var(--border);max-width:420px;width:100%;
+}
+.feature-item {
+  display:flex;align-items:center;gap:10px;font-size:13px;color:var(--text-secondary);
+}
+.feature-item::before { content:'⏳'; font-size:14px; }
+</style>
+</head>
+<body>
+<div class="login-page" id="login-page">
+  <div class="login-box">
+    <div class="login-logo"><img src="../assets/images/ICN-Junior-Conseil_logo.png" style="height:54px;object-fit:contain"/></div>
+    <div class="login-title">Connexion</div>
+    <div class="login-sub">Accès réservé — Trésorerie ICN Junior Conseil.</div>
+    <button class="google-btn" onclick="doGoogleLogin()">
+      <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google"/>Se connecter avec Google
+    </button>
+    <div class="denied-box" id="denied-box"><strong>Accès refusé</strong><p id="denied-msg"></p></div>
+    <div class="login-error" id="login-error"></div>
+  </div>
+</div>
+
+<div class="app-page" id="app-page">
+  <div id="sidebar-container"></div>
+  <div class="app-content">
+    <div class="page-header">
+      <div class="page-title">💼 Comptabilité</div>
+      <div class="page-subtitle">Module en cours de développement</div>
+    </div>
+    <div class="page-body">
+      <div class="coming-soon-wrap">
+        <div class="coming-soon-icon">💼</div>
+        <div class="coming-soon-title">Module Comptabilité</div>
+        <div class="coming-soon-sub">
+          Ce module sera alimenté par l'import de la balance âgée SAGE.<br/>
+          Il permettra de suivre les encaissements, les impayés et de réconcilier
+          les données avec les KPI Trésorerie.
+        </div>
+        <div class="feature-list">
+          <div class="feature-item">Import balance âgée SAGE (CSV/Excel)</div>
+          <div class="feature-item">Suivi des encaissements par client</div>
+          <div class="feature-item">Tableau de bord impayés et relances</div>
+          <div class="feature-item">Réconciliation automatique avec les études</div>
+          <div class="feature-item">Alimentation automatique KPI Trésorerie</div>
+          <div class="feature-item">Export comptable</div>
+        </div>
+        <div style="font-size:12px;color:var(--text-tertiary);margin-top:8px">
+          Disponible en V2 · En attente de l'export SAGE
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+initAuth('crm_compta', function(user, role, profile) {
+  renderSidebar(role, profile, user, 'crm_compta');
+  showAppPage(user, role, profile);
+  updateHealthIndicator();
+});
+</script>
+</body>
+</html>
