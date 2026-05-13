@@ -64,6 +64,7 @@ const PAGE_ACCESS = {
                       'responsable_commercial','responsable_qualite','responsable_marketing',
                       'tresorerie','auditeur','marketing','commercial','intervenant','membre_cos'],
   'gestion_docs':    ['super_admin','responsable_qualite'],
+  'crm_compta':      ['super_admin','president','vice_president','tresorier','tresorerie','responsable_qualite'],
 
   'etudes': ['super_admin','president','vice_president','tresorier','responsable_commercial',
              'responsable_qualite','secretaire','tresorerie','responsable_marketing','membre_cos'],
