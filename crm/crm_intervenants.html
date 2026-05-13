@@ -96,7 +96,11 @@
           <option>Étudiant</option><option>Alternance</option><option>Stage</option>
           <option>Diplômé</option><option>En recherche d'emploi</option><option>En poste</option><option>Autre</option>
         </select>
+        <select id="f-ville" onchange="render()" style="padding:6px 10px;border-radius:var(--radius-md);border:1.5px solid var(--border-strong);font-family:'Sora',sans-serif;font-size:12px;background:var(--white)">
+          <option value="">Toutes villes</option>
+        </select>
         <button class="btn btn-secondary btn-sm" onclick="clearFilters()">Réinitialiser</button>
+        <span id="iv-filter-count" style="font-size:11px;color:var(--text-tertiary);font-style:italic"></span>
         <span style="font-size:11px;color:var(--text-tertiary);font-style:italic" id="f-note"></span>
       </div>
       <div class="iv-grid" id="iv-grid">
@@ -190,24 +194,41 @@ var EDIT_ROLES_IV = ['super_admin','president','vice_president','responsable_com
 
 // 35 intervenants initiaux
 var SEED_INTERVENANTS = [
-  {nom:'FERNANDES',prenom:'Antoine'},{nom:'GRANDIN',prenom:'Maeline'},
-  {nom:'FORTUNATO',prenom:'Enzo'},{nom:'KANESALINGAM',prenom:'Suhirthan'},
-  {nom:'BOUVIER',prenom:'Eliott'},{nom:'DESMOND',prenom:'Nicolas'},
-  {nom:'CORNET',prenom:'Olivier'},{nom:'BOUTARFA',prenom:'Mathis'},
-  {nom:'NEIFAR',prenom:'Taoufik'},{nom:'RENARD',prenom:'Julia'},
-  {nom:'SERS',prenom:'Raoul'},{nom:'DA CUNHA',prenom:'JB'},
-  {nom:'AMELINE',prenom:'Julie'},{nom:'GERNET',prenom:'Cecil'},
-  {nom:'BAHMED',prenom:'Gwilherm'},{nom:'YATHE',prenom:'Stella'},
-  {nom:'LI',prenom:'Sophia'},{nom:'ETIENNE',prenom:'Océane'},
-  {nom:'CISSOKHO',prenom:'Maryama'},{nom:'CAVERY',prenom:'Djalil'},
-  {nom:'NYAZI',prenom:'Bilal'},{nom:'TRUFFO',prenom:'Nathan'},
-  {nom:'BANGOURA',prenom:'Mamet'},{nom:'LOPES',prenom:'Diego'},
-  {nom:'WELLENREITER',prenom:'Tom'},{nom:'DELABARRE',prenom:'Oriane'},
-  {nom:'CHARRIER',prenom:'Arthur'},{nom:'ARUDCHELVAN',prenom:'Pagesan'},
-  {nom:'MARGOSSIAN',prenom:'Jorys'},{nom:'RAMADAN',prenom:'Celine'},
-  {nom:'ABIDI',prenom:'Roua'},{nom:'SAMUEL',prenom:'Victor'},
-  {nom:'TOUAITI',prenom:'Amen'},{nom:"L'HOMÉ",prenom:'Léo'},
-  {nom:'DOYEN',prenom:'Antoine'}
+  {nom:'FERNANDES',prenom:'Antoine',email:'antoine.fernandes@icnjuniorconseil.com'},
+  {nom:'GRANDIN',prenom:'Maeline',email:'maeline.grandin@icnjuniorconseil.com'},
+  {nom:'FORTUNATO',prenom:'Enzo',email:'enzo.fortunato@icnjuniorconseil.com'},
+  {nom:'KANESALINGAM',prenom:'Suhirthan',email:'suhirthan.kanesalingam@icnjuniorconseil.com'},
+  {nom:'BOUVIER',prenom:'Eliott',email:'eliott.bouvier@icnjuniorconseil.com'},
+  {nom:'DESMOND',prenom:'Nicolas',email:'nicolas.desmond@icnjuniorconseil.com'},
+  {nom:'CORNET',prenom:'Olivier',email:'olivier.cornet@icnjuniorconseil.com'},
+  {nom:'BOUTARFA',prenom:'Mathis',email:'mathis.boutarfa@icnjuniorconseil.com'},
+  {nom:'NEIFAR',prenom:'Taoufik',email:'taoufik.neifar@icnjuniorconseil.com'},
+  {nom:'RENARD',prenom:'Julia',email:'julia.renard@icnjuniorconseil.com'},
+  {nom:'SERS',prenom:'Raoul',email:'raoul.sers@icnjuniorconseil.com'},
+  {nom:'DA CUNHA',prenom:'JB',email:'jb.dacunha@icnjuniorconseil.com'},
+  {nom:'AMELINE',prenom:'Julie',email:'julie.ameline@icnjuniorconseil.com'},
+  {nom:'GERNET',prenom:'Cecil',email:'cecil.gernet@icnjuniorconseil.com'},
+  {nom:'BAHMED',prenom:'Gwilherm',email:'gwilherm.bahmed@icnjuniorconseil.com'},
+  {nom:'YATHE',prenom:'Stella',email:'stella.yathe@icnjuniorconseil.com'},
+  {nom:'LI',prenom:'Sophia',email:'sophia.li@icnjuniorconseil.com'},
+  {nom:'ETIENNE',prenom:'Oceane',email:'oceane.etienne@icnjuniorconseil.com'},
+  {nom:'CISSOKHO',prenom:'Maryama',email:'maryama.cissokho@icnjuniorconseil.com'},
+  {nom:'CAVERY',prenom:'Djalil',email:'djalil.cavery@icnjuniorconseil.com'},
+  {nom:'NYAZI',prenom:'Bilal',email:'bilal.nyazi@icnjuniorconseil.com'},
+  {nom:'TRUFFO',prenom:'Nathan',email:'nathan.truffo@icnjuniorconseil.com'},
+  {nom:'BANGOURA',prenom:'Mamet',email:'mamet.bangoura@icnjuniorconseil.com'},
+  {nom:'LOPES',prenom:'Diego',email:'diego.lopes@icnjuniorconseil.com'},
+  {nom:'WELLENREITER',prenom:'Tom',email:'tom.wellenreiter@icnjuniorconseil.com'},
+  {nom:'DELABARRE',prenom:'Oriane',email:'oriane.delabarre@icnjuniorconseil.com'},
+  {nom:'CHARRIER',prenom:'Arthur',email:'arthur.charrier@icnjuniorconseil.com'},
+  {nom:'ARUDCHELVAN',prenom:'Pagesan',email:'pagesan.arudchelvan@icnjuniorconseil.com'},
+  {nom:'MARGOSSIAN',prenom:'Jorys',email:'jorys.margossian@icnjuniorconseil.com'},
+  {nom:'RAMADAN',prenom:'Celine',email:'celine.ramadan@icnjuniorconseil.com'},
+  {nom:'ABIDI',prenom:'Roua',email:'roua.abidi@icnjuniorconseil.com'},
+  {nom:'SAMUEL',prenom:'Victor',email:'victor.samuel@icnjuniorconseil.com'},
+  {nom:'TOUAITI',prenom:'Amen',email:'amen.touaiti@icnjuniorconseil.com'},
+  {nom:"L'HOME",prenom:'Leo',email:'leo.lhome@icnjuniorconseil.com'},
+  {nom:'DOYEN',prenom:'Antoine',email:'antoine.doyen@icnjuniorconseil.com'}
 ];
 
 function localDateStr(d) { return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
@@ -248,7 +269,7 @@ function seedIntervenants() {
   SEED_INTERVENANTS.forEach(function(iv) {
     var ref = db.collection('intervenants').doc();
     batch.set(ref, Object.assign({
-      email:'',tel:'',ville:'',adresse:'',date_naissance:'',nationalite:'Française',
+      tel:'',ville:'',adresse:'',date_naissance:'',nationalite:'Française',
       ecole:'ICN Business School',niveau_etudes:'',specialite:'',
       iban:'',competences:[],langues:['Français'],
       disponibilite:'Disponible',statut:'Actif',situation:'Étudiant',
@@ -259,12 +280,13 @@ function seedIntervenants() {
   batch.commit();
 }
 
-function renderDashboard() {
-  var total = allIntervenants.length;
-  var dispo = allIntervenants.filter(function(iv){return iv.disponibilite==='Disponible';}).length;
-  var mission = allIntervenants.filter(function(iv){return iv.disponibilite==='En mission';}).length;
-  var indispo = allIntervenants.filter(function(iv){return iv.disponibilite==='Indisponible';}).length;
-  var actifs = allIntervenants.filter(function(iv){return iv.statut==='Actif';}).length;
+function renderDashboard(filtered) {
+  var data = filtered || allIntervenants;
+  var total = data.length;
+  var dispo = data.filter(function(iv){return iv.disponibilite==='Disponible';}).length;
+  var mission = data.filter(function(iv){return iv.disponibilite==='En mission';}).length;
+  var indispo = data.filter(function(iv){return iv.disponibilite==='Indisponible';}).length;
+  var actifs = data.filter(function(iv){return iv.statut==='Actif';}).length;
   var el = document.getElementById('iv-dashboard');
   if (!el) return;
   el.innerHTML = [
@@ -281,22 +303,50 @@ function renderDashboard() {
   }).join('');
 }
 
-function render() {
-  renderDashboard();
+function getFilteredData() {
   var srch = (document.getElementById('srch').value||'').toLowerCase();
   var fd = document.getElementById('f-dispo').value;
   var fs = document.getElementById('f-statut').value;
-  var data = allIntervenants.filter(function(iv) {
+  var fsi = document.getElementById('f-situation') ? document.getElementById('f-situation').value : '';
+  var fv = document.getElementById('f-ville') ? document.getElementById('f-ville').value : '';
+  return allIntervenants.filter(function(iv) {
     var name = ((iv.prenom||'')+' '+(iv.nom||'')).toLowerCase();
     var comp = (iv.competences||[]).join(' ').toLowerCase();
     if (srch && !name.includes(srch) && !comp.includes(srch)) return false;
     if (fd && iv.disponibilite !== fd) return false;
     if (fs && iv.statut !== fs) return false;
-    var fsi = document.getElementById('f-situation') ? document.getElementById('f-situation').value : '';
     if (fsi && iv.situation !== fsi) return false;
+    if (fv && (iv.ville||'').toLowerCase() !== fv.toLowerCase()) return false;
     return true;
   }).sort(function(a,b){return (a.nom||'').localeCompare(b.nom||'');});
-  document.getElementById('f-note').innerText = data.length < allIntervenants.length ? data.length+' / '+allIntervenants.length : '';
+}
+
+function populateVilleFilter() {
+  var sel = document.getElementById('f-ville');
+  if (!sel) return;
+  var cur = sel.value;
+  var villes = [];
+  allIntervenants.forEach(function(iv) {
+    var v = (iv.ville||'').trim();
+    if (v && !villes.includes(v)) villes.push(v);
+  });
+  villes.sort();
+  sel.innerHTML = '<option value="">Toutes villes</option>' +
+    villes.map(function(v) {
+      return '<option value="'+v+'"'+(cur===v?' selected':'')+'>'+v+'</option>';
+    }).join('');
+}
+
+function render() {
+  populateVilleFilter();
+  var data = getFilteredData();
+
+  // Dashboard dynamique basé sur les données filtrées
+  renderDashboard(data);
+
+  document.getElementById('f-note').innerText = data.length < allIntervenants.length ? data.length+' / '+allIntervenants.length+' intervenants' : '';
+  var countEl = document.getElementById('iv-filter-count');
+  if (countEl) countEl.innerText = data.length < allIntervenants.length ? data.length+' résultat(s)' : '';
 
   var dispoCls = {Disponible:'dispo',　'En mission':'mission',Indisponible:'indispo'};
   document.getElementById('iv-grid').innerHTML = data.length === 0
@@ -336,7 +386,9 @@ function render() {
 }
 
 function clearFilters() {
-  ['srch','f-dispo','f-statut','f-situation'].forEach(function(id){document.getElementById(id).value='';});
+  ['srch','f-dispo','f-statut','f-situation','f-ville'].forEach(function(id){
+    var el = document.getElementById(id); if(el) el.value='';
+  });
   render();
 }
 
