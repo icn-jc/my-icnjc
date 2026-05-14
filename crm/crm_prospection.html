@@ -1873,6 +1873,49 @@ function saveAction() {
     if (montant && parseFloat(montant)) prospUpdate.estimated_amount = parseFloat(montant);
 
     db.collection('prospects').doc(curProspectId).update(prospUpdate).then(function() {
+      // ── Auto-créer une étude si statut passe à "Signé" ──────
+      if (result === 'Signé' && curProspect) {
+        // Vérifier qu'une étude n'existe pas déjà pour ce prospect
+        db.collection('etudes').where('prospect_id','==',curProspectId).get().then(function(snap) {
+          if (snap.empty) {
+            var actifMandat = null;
+            // Générer la référence
+            var year = new Date().getFullYear().toString().slice(2);
+            var clientName = (curProspect.company_name||'').toUpperCase()
+              .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+              .replace(/[^A-Z0-9]/g,'').slice(0,3) || 'XXX';
+            db.collection('etudes').where('reference','>=',year+clientName).where('reference','<=',year+clientName+'99').get().then(function(eSnap) {
+              var num = String(eSnap.size + 1).padStart(2,'0');
+              var ref = year + clientName + num;
+              db.collection('mandats').where('statut','==','actif').limit(1).get().then(function(mSnap) {
+                var mandatId = mSnap.empty ? '' : mSnap.docs[0].id;
+                db.collection('etudes').add({
+                  reference: ref,
+                  title: 'Étude — ' + (curProspect.company_name||''),
+                  client_id: '',
+                  client_name: curProspect.company_name || '',
+                  prospect_id: curProspectId,
+                  statut: 'Signé',
+                  montant_ht: parseFloat(curProspect.estimated_amount)||0,
+                  montant_encaisse: 0,
+                  date_signature: new Date().toISOString().split('T')[0],
+                  date_debut: null,
+                  date_fin: null,
+                  responsable_email: curProspect.owner_email || ME,
+                  intervenants: [],
+                  phases: [],
+                  mandat_id: mandatId,
+                  source: 'prospection',
+                  a_completer: true,
+                  notes: 'Créée automatiquement depuis le CRM Prospection. À compléter.',
+                  created_at_str: new Date().toISOString().split('T')[0],
+                  created_at: firebase.firestore.FieldValue.serverTimestamp()
+                });
+              });
+            });
+          }
+        });
+      }
       // Si RDV planifié → créer/MAJ entrée dans prospects_rdv
       if (result === 'RDV planifié' && rdvDate && curProspect) {
         var pid = curProspectId;
