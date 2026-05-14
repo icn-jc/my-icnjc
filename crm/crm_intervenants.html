@@ -589,7 +589,7 @@ function renderIvEdit(iv) {
     ef('Statut','select:'+statOpts,iv.statut||'','statut',id)+
     ef('Compétences','text',(iv.competences||[]).join(', '),'competences_str',id)+
     ef('Langues','text',(iv.langues||[]).join(', '),'langues_str',id)+
-    '<div><label class="input-label">Mandats</label><select class="select-field" id="ev-mandats-'+id+'" multiple style="height:80px;font-size:12px"></select><button class="btn btn-secondary btn-sm" style="margin-top:4px" onclick="saveMandatsIv(''+id+'')">Enregistrer mandats</button></div>'+
+    '<div><label class="input-label">Mandats</label><select class="select-field" id="ev-mandats-'+id+'" multiple style="height:80px;font-size:12px"></select><button class="btn btn-secondary btn-sm" style="margin-top:4px" onclick="saveMandatsIv(this.previousElementSibling,this)">Enregistrer mandats</button></div>'+
     ef('Dispo — date début','date',iv.dispo_debut||'','dispo_debut',id)+
     ef('Dispo — date fin','date',iv.dispo_fin||'','dispo_fin',id)+
     ef('IBAN','text',iv.iban||'','iban',id)+
@@ -609,8 +609,8 @@ function ef(label, type, val, field, id) {
   return '<div><label class="input-label">'+label+'</label>'+input+'</div>';
 }
 
-function saveMandatsIv(id) {
-  var sel = document.getElementById('ev-mandats-'+id);
+function saveMandatsIv(sel, btn) {
+  var id = sel.id.replace('ev-mandats-', '');
   if (!sel) return;
   var selected = Array.from(sel.selectedOptions).map(function(o){return o.value;}).filter(function(v){return v!=='externe';});
   db.collection('intervenants').doc(id).update({mandats_ids: selected}).then(function(){
