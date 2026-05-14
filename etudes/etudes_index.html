@@ -35,7 +35,7 @@ tr:hover td{background:rgba(27,42,74,0.02);cursor:pointer;}
 .kpi-mini-val{font-size:18px;font-weight:700;color:var(--navy);}
 .kpi-mini-lbl{font-size:10px;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:.06em;}
 .toolbar{display:flex;gap:7px;flex-wrap:wrap;align-items:center;margin-bottom:12px;}
-.toolbar select,.toolbar input{padding:6px 10px;border-radius:var(--radius-md);border:1.5px solid var(--border-strong);font-family:'Sora',sans-serif;font-size:12px;background:var(--white);}
+.toolbar select,.toolbar input{padding:6px 10px;border-radius:var(--radius-md);border:1.5px solid var(--border-strong);font-family:Sora,sans-serif;font-size:12px;background:var(--white);}
 /* Panel étude */
 .etude-panel{position:fixed;right:0;top:0;bottom:0;width:520px;max-width:96vw;background:var(--white);box-shadow:-8px 0 40px rgba(27,42,74,0.18);z-index:400;display:flex;flex-direction:column;transform:translateX(100%);transition:transform .25s ease;}
 .etude-panel.open{transform:translateX(0);}
@@ -705,11 +705,12 @@ function genRef() {
   var client = allClients.find(function(c){return c.id===clientId;});
   if (!client) return;
   var year = new Date().getFullYear().toString().slice(2);
+  // 3 premières lettres du nom (pas les initiales)
   var name3 = (client.company_name||'').toUpperCase()
-    .normalize('NFD').replace(/[\u0300-\u036f]/g,'') // remove accents
-    .replace(/[^A-Z0-9]/g,' ').trim()
-    .split(/\s+/).map(function(w){return w[0]||'';}).join('').slice(0,3);
-  if (name3.length < 3) name3 = ((client.company_name||'').toUpperCase().replace(/[^A-Z]/g,'')).slice(0,3);
+    .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+    .replace(/[^A-Z0-9]/g,'')
+    .slice(0,3);
+  if (name3.length < 3) name3 = (name3 + 'XXX').slice(0,3);
   // Count existing studies for this client this year
   var existing = allEtudes.filter(function(e){
     return e.client_id === clientId && (e.reference||'').startsWith(year);
@@ -853,11 +854,11 @@ function renderNePhasesUI() {
     return '<div style="background:var(--bg);border-radius:var(--radius-md);padding:10px 12px;border:1px solid '+(ph.actif?'var(--border)':'#fca5a5')+';opacity:'+(ph.actif?'1':'0.6')+'" id="neph-'+i+'">' +
       '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">' +
         '<input type="checkbox" checked="'+(ph.actif?'checked':'')+'" onchange="togglePhaseActif('+i+',this.checked)" style="accent-color:var(--bordeaux)"/>' +
-        '<input style="flex:1;min-width:120px;padding:4px 8px;border:1px solid var(--border);border-radius:var(--radius-sm);font-family:'Sora',sans-serif;font-size:12px;font-weight:600" value="'+ph.label+'" onblur="updatePhaseLabel('+i+',this.value)"/>' +
+        '<input style="flex:1;min-width:120px;padding:4px 8px;border:1px solid var(--border);border-radius:var(--radius-sm);font-family:Sora,sans-serif;font-size:12px;font-weight:600" value="'+ph.label+'" onblur="updatePhaseLabel('+i+',this.value)"/>' +
         '<div style="display:flex;align-items:center;gap:6px;flex-shrink:0">' +
-          '<input type="number" min="0" step="0.5" value="'+(ph.jeh_total||'')+'" placeholder="JEH" style="width:70px;padding:4px 6px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:12px;font-family:'Sora',sans-serif" oninput="updatePhaseJEH('+i+',this.value)"/>' +
+          '<input type="number" min="0" step="0.5" value="'+(ph.jeh_total||'')+'" placeholder="JEH" style="width:70px;padding:4px 6px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:12px;font-family:Sora,sans-serif" oninput="updatePhaseJEH('+i+',this.value)"/>' +
           '<span style="font-size:11px;color:var(--text-tertiary)">×</span>' +
-          '<input type="number" min="0" value="'+(ph.montant_jeh||'')+'" placeholder="€/JEH" style="width:80px;padding:4px 6px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:12px;font-family:'Sora',sans-serif" oninput="updatePhaseMontant('+i+',this.value)"/>' +
+          '<input type="number" min="0" value="'+(ph.montant_jeh||'')+'" placeholder="€/JEH" style="width:80px;padding:4px 6px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:12px;font-family:Sora,sans-serif" oninput="updatePhaseMontant('+i+',this.value)"/>' +
           '<span style="font-size:12px;font-weight:600;color:var(--bordeaux);min-width:70px;text-align:right" id="neph-total-'+i+'">'+fmtM(calcPhase(ph).montant_total)+'</span>' +
         '</div>' +
         (i > 5 ? '<button onclick="removeCustomPhase('+i+')" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:14px;padding:0 2px">×</button>' : '') +
