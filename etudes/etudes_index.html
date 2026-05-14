@@ -73,7 +73,7 @@ tr:hover td{background:rgba(27,42,74,0.02);cursor:pointer;}
       <div class="flex justify-between items-center" style="flex-wrap:wrap;gap:10px">
         <div><div class="page-title">Études</div><div class="page-subtitle" id="page-subtitle"></div></div>
         <div class="flex gap-2">
-          <button class="btn btn-primary btn-sm" id="btn-add" onclick="openAdd()" style="display:none">+ Nouvelle étude</button>
+          <button class="btn btn-primary btn-sm" id="btn-add" onclick="openAddModal()" style="display:none">+ Nouvelle étude</button>
           <button class="btn btn-secondary btn-sm" onclick="exportXLSX()">⬇ Excel</button>
         </div>
       </div>
@@ -170,8 +170,31 @@ tr:hover td{background:rgba(27,42,74,0.02);cursor:pointer;}
         </select>
       </div>
       <div class="form-field full">
-        <label class="input-label">Description de la mission</label>
-        <textarea class="select-field" id="ne-desc" rows="2" style="resize:vertical" placeholder="Contexte, objectifs, périmètre de la mission…"></textarea>
+        <label class="input-label">Description de la mission *</label>
+        <textarea class="input" id="ne-desc" rows="2" style="resize:vertical" placeholder="Contexte, objectifs, périmètre de la mission…"></textarea>
+      </div>
+      <div class="form-field full">
+        <label class="input-label">Phases & JEH <span style="font-size:10px;color:var(--text-tertiary);font-weight:400">— générées depuis le type d'étude, ajustables</span></label>
+        <div id="ne-phases-list" style="display:flex;flex-direction:column;gap:6px;margin-top:4px"></div>
+        <button type="button" class="btn btn-secondary btn-sm" style="margin-top:8px" onclick="addCustomPhase()">+ Phase personnalisée</button>
+        <div style="background:var(--bg);border-radius:var(--radius-md);padding:10px 14px;margin-top:10px;font-size:12px">
+          <div style="display:flex;justify-content:space-between;margin-bottom:3px">
+            <span style="color:var(--text-tertiary)">Total JEH</span>
+            <span style="font-weight:700;color:var(--navy)" id="ne-total-jeh">0 JEH</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;margin-bottom:3px">
+            <span style="color:var(--text-tertiary)">Montant HT (facturé client)</span>
+            <span style="font-weight:700;color:var(--bordeaux)" id="ne-total-ht">0 €</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;margin-bottom:3px">
+            <span style="color:var(--text-tertiary)">Rémunération brute intervenants (50%)</span>
+            <span style="font-weight:600;color:var(--success)" id="ne-total-brut">0 €</span>
+          </div>
+          <div style="display:flex;justify-content:space-between">
+            <span style="color:var(--text-tertiary)">Part JE (50%)</span>
+            <span style="font-weight:600;color:var(--navy)" id="ne-total-je">0 €</span>
+          </div>
+        </div>
       </div>
       <div class="form-field full">
         <label class="input-label">Responsable</label>
@@ -389,7 +412,7 @@ function openEtude(id) {
       '<div style="grid-column:1/-1"><label class="input-label">Motif / note</label><input class="input" id="av-note" placeholder="Prolongation, modification de périmètre…" style="font-size:12px"/></div>' +
     '</div>' +
     '<button class="btn btn-secondary btn-sm" onclick="addAvenant(\''+id+'\')">+ Enregistrer l\'avenant</button>' +
-    (intervenants ? '<div class="ep-section" style="margin-top:16px">Intervenants</div><div>'+intervenants+'</div>' : '') +
+    renderPhasesPanel(e, isSA, canEdit) +
     (isSA ? '<div style="margin-top:16px"><button class="btn btn-secondary btn-sm" style="background:#fee2e2;color:#991b1b;border-color:#fca5a5" onclick="deleteEtude(\''+id+'\')">🗑 Supprimer</button></div>' : '');
 
   document.getElementById('etude-panel').classList.add('open');
@@ -405,6 +428,214 @@ function epField(label, val) {
 function updEtude(id, field, val) {
   var u = {}; u[field] = val;
   db.collection('etudes').doc(id).update(u);
+}
+
+function renderPhasesPanel(e, isSA, canEdit) {
+  var phases = e.phases || [];
+  if (!phases.length) {
+    return '<div class="ep-section" style="margin-top:16px">Phases & JEH</div>' +
+      '<div style="font-size:12px;color:var(--text-tertiary);font-style:italic">Aucune phase définie. ' +
+      (isSA ? 'Modifie l\'étude pour ajouter des phases.' : '') + '</div>';
+  }
+  var calc = calcEtude(phases);
+  var html = '<div class="ep-section" style="margin-top:16px">Phases & JEH — ' +
+    fmtJEH(calc.jeh_total) + ' · ' + fmtM(calc.montant_ht) + ' HT</div>';
+
+  // Financial summary
+  html += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px">' +
+    '<div style="background:rgba(163,33,95,0.06);border-radius:var(--radius-md);padding:10px;text-align:center">' +
+      '<div style="font-size:18px;font-weight:800;color:var(--bordeaux)">' + fmtM(calc.montant_ht) + '</div>' +
+      '<div style="font-size:10px;color:var(--text-tertiary);text-transform:uppercase">Facturé client</div>' +
+    '</div>' +
+    '<div style="background:rgba(34,197,94,0.08);border-radius:var(--radius-md);padding:10px;text-align:center">' +
+      '<div style="font-size:18px;font-weight:800;color:#15803d">' + fmtM(calc.montant_brut_iv) + '</div>' +
+      '<div style="font-size:10px;color:var(--text-tertiary);text-transform:uppercase">Brut intervenants (50%)</div>' +
+    '</div>' +
+    '<div style="background:rgba(27,42,74,0.06);border-radius:var(--radius-md);padding:10px;text-align:center">' +
+      '<div style="font-size:18px;font-weight:800;color:var(--navy)">' + fmtM(calc.part_je) + '</div>' +
+      '<div style="font-size:10px;color:var(--text-tertiary);text-transform:uppercase">Part JE (50%)</div>' +
+    '</div>' +
+  '</div>';
+
+  // Phases list
+  phases.forEach(function(ph) {
+    var phCalc = calcPhase(ph);
+    var ivList = (ph.intervenants||[]);
+    var jehAssigned = ivList.reduce(function(a,i){return a+(parseFloat(i.jeh)||0);},0);
+    var jehRestant = (ph.jeh_total||0) - jehAssigned;
+    var isActif = ph.actif !== false;
+
+    html += '<div style="border:1px solid var(--border);border-radius:var(--radius-lg);padding:12px 14px;margin-bottom:8px;opacity:'+(isActif?'1':'0.5')+';background:'+(isActif?'var(--bg-card)':'#f8f7f5')+'">' +
+      '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px;margin-bottom:8px">' +
+        '<div>' +
+          '<span style="font-weight:700;font-size:13px;color:var(--navy)">' + ph.label + '</span>' +
+          (!isActif ? ' <span style="font-size:10px;color:var(--text-tertiary);font-style:italic">désactivée</span>' : '') +
+          '<div style="font-size:10px;color:var(--text-tertiary);margin-top:1px">' + (ph.sub||'') + '</div>' +
+        '</div>' +
+        '<div style="text-align:right;font-size:12px">' +
+          '<span style="font-weight:700;color:var(--bordeaux)">' + fmtM(phCalc.montant_total) + '</span>' +
+          ' <span style="color:var(--text-tertiary)">(' + (ph.jeh_total||0) + ' JEH × ' + fmtM(ph.montant_jeh||0) + ')</span>' +
+        '</div>' +
+      '</div>';
+
+    // Intervenants sur cette phase
+    if (ivList.length > 0) {
+      html += '<div style="display:flex;flex-direction:column;gap:4px;margin-bottom:8px">';
+      ivList.forEach(function(iv) {
+        var ivBrut = (iv.jeh||0) * (ph.montant_jeh||0) * 0.5;
+        html += '<div style="display:flex;align-items:center;gap:8px;background:var(--bg);border-radius:var(--radius-sm);padding:6px 10px;font-size:12px">' +
+          '<div style="width:26px;height:26px;border-radius:50%;background:var(--bordeaux);color:white;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0">' +
+            ((iv.nom||'?')[0]) +
+          '</div>' +
+          '<span style="flex:1;color:var(--navy);font-weight:600">' + (iv.nom||'') + '</span>' +
+          '<span style="color:var(--text-tertiary)">' + (iv.jeh||0) + ' JEH</span>' +
+          '<span style="color:var(--success);font-weight:600">' + fmtM(ivBrut) + '</span>' +
+          (canEdit ? '<button onclick="removeIvFromPhase(''+e.id+'',''+ph.id+'',''+iv.intervenant_id+'')" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:12px;padding:0">×</button>' : '') +
+        '</div>';
+      });
+      html += '</div>';
+    }
+
+    // JEH restants + bouton assigner
+    if (isActif && canEdit) {
+      html += '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">' +
+        '<span style="font-size:11px;color:' + (jehRestant < 0 ? 'var(--danger)' : jehRestant === 0 ? 'var(--success)' : 'var(--text-tertiary)') + '">' +
+          (jehRestant < 0 ? '⚠️ Dépassement de ' + Math.abs(jehRestant) + ' JEH' :
+           jehRestant === 0 ? '✅ JEH entièrement assignés' :
+           jehRestant + ' JEH restants à assigner') +
+        '</span>' +
+        (jehRestant > 0 ?
+          '<button class="btn btn-secondary btn-sm" onclick="openAssignPhase(''+e.id+'',''+ph.id+'','+jehRestant+',''+ph.label+'',' + (ph.montant_jeh||0) + ')" style="font-size:11px;padding:3px 10px">+ Assigner intervenant</button>'
+          : '') +
+      '</div>';
+    }
+
+    html += '</div>';
+  });
+
+  return html;
+}
+
+// ── Assigner intervenant à une phase ─────────────────────────
+var curAssignEtudeId = null, curAssignPhaseId = null, curAssignMaxJeh = 0, curAssignMontantJeh = 0;
+
+function openAssignPhase(etudeId, phaseId, maxJeh, phaseLabel, montantJeh) {
+  curAssignEtudeId = etudeId; curAssignPhaseId = phaseId;
+  curAssignMaxJeh = maxJeh; curAssignMontantJeh = montantJeh;
+  // Build modal dynamically
+  var modal = document.getElementById('modal-assign-phase');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    modal.id = 'modal-assign-phase';
+    modal.onclick = function(evt){if(evt.target===this)closeAssignPhase();};
+    document.body.appendChild(modal);
+  }
+  var ivOptions = allIntervenants.map(function(iv){
+    return '<option value="'+iv.id+'">'+iv.prenom+' '+iv.nom+'</option>';
+  }).join('');
+  modal.innerHTML =
+    '<div class="modal-box" style="max-width:440px">' +
+      '<div class="modal-header"><div class="modal-title">Assigner — '+phaseLabel+'</div>' +
+        '<button class="modal-close" onclick="closeAssignPhase()">×</button></div>' +
+      '<div class="form-grid">' +
+        '<div class="form-field full"><label class="input-label">Intervenant</label>' +
+          '<select class="select-field" id="ap-iv">'+ivOptions+'</select></div>' +
+        '<div class="form-field"><label class="input-label">JEH à assigner (max '+maxJeh+')</label>' +
+          '<input class="input" type="number" id="ap-jeh" min="0.5" step="0.5" max="'+maxJeh+'" placeholder="0" oninput="updateApCalc()"/></div>' +
+        '<div class="form-field">' +
+          '<label class="input-label">Rémunération brute</label>' +
+          '<div style="padding:8px;background:var(--bg);border-radius:var(--radius-sm);font-weight:700;color:var(--success)" id="ap-remun">0 €</div>' +
+        '</div>' +
+        '<div class="form-field full" style="background:#fef3c7;border-radius:var(--radius-md);padding:8px 12px;font-size:11px;color:#78350f">' +
+          '× montant JEH de la phase ('+fmtM(montantJeh)+') × 50% = rémunération brute intervenant' +
+        '</div>' +
+      '</div>' +
+      '<div class="modal-actions">' +
+        '<button class="btn btn-secondary" onclick="closeAssignPhase()">Annuler</button>' +
+        '<button class="btn btn-primary" onclick="confirmAssignPhase()">Assigner →</button>' +
+      '</div>' +
+    '</div>';
+  modal.classList.add('open');
+}
+
+function updateApCalc() {
+  var jeh = parseFloat(document.getElementById('ap-jeh').value)||0;
+  var remun = jeh * curAssignMontantJeh * 0.5;
+  var el = document.getElementById('ap-remun');
+  if (el) el.innerText = fmtM(remun);
+}
+
+function closeAssignPhase() {
+  var modal = document.getElementById('modal-assign-phase');
+  if (modal) modal.classList.remove('open');
+}
+
+function confirmAssignPhase() {
+  var ivId = document.getElementById('ap-iv').value;
+  var jeh = parseFloat(document.getElementById('ap-jeh').value)||0;
+  if (!ivId || jeh <= 0) { alert('Sélectionne un intervenant et un nombre de JEH.'); return; }
+  if (jeh > curAssignMaxJeh) { alert('Maximum ' + curAssignMaxJeh + ' JEH disponibles sur cette phase.'); return; }
+  var iv = allIntervenants.find(function(x){return x.id===ivId;});
+  if (!iv) return;
+  var e = allEtudes.find(function(x){return x.id===curAssignEtudeId;});
+  if (!e) return;
+  var phases = JSON.parse(JSON.stringify(e.phases||[]));
+  var phIdx = phases.findIndex(function(p){return p.id===curAssignPhaseId;});
+  if (phIdx < 0) return;
+  if (!phases[phIdx].intervenants) phases[phIdx].intervenants = [];
+  // Check if already assigned to this phase
+  var alreadyIdx = phases[phIdx].intervenants.findIndex(function(i){return i.intervenant_id===ivId;});
+  var ivEntry = {
+    intervenant_id: ivId,
+    nom: (iv.prenom||'')+' '+(iv.nom||''),
+    email: iv.email||'',
+    jeh: jeh,
+    montant_brut: jeh * (phases[phIdx].montant_jeh||0) * 0.5,
+    statut: 'Assigné'
+  };
+  if (alreadyIdx >= 0) {
+    phases[phIdx].intervenants[alreadyIdx] = ivEntry; // update existing
+  } else {
+    phases[phIdx].intervenants.push(ivEntry);
+  }
+  // Create RM document
+  db.collection('documents').add({
+    type: 'RM',
+    etude_id: curAssignEtudeId,
+    etude_ref: e.reference||'',
+    phase_id: curAssignPhaseId,
+    phase_label: phases[phIdx].label,
+    intervenant_id: ivId,
+    intervenant_nom: ivEntry.nom,
+    nom_affiche: 'RM — '+(e.reference||'')+' — '+phases[phIdx].label+' — '+ivEntry.nom,
+    lien_gdrive: '',
+    statut: 'en_attente_lien',
+    vu_par_intervenant: false,
+    created_at: firebase.firestore.FieldValue.serverTimestamp()
+  });
+  // Update étude
+  var recalc = calcEtude(phases);
+  db.collection('etudes').doc(curAssignEtudeId).update({
+    phases: phases,
+    jeh_total_etude: recalc.jeh_total
+  }).then(function(){
+    closeAssignPhase();
+    openEtude(curAssignEtudeId); // refresh panel
+  });
+}
+
+function removeIvFromPhase(etudeId, phaseId, ivId) {
+  if (!confirm('Retirer cet intervenant de la phase ?')) return;
+  var e = allEtudes.find(function(x){return x.id===etudeId;});
+  if (!e) return;
+  var phases = JSON.parse(JSON.stringify(e.phases||[]));
+  var phIdx = phases.findIndex(function(p){return p.id===phaseId;});
+  if (phIdx < 0) return;
+  phases[phIdx].intervenants = (phases[phIdx].intervenants||[]).filter(function(i){return i.intervenant_id!==ivId;});
+  db.collection('etudes').doc(etudeId).update({phases:phases}).then(function(){
+    openEtude(etudeId);
+  });
 }
 
 function deleteEtude(id) {
@@ -504,11 +735,168 @@ function confirmAdd() {
     mandat_id: actifMandat ? actifMandat.id : '',
     type_etude: document.getElementById('ne-type-etude').value,
     description: document.getElementById('ne-desc') ? document.getElementById('ne-desc').value.trim() : '',
+    phases: nePhases.map(function(p){return Object.assign({},p,{intervenants:p.intervenants||[]});}),
+    jeh_total_etude: calcEtude(nePhases).jeh_total,
     notes: document.getElementById('ne-notes').value.trim(),
     created_at_str: new Date().toISOString().split('T')[0],
     created_at: firebase.firestore.FieldValue.serverTimestamp()
   }).then(function(){ closeAdd(); });
 }
+
+// ── Phases par type d'étude ───────────────────────────────────
+var PHASES_DEF = {
+  marche: [
+    {id:'cadrage',      label:'Cadrage',        sub:'Objectifs, problématique, périmètre'},
+    {id:'conception',   label:'Conception',     sub:'Méthodologie, questionnaires, guides entretien'},
+    {id:'collecte',     label:'Collecte',       sub:'Enquêtes terrain, interviews, recherche documentaire'},
+    {id:'analyse',      label:'Analyse',        sub:'Traitement données, segmentation, insights'},
+    {id:'recommandations',label:'Recommandations',sub:'Opportunités, positionnement, axes de développement'},
+    {id:'restitution',  label:'Restitution',    sub:'Rapport détaillé, présentation client'}
+  ],
+  marketing: [
+    {id:'cadrage',      label:'Cadrage',        sub:'KPIs, identification des cibles'},
+    {id:'conception',   label:'Conception',     sub:'Questionnaires, sondages, choix des canaux'},
+    {id:'collecte',     label:'Collecte',       sub:'Diffusion enquêtes, collecte feedback clients'},
+    {id:'analyse',      label:'Analyse',        sub:'Indicateurs, analyse qualitative des retours'},
+    {id:'recommandations',label:'Recommandations',sub:'Actions marketing, stratégie communication'},
+    {id:'restitution',  label:'Restitution',    sub:'Synthèse opérationnelle, plan d\'actions'}
+  ],
+  finance: [
+    {id:'cadrage',      label:'Cadrage',        sub:'Analyse des besoins (financement, performance)'},
+    {id:'collecte',     label:'Collecte',       sub:'Données financières, documents internes'},
+    {id:'analyse',      label:'Analyse',        sub:'Diagnostic, calculs de rentabilité'},
+    {id:'construction', label:'Construction',   sub:'Business plan, scénarios financiers'},
+    {id:'recommandations',label:'Recommandations',sub:'Décisions investissement, optimisation des ressources'},
+    {id:'restitution',  label:'Restitution',    sub:'Livrables structurés, tableaux, projections'}
+  ],
+  affaires: [
+    {id:'cadrage',      label:'Cadrage',        sub:'Public cible, objectif du sondage'},
+    {id:'conception',   label:'Conception',     sub:'Création du questionnaire'},
+    {id:'collecte',     label:'Collecte',       sub:'Diffusion à l\'échantillon cible'},
+    {id:'analyse',      label:'Analyse',        sub:'Traitement statistique, interprétation'},
+    {id:'recommandations',label:'Recommandations',sub:'Compréhension des attentes, aide à la décision'},
+    {id:'restitution',  label:'Restitution',    sub:'Rapport + synthèse décisionnelle'}
+  ]
+};
+
+function getTypeKey(t) {
+  if (!t) return 'marche';
+  var tl = (t||'').toLowerCase();
+  if (tl.includes('march')||tl.includes('strat')||tl.includes('bench')||tl.includes('veille')||tl.includes('lancement')) return 'marche';
+  if (tl.includes('market')||tl.includes('not')||tl.includes('satisf')||tl.includes('com')||tl.includes('plan')) return 'marketing';
+  if (tl.includes('finan')||tl.includes('audit')||tl.includes('business')||tl.includes('rse')||tl.includes('myst')) return 'finance';
+  if (tl.includes('public')||tl.includes('sondage')||tl.includes('opinion')) return 'affaires';
+  return 'marche';
+}
+
+function buildDefaultPhases(typeKey) {
+  var defs = PHASES_DEF[typeKey] || PHASES_DEF.marche;
+  return defs.map(function(p) {
+    return {id:p.id, label:p.label, sub:p.sub, ordre:defs.indexOf(p)+1,
+            jeh_total:0, montant_jeh:0, actif:true, intervenants:[]};
+  });
+}
+
+// ── Calculs financiers ────────────────────────────────────────
+function calcPhase(ph) {
+  var total = (ph.jeh_total||0) * (ph.montant_jeh||0);
+  var brut_iv = total * 0.5;
+  var part_je = total * 0.5;
+  return {montant_total: total, montant_brut_iv: brut_iv, part_je: part_je};
+}
+
+function calcEtude(phases) {
+  var jeh = 0, montant = 0, brut = 0, je = 0;
+  (phases||[]).filter(function(p){return p.actif;}).forEach(function(p) {
+    jeh += (p.jeh_total||0);
+    var c = calcPhase(p);
+    montant += c.montant_total;
+    brut += c.montant_brut_iv;
+    je += c.part_je;
+  });
+  return {jeh_total: jeh, montant_ht: montant, montant_brut_iv: brut, part_je: je};
+}
+
+function fmtM(n) { return Number(n||0).toLocaleString('fr-FR',{minimumFractionDigits:0,maximumFractionDigits:0})+' €'; }
+function fmtJEH(n) { return (n||0)+' JEH'; }
+
+
+// ── Phase builder UI ──────────────────────────────────────────
+var nePhases = [];
+
+function onTypeEtudeChange() {
+  var typeKey = getTypeKey(document.getElementById('ne-type-etude').value);
+  nePhases = buildDefaultPhases(typeKey);
+  renderNePhasesUI();
+}
+
+function renderNePhasesUI() {
+  var container = document.getElementById('ne-phases-list');
+  if (!container) return;
+  container.innerHTML = nePhases.map(function(ph, i) {
+    return '<div style="background:var(--bg);border-radius:var(--radius-md);padding:10px 12px;border:1px solid '+(ph.actif?'var(--border)':'#fca5a5')+';opacity:'+(ph.actif?'1':'0.6')+'" id="neph-'+i+'">' +
+      '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">' +
+        '<input type="checkbox" checked="'+(ph.actif?'checked':'')+'" onchange="togglePhaseActif('+i+',this.checked)" style="accent-color:var(--bordeaux)"/>' +
+        '<input style="flex:1;min-width:120px;padding:4px 8px;border:1px solid var(--border);border-radius:var(--radius-sm);font-family:'Sora',sans-serif;font-size:12px;font-weight:600" value="'+ph.label+'" onblur="updatePhaseLabel('+i+',this.value)"/>' +
+        '<div style="display:flex;align-items:center;gap:6px;flex-shrink:0">' +
+          '<input type="number" min="0" step="0.5" value="'+(ph.jeh_total||'')+'" placeholder="JEH" style="width:70px;padding:4px 6px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:12px;font-family:'Sora',sans-serif" oninput="updatePhaseJEH('+i+',this.value)"/>' +
+          '<span style="font-size:11px;color:var(--text-tertiary)">×</span>' +
+          '<input type="number" min="0" value="'+(ph.montant_jeh||'')+'" placeholder="€/JEH" style="width:80px;padding:4px 6px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:12px;font-family:'Sora',sans-serif" oninput="updatePhaseMontant('+i+',this.value)"/>' +
+          '<span style="font-size:12px;font-weight:600;color:var(--bordeaux);min-width:70px;text-align:right" id="neph-total-'+i+'">'+fmtM(calcPhase(ph).montant_total)+'</span>' +
+        '</div>' +
+        (i > 5 ? '<button onclick="removeCustomPhase('+i+')" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:14px;padding:0 2px">×</button>' : '') +
+      '</div>' +
+      '<div style="font-size:10px;color:var(--text-tertiary);margin-top:3px;padding-left:22px">'+ph.sub+'</div>' +
+    '</div>';
+  }).join('');
+  updateNeTotals();
+}
+
+function togglePhaseActif(i, val) {
+  nePhases[i].actif = val;
+  renderNePhasesUI();
+}
+function updatePhaseLabel(i, val) { nePhases[i].label = val; }
+function updatePhaseJEH(i, val) {
+  nePhases[i].jeh_total = parseFloat(val)||0;
+  var el = document.getElementById('neph-total-'+i);
+  if (el) el.innerText = fmtM(calcPhase(nePhases[i]).montant_total);
+  updateNeTotals();
+}
+function updatePhaseMontant(i, val) {
+  nePhases[i].montant_jeh = parseFloat(val)||0;
+  var el = document.getElementById('neph-total-'+i);
+  if (el) el.innerText = fmtM(calcPhase(nePhases[i]).montant_total);
+  updateNeTotals();
+}
+function addCustomPhase() {
+  nePhases.push({id:'custom_'+Date.now(),label:'Phase personnalisée',sub:'',ordre:nePhases.length+1,jeh_total:0,montant_jeh:0,actif:true,intervenants:[]});
+  renderNePhasesUI();
+}
+function removeCustomPhase(i) {
+  nePhases.splice(i, 1);
+  renderNePhasesUI();
+}
+function updateNeTotals() {
+  var calc = calcEtude(nePhases);
+  var jEl = document.getElementById('ne-total-jeh');
+  var hEl = document.getElementById('ne-total-ht');
+  var bEl = document.getElementById('ne-total-brut');
+  var jeEl = document.getElementById('ne-total-je');
+  if (jEl) jEl.innerText = calc.jeh_total + ' JEH';
+  if (hEl) hEl.innerText = fmtM(calc.montant_ht);
+  if (bEl) bEl.innerText = fmtM(calc.montant_brut_iv);
+  if (jeEl) jeEl.innerText = fmtM(calc.part_je);
+  // Sync montant HT field
+  var mhtEl = document.getElementById('ne-montant');
+  if (mhtEl && calc.montant_ht > 0) mhtEl.value = calc.montant_ht;
+}
+
+// Hook type change
+document.addEventListener('DOMContentLoaded', function() {
+  var sel = document.getElementById('ne-type-etude');
+  if (sel) sel.addEventListener('change', onTypeEtudeChange);
+});
 
 function exportXLSX() {
   var rows = [['Référence','Titre','Client','Statut','Montant HT','Responsable','Date début','Date fin','Mandat']];
