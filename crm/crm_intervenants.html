@@ -195,7 +195,7 @@
 
 <script>
 var ME = '', MY_ROLE = '', CAN_EDIT = false;
-var allIntervenants = [], allEtudes = [];
+var allIntervenants = [], allEtudes = [], allMandatsIV = [];
 var curIvId = null;
 var EDIT_ROLES_IV = ['super_admin','president','vice_president','responsable_commercial','secretaire'];
 
@@ -260,9 +260,10 @@ initAuth('crm_intervenants', function(user, role, profile) {
 function loadData() {
   // Charger les mandats pour les filtres et le formulaire
   db.collection('mandats').where('statut','in',['actif','clos']).get().then(function(snap) {
-    var mandats = [];
-    snap.forEach(function(doc){mandats.push(Object.assign({id:doc.id},doc.data()));});
-    mandats.sort(function(a,b){return (b.date_debut||'').localeCompare(a.date_debut||'');});
+    allMandatsIV = [];
+    snap.forEach(function(doc){allMandatsIV.push(Object.assign({id:doc.id},doc.data()));});
+    allMandatsIV.sort(function(a,b){return (b.date_debut||'').localeCompare(a.date_debut||'');});
+    var mandats = allMandatsIV;
     // Filter select
     var fSel = document.getElementById('f-mandat-iv');
     mandats.forEach(function(m){
@@ -270,12 +271,15 @@ function loadData() {
       fSel.appendChild(o);
     });
     // Add form select
+    // Populate add form select (may not exist yet)
     var niSel = document.getElementById('ni-mandats');
-    niSel.innerHTML = '<option value="externe">Externe (aucun mandat)</option>';
-    mandats.forEach(function(m){
-      var o=document.createElement('option');o.value=m.id;o.text=m.label;
-      niSel.appendChild(o);
-    });
+    if (niSel) {
+      niSel.innerHTML = '<option value="externe">Externe (aucun mandat)</option>';
+      mandats.forEach(function(m){
+        var o=document.createElement('option');o.value=m.id;o.text=m.label;
+        niSel.appendChild(o);
+      });
+    }
   });
 
   db.collection('etudes').onSnapshot(function(snap) {
@@ -515,18 +519,140 @@ function renderIvMissions(ivId) {
 function renderIvAssigner(iv) {
   if (!CAN_EDIT) { document.getElementById('ivp-assigner').innerHTML = ''; return; }
   var etudesActives = allEtudes.filter(function(e){
-    return ['Signé','En cours'].includes(e.statut) &&
-           !(e.intervenants||[]).some(function(i){return i.intervenant_id===iv.id;});
+    return ['Signé','En cours'].includes(e.statut);
   });
   document.getElementById('ivp-assigner').innerHTML =
-    '<div style="font-size:13px;color:var(--text-secondary);margin-bottom:14px">Assigner '+(iv.prenom||'')+' à une étude</div>' +
-    '<div class="form-field"><label class="input-label">Étude</label>' +
-      '<select class="select-field" id="assign-etude"><option value="">— Choisir —</option>' +
-      etudesActives.map(function(e){return '<option value="'+e.id+'">'+e.reference+' — '+e.title+'</option>';}).join('') +
+    '<div style="font-size:13px;color:var(--text-secondary);margin-bottom:14px">Assigner <strong>'+(iv.prenom||'')+' '+(iv.nom||'')+'</strong> à une phase</div>' +
+    '<div class="form-field"><label class="input-label">Étude *</label>' +
+      '<select class="select-field" id="assign-etude" onchange="onAssignEtudeChange()"><option value="">— Choisir une étude —</option>' +
+      etudesActives.map(function(e){
+        return '<option value="'+e.id+'">'+e.reference+' — '+e.title+' ('+e.client_name+')</option>';
+      }).join('') +
       '</select></div>' +
-    '<div class="form-field"><label class="input-label">Montant brut (€)</label><input class="input" type="number" id="assign-montant" placeholder="0"/></div>' +
-    '<div class="form-field"><label class="input-label">Notes</label><input class="input" id="assign-notes" placeholder="Rôle, modalités…"/></div>' +
-    '<button class="btn btn-primary" style="margin-top:8px" onclick="assignToEtude()">Assigner →</button>';
+    '<div id="assign-phases-section" style="display:none">' +
+      '<div class="form-field"><label class="input-label">Phase *</label>' +
+        '<select class="select-field" id="assign-phase" onchange="onAssignPhaseChange()"><option value="">— Choisir une phase —</option></select>' +
+      '</div>' +
+      '<div id="assign-phase-detail" style="display:none;background:var(--bg);border-radius:var(--radius-md);padding:10px 12px;margin-bottom:10px;font-size:12px"></div>' +
+      '<div class="form-field"><label class="input-label">JEH à assigner *</label>' +
+        '<input class="input" type="number" id="assign-jeh" min="0.5" step="0.5" placeholder="0" oninput="onAssignJehChange()"/>' +
+        '<div style="font-size:11px;color:var(--text-tertiary);margin-top:3px" id="assign-jeh-hint"></div>' +
+      '</div>' +
+      '<div style="background:var(--bg);border-radius:var(--radius-md);padding:10px;margin-bottom:10px" id="assign-remun-preview" style="display:none">' +
+        '<div style="font-size:12px;font-weight:600;color:var(--navy)">Rémunération brute : <span id="assign-remun-val" style="color:var(--success)">0 €</span></div>' +
+        '<div style="font-size:10px;color:var(--text-tertiary);margin-top:2px">= JEH × montant/JEH × 50%</div>' +
+      '</div>' +
+    '</div>' +
+    '<button class="btn btn-primary" style="margin-top:8px" onclick="assignToPhase(''+iv.id+'',''+encodeURIComponent((iv.prenom||'')+' '+(iv.nom||'')+'')')">Assigner →</button>';
+}
+
+function onAssignEtudeChange() {
+  var etudeId = document.getElementById('assign-etude').value;
+  var section = document.getElementById('assign-phases-section');
+  if (!etudeId) { section.style.display='none'; return; }
+  var e = allEtudes.find(function(x){return x.id===etudeId;});
+  if (!e) { section.style.display='none'; return; }
+  var phases = (e.phases||[]).filter(function(p){return p.actif!==false;});
+  var phaseSel = document.getElementById('assign-phase');
+  phaseSel.innerHTML = '<option value="">— Choisir —</option>' +
+    phases.map(function(ph){
+      var jehAssigned = (ph.intervenants||[]).reduce(function(a,i){return a+(parseFloat(i.jeh)||0);},0);
+      var jehDispo = (ph.jeh_total||0) - jehAssigned;
+      var suffix = jehDispo <= 0 ? ' (complet)' : ' — '+jehDispo+' JEH disponibles';
+      return '<option value="'+ph.id+'"'+(jehDispo<=0?' disabled':'')+'>'+ph.label+suffix+'</option>';
+    }).join('');
+  section.style.display = 'block';
+  document.getElementById('assign-phase-detail').style.display = 'none';
+}
+
+function onAssignPhaseChange() {
+  var etudeId = document.getElementById('assign-etude').value;
+  var phaseId = document.getElementById('assign-phase').value;
+  var detailEl = document.getElementById('assign-phase-detail');
+  if (!etudeId || !phaseId) { detailEl.style.display='none'; return; }
+  var e = allEtudes.find(function(x){return x.id===etudeId;});
+  if (!e) return;
+  var ph = (e.phases||[]).find(function(p){return p.id===phaseId;});
+  if (!ph) { detailEl.style.display='none'; return; }
+  var jehAssigned = (ph.intervenants||[]).reduce(function(a,i){return a+(parseFloat(i.jeh)||0);},0);
+  var jehDispo = (ph.jeh_total||0) - jehAssigned;
+  var existingList = (ph.intervenants||[]).length > 0
+    ? '<div style="margin-top:6px"><span style="font-weight:600">Déjà assignés :</span> ' +
+      (ph.intervenants||[]).map(function(i){return i.nom+' ('+i.jeh+' JEH)';}).join(', ')+'</div>'
+    : '<div style="margin-top:4px;color:var(--success)">Aucun intervenant sur cette phase.</div>';
+  detailEl.innerHTML =
+    '<div><span style="font-weight:600">'+ph.label+'</span> · '+ph.jeh_total+' JEH total · '+fmtM(ph.montant_jeh||0)+'/JEH</div>' +
+    '<div style="margin-top:3px">JEH assignés : <strong>'+jehAssigned+'</strong> / '+ph.jeh_total+' · Disponibles : <strong style="color:'+(jehDispo>0?'var(--success)':'var(--danger)')+'">'+jehDispo+'</strong></div>' +
+    existingList;
+  detailEl.style.display = 'block';
+  var hint = document.getElementById('assign-jeh-hint');
+  if (hint) hint.innerText = 'Maximum disponible : '+jehDispo+' JEH';
+  var jehInp = document.getElementById('assign-jeh');
+  if (jehInp) { jehInp.max = jehDispo; jehInp.value = ''; }
+  document.getElementById('assign-remun-preview').style.display = 'block';
+}
+
+function onAssignJehChange() {
+  var etudeId = document.getElementById('assign-etude').value;
+  var phaseId = document.getElementById('assign-phase').value;
+  var jeh = parseFloat(document.getElementById('assign-jeh').value)||0;
+  if (!etudeId || !phaseId) return;
+  var e = allEtudes.find(function(x){return x.id===etudeId;});
+  if (!e) return;
+  var ph = (e.phases||[]).find(function(p){return p.id===phaseId;});
+  if (!ph) return;
+  var remun = jeh * (ph.montant_jeh||0) * 0.5;
+  var el = document.getElementById('assign-remun-val');
+  if (el) el.innerText = fmtM(remun);
+}
+
+function assignToPhase(ivId, ivNameEnc) {
+  var ivName = decodeURIComponent(ivNameEnc);
+  var etudeId = document.getElementById('assign-etude').value;
+  var phaseId = document.getElementById('assign-phase').value;
+  var jeh = parseFloat(document.getElementById('assign-jeh').value)||0;
+  if (!etudeId) { alert('Choisir une étude.'); return; }
+  if (!phaseId) { alert('Choisir une phase.'); return; }
+  if (jeh <= 0) { alert('Le nombre de JEH doit être > 0.'); return; }
+  var e = allEtudes.find(function(x){return x.id===etudeId;});
+  if (!e) return;
+  var phases = JSON.parse(JSON.stringify(e.phases||[]));
+  var phIdx = phases.findIndex(function(p){return p.id===phaseId;});
+  if (phIdx < 0) return;
+  var ph = phases[phIdx];
+  var jehAssigned = (ph.intervenants||[]).reduce(function(a,i){return a+(parseFloat(i.jeh)||0);},0);
+  var jehDispo = (ph.jeh_total||0) - jehAssigned;
+  if (jeh > jehDispo) { alert('Maximum '+jehDispo+' JEH disponibles sur cette phase.'); return; }
+  var iv = allIntervenants.find(function(x){return x.id===ivId;});
+  if (!phases[phIdx].intervenants) phases[phIdx].intervenants = [];
+  var existing = phases[phIdx].intervenants.findIndex(function(i){return i.intervenant_id===ivId;});
+  var entry = {
+    intervenant_id: ivId,
+    nom: ivName,
+    email: iv ? (iv.email||'') : '',
+    jeh: jeh,
+    montant_brut: jeh * (ph.montant_jeh||0) * 0.5,
+    statut: 'Assigné'
+  };
+  if (existing >= 0) phases[phIdx].intervenants[existing] = entry;
+  else phases[phIdx].intervenants.push(entry);
+  // Create RM document
+  db.collection('documents').add({
+    type:'RM', etude_id:etudeId, etude_ref:e.reference||'',
+    phase_id:phaseId, phase_label:ph.label,
+    intervenant_id:ivId, intervenant_nom:ivName,
+    nom_affiche:'RM — '+(e.reference||'')+' — '+ph.label+' — '+ivName,
+    lien_gdrive:'', statut:'en_attente_lien', vu_par_intervenant:false,
+    created_at:firebase.firestore.FieldValue.serverTimestamp()
+  });
+  var recalc = calcEtude(phases);
+  db.collection('etudes').doc(etudeId).update({
+    phases:phases, jeh_total_etude:recalc.jeh_total, a_completer:false
+  }).then(function(){
+    alert('Assigné avec succès. Un RM a été créé dans Gestion documents.');
+    renderIvAssigner(iv);
+    renderIvMissions(ivId);
+  });
 }
 
 function assignToEtude() {
