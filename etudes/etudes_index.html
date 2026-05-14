@@ -474,7 +474,7 @@ function renderPhasesEditor(e) {
       (e.type_etude ? 'Génère les phases depuis le type d\'étude ci-dessous.' : 'Définis d\'abord le type d\'étude.') +
     '</div>';
     if (e.type_etude) {
-      html += '<button class="btn btn-secondary btn-sm" onclick="generatePhasesForEtude(''+e.id+'')" style="margin-bottom:12px">⚡ Générer les phases depuis le type</button>';
+      html += '<button class="btn btn-secondary btn-sm" data-eid="" data-eid="'+ e.id +'" data-action="genPhases" onclick="handleEtudeBtn(this)" style="margin-bottom:12px">⚡ Générer les phases depuis le type</button>';
     }
   }
 
@@ -505,10 +505,17 @@ function renderPhasesEditor(e) {
   html += '</div>';
 
   // Add custom phase button
-  html += '<button class="btn btn-secondary btn-sm" style="margin-top:8px" onclick="addPhaseToExisting(''+e.id+'')">+ Phase personnalisée</button>';
+  html += '<button class="btn btn-secondary btn-sm" style="margin-top:8px" data-eid="" data-eid="'+ e.id +'" data-action="addPhase" onclick="handleEtudeBtn(this)">+ Phase personnalisée</button>';
   html += '</div>';
 
   return html;
+}
+
+function handleEtudeBtn(btn) {
+  var eid = btn.dataset.eid;
+  var action = btn.dataset.action;
+  if (action === 'genPhases') generatePhasesForEtude(eid);
+  else if (action === 'addPhase') addPhaseToExisting(eid);
 }
 
 function generatePhasesForEtude(etudeId) {
