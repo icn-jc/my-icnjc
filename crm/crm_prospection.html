@@ -1875,9 +1875,15 @@ function saveAction() {
     db.collection('prospects').doc(curProspectId).update(prospUpdate).then(function() {
       // ── Auto-créer une étude si statut passe à "Signé" ──────
       if (result === 'Signé' && curProspect) {
-        // Vérifier qu'une étude n'existe pas déjà pour ce prospect
         db.collection('etudes').where('prospect_id','==',curProspectId).get().then(function(snap) {
-          if (snap.empty) {
+          var existingEtudes = [];
+          snap.forEach(function(doc){existingEtudes.push(Object.assign({id:doc.id},doc.data()));});
+          var shouldCreate = true;
+          if (existingEtudes.length > 0) {
+            var refs = existingEtudes.map(function(e){return e.reference||e.id;}).join(', ');
+            shouldCreate = confirm('Ce prospect a déjà ' + existingEtudes.length + ' étude(s) liée(s) : ' + refs + '.\n\nCréer une nouvelle étude pour cette signature ?');
+          }
+          if (shouldCreate) {
             var actifMandat = null;
             // Générer la référence
             var year = new Date().getFullYear().toString().slice(2);
