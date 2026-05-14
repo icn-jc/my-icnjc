@@ -225,6 +225,95 @@ function renderMissions(){
   renderList(done,'mmp-historique',false);
 }
 
+// ── Phases par type d'étude ───────────────────────────────────
+var PHASES_DEF = {
+  marche: [
+    {id:'cadrage',      label:'Cadrage',        sub:'Objectifs, problématique, périmètre'},
+    {id:'conception',   label:'Conception',     sub:'Méthodologie, questionnaires, guides entretien'},
+    {id:'collecte',     label:'Collecte',       sub:'Enquêtes terrain, interviews, recherche documentaire'},
+    {id:'analyse',      label:'Analyse',        sub:'Traitement données, segmentation, insights'},
+    {id:'recommandations',label:'Recommandations',sub:'Opportunités, positionnement, axes de développement'},
+    {id:'restitution',  label:'Restitution',    sub:'Rapport détaillé, présentation client'}
+  ],
+  marketing: [
+    {id:'cadrage',      label:'Cadrage',        sub:'KPIs, identification des cibles'},
+    {id:'conception',   label:'Conception',     sub:'Questionnaires, sondages, choix des canaux'},
+    {id:'collecte',     label:'Collecte',       sub:'Diffusion enquêtes, collecte feedback clients'},
+    {id:'analyse',      label:'Analyse',        sub:'Indicateurs, analyse qualitative des retours'},
+    {id:'recommandations',label:'Recommandations',sub:'Actions marketing, stratégie communication'},
+    {id:'restitution',  label:'Restitution',    sub:'Synthèse opérationnelle, plan d\'actions'}
+  ],
+  finance: [
+    {id:'cadrage',      label:'Cadrage',        sub:'Analyse des besoins (financement, performance)'},
+    {id:'collecte',     label:'Collecte',       sub:'Données financières, documents internes'},
+    {id:'analyse',      label:'Analyse',        sub:'Diagnostic, calculs de rentabilité'},
+    {id:'construction', label:'Construction',   sub:'Business plan, scénarios financiers'},
+    {id:'recommandations',label:'Recommandations',sub:'Décisions investissement, optimisation des ressources'},
+    {id:'restitution',  label:'Restitution',    sub:'Livrables structurés, tableaux, projections'}
+  ],
+  affaires: [
+    {id:'cadrage',      label:'Cadrage',        sub:'Public cible, objectif du sondage'},
+    {id:'conception',   label:'Conception',     sub:'Création du questionnaire'},
+    {id:'collecte',     label:'Collecte',       sub:'Diffusion à l\'échantillon cible'},
+    {id:'analyse',      label:'Analyse',        sub:'Traitement statistique, interprétation'},
+    {id:'recommandations',label:'Recommandations',sub:'Compréhension des attentes, aide à la décision'},
+    {id:'restitution',  label:'Restitution',    sub:'Rapport + synthèse décisionnelle'}
+  ]
+};
+
+function getTypeKey(t) {
+  if (!t) return 'marche';
+  var tl = (t||'').toLowerCase();
+  if (tl.includes('march')||tl.includes('strat')||tl.includes('bench')||tl.includes('veille')||tl.includes('lancement')) return 'marche';
+  if (tl.includes('market')||tl.includes('not')||tl.includes('satisf')||tl.includes('com')||tl.includes('plan')) return 'marketing';
+  if (tl.includes('finan')||tl.includes('audit')||tl.includes('business')||tl.includes('rse')||tl.includes('myst')) return 'finance';
+  if (tl.includes('public')||tl.includes('sondage')||tl.includes('opinion')) return 'affaires';
+  return 'marche';
+}
+
+function buildDefaultPhases(typeKey) {
+  var defs = PHASES_DEF[typeKey] || PHASES_DEF.marche;
+  return defs.map(function(p) {
+    return {id:p.id, label:p.label, sub:p.sub, ordre:defs.indexOf(p)+1,
+            jeh_total:0, montant_jeh:0, actif:true, intervenants:[]};
+  });
+}
+
+// ── Calculs financiers ────────────────────────────────────────
+function calcPhase(ph) {
+  var total = (ph.jeh_total||0) * (ph.montant_jeh||0);
+  var brut_iv = total * 0.5;
+  var part_je = total * 0.5;
+  return {montant_total: total, montant_brut_iv: brut_iv, part_je: part_je};
+}
+
+function calcEtude(phases) {
+  var jeh = 0, montant = 0, brut = 0, je = 0;
+  (phases||[]).filter(function(p){return p.actif;}).forEach(function(p) {
+    jeh += (p.jeh_total||0);
+    var c = calcPhase(p);
+    montant += c.montant_total;
+    brut += c.montant_brut_iv;
+    je += c.part_je;
+  });
+  return {jeh_total: jeh, montant_ht: montant, montant_brut_iv: brut, part_je: je};
+}
+
+function fmtM(n) { return Number(n||0).toLocaleString('fr-FR',{minimumFractionDigits:0,maximumFractionDigits:0})+' €'; }
+function fmtJEH(n) { return (n||0)+' JEH'; }
+
+function getMyPhasesInEtude(e) {
+  var myPhases = [];
+  (e.phases||[]).forEach(function(ph) {
+    (ph.intervenants||[]).forEach(function(iv) {
+      if (iv.intervenant_id===MY_IV_ID || (iv.email||'').toLowerCase()===ME.toLowerCase()) {
+        myPhases.push({phase:ph, assignment:iv});
+      }
+    });
+  });
+  return myPhases;
+}
+
 function renderList(list,cid,isActive){
   if(!list.length){
     document.getElementById(cid).innerHTML='<div class="empty-state"><div class="empty-icon">'+(isActive?'🎯':'✅')+'</div><div class="empty-title">'+(isActive?'Aucune mission en cours':'Aucune mission terminée')+'</div><div class="empty-sub">'+(isActive?'Tu seras notifié dès qu\'une mission t\'est assignée.':'Tes missions terminées apparaîtront ici.')+'</div></div>';
@@ -236,27 +325,36 @@ function renderList(list,cid,isActive){
     var tk=getTypeKey(e.type_etude||'');var td=STUDY_TYPES[tk];
     var p=e.date_debut?e.date_debut.split('-'):null;
     var day=p?p[2]:'—';var mo=p?MOIS_S[parseInt(p[1])-1]:'';
-    var phases=td.phases;
-    var pd=myIv.phases_done||[];
-    var pct=Math.round(pd.length/phases.length*100);
-    var canQ=e.statut==='Livré'&&questionnaire&&!myIv.questionnaire_soumis;
-    var bar=phases.map(function(ph,i){
-      return '<div class="phase-seg '+(pd.includes(ph.id)?'done':i===pd.length?'current':'')+'" style="background:'+(pd.includes(ph.id)?'var(--bordeaux)':i===pd.length?'#f9a8d4':'var(--border)')+'"></div>';
+    // Get my assigned phases from étude phases
+    var myPhasesList = getMyPhasesInEtude(e);
+    var totalMyJeh = myPhasesList.reduce(function(a,mp){return a+(parseFloat(mp.assignment.jeh)||0);},0);
+    var totalMyBrut = myPhasesList.reduce(function(a,mp){return a+(parseFloat(mp.assignment.montant_brut)||0);},0);
+    var donePhasesCount = myPhasesList.filter(function(mp){return (mp.assignment.phases_done||[]).includes(mp.phase.id);}).length;
+    var pct = myPhasesList.length > 0 ? Math.round(donePhasesCount/myPhasesList.length*100) : 0;
+    var canQ = e.statut==='Livré' && questionnaire && !(myPhasesList[0]&&myPhasesList[0].assignment.questionnaire_soumis);
+    var bar = myPhasesList.map(function(mp){
+      var isDone = (mp.assignment.phases_done||[]).includes(mp.phase.id);
+      return '<div class="phase-seg" style="flex:1;border-radius:99px;height:6px;background:'+(isDone?'var(--bordeaux)':'var(--border)')+'"></div>';
     }).join('');
-    var phList=phases.map(function(ph,i){
-      var isDone=pd.includes(ph.id);var isCur=i===pd.length;
-      var pNote=(myIv.phase_notes||{})[ph.id]||'';
-      var pLiv=(myIv.phase_livrables||{})[ph.id]||'';
-      var pDate=(myIv.phase_dates||{})[ph.id]||'';
+    var phList = myPhasesList.map(function(mp) {
+      var ph=mp.phase; var asn=mp.assignment;
+      var isDone=(asn.phases_done||[]).includes(ph.id);
+      var pNote=(asn.phase_notes||{})[ph.id]||'';
+      var pLiv=(asn.phase_livrables||{})[ph.id]||'';
+      var pDate=(asn.phase_dates||{})[ph.id]||'';
       return '<div class="phase-item">'+
-        '<div class="phase-check '+(isDone?'done':isCur?'current':'')+'" onclick="togglePhase(\''+e.id+'\',\''+ph.id+'\','+i+','+phases.length+')">'+(isDone?'✓':'')+'</div>'+
+        '<div class="phase-check '+(isDone?'done':'')+'" onclick="togglePhaseNew(\''+e.id+'\',\''+ph.id+'\')">'+(isDone?'✓':'')+'</div>'+
         '<div style="flex:1;min-width:0">'+
-          '<div class="phase-name">'+ph.label+(pDate?' <span style="font-size:10px;color:var(--text-tertiary);font-weight:400">· '+fmtD(pDate)+'</span>':'')+'</div>'+
+          '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">'+
+            '<div class="phase-name">'+ph.label+(pDate?' <span style="font-size:10px;color:var(--text-tertiary)">· '+fmtD(pDate)+'</span>':'')+'</div>'+
+            '<span style="font-size:11px;color:var(--bordeaux);font-weight:600">'+asn.jeh+' JEH</span>'+
+            '<span style="font-size:11px;color:var(--success);font-weight:600">'+fmtM(asn.montant_brut)+'</span>'+
+          '</div>'+
           '<div class="phase-sub">'+ph.sub+'</div>'+
           '<div class="phase-expand" onclick="toggleExtra(\'pe-'+e.id+'-'+ph.id+'\')">+ Notes & livrables</div>'+
           '<div class="phase-extra '+(pNote||pLiv?'open':'')+'" id="pe-'+e.id+'-'+ph.id+'">'+
-            '<textarea class="phase-note" placeholder="Notes sur cette phase…" onblur="savePN(\''+e.id+'\',\''+ph.id+'\',this.value)">'+esc(pNote)+'</textarea>'+
-            '<input style="margin-top:4px;width:100%;padding:5px 8px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:12px;font-family:\'Sora\',sans-serif;box-sizing:border-box" placeholder="Livrables produits…" value="'+esc(pLiv)+'" onblur="savePL(\''+e.id+'\',\''+ph.id+'\',this.value)"/>'+
+            '<textarea class="phase-note" placeholder="Notes…" onblur="savePNNew(\''+e.id+'\',\''+ph.id+'\',this.value)">'+esc(pNote)+'</textarea>'+
+            '<input style="margin-top:4px;width:100%;padding:5px 8px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:12px;font-family:\'Sora\',sans-serif;box-sizing:border-box" placeholder="Livrables produits…" value="'+esc(pLiv)+'" onblur="savePLNew(\''+e.id+'\',\''+ph.id+'\',this.value)"/>'+
           '</div>'+
         '</div>'+
       '</div>';
@@ -278,14 +376,15 @@ function renderList(list,cid,isActive){
         '<div style="text-align:right;flex-shrink:0">'+
           '<div style="font-size:26px;font-weight:800;color:var(--bordeaux)">'+pct+'%</div>'+
           '<div style="font-size:10px;color:var(--text-tertiary)">avancement</div>'+
-          (myIv.montant_brut?'<div style="font-size:13px;font-weight:700;color:var(--navy);margin-top:6px">'+fmtM(myIv.montant_brut)+'</div><div style="font-size:10px;color:var(--text-tertiary)">brut</div>':'')+
+          (totalMyBrut?'<div style="font-size:13px;font-weight:700;color:var(--success);margin-top:6px">'+fmtM(totalMyBrut)+'</div><div style="font-size:10px;color:var(--text-tertiary)">brut total</div>':'')+
         '</div>'+
       '</div>'+
       '<div class="mc-stats">'+
         '<div class="mc-stat"><div class="mc-stat-val">'+fmtD(e.date_debut)+'</div><div class="mc-stat-lbl">Début</div></div>'+
         '<div class="mc-stat"><div class="mc-stat-val">'+fmtD(e.date_fin)+'</div><div class="mc-stat-lbl">Fin prévue</div></div>'+
-        '<div class="mc-stat"><div class="mc-stat-val">'+pd.length+' / '+phases.length+'</div><div class="mc-stat-lbl">Phases</div></div>'+
-        (myIv.montant_brut?'':'<div class="mc-stat"><div class="mc-stat-val">'+esc(e.mandat_id||'—')+'</div><div class="mc-stat-lbl">Mandat</div></div>')+
+        '<div class="mc-stat"><div class="mc-stat-val">'+totalMyJeh+'</div><div class="mc-stat-lbl">Mes JEH</div></div>'+
+        '<div class="mc-stat"><div class="mc-stat-val">'+fmtM(totalMyBrut)+'</div><div class="mc-stat-lbl">Brut total</div></div>'+
+        '<div class="mc-stat"><div class="mc-stat-val">'+myPhasesList.length+'</div><div class="mc-stat-lbl">Phase(s) assignée(s)</div></div>'+
       '</div>'+
       '<div class="phase-track">'+
         '<div class="phase-title">Suivi des phases — '+td.label+'</div>'+
@@ -300,6 +399,68 @@ function renderList(list,cid,isActive){
 }
 
 function toggleExtra(id){var el=document.getElementById(id);if(el)el.classList.toggle('open');}
+
+function getMyIvInPhase(e, phaseId) {
+  var phase = (e.phases||[]).find(function(p){return p.id===phaseId;});
+  if (!phase) return null;
+  return (phase.intervenants||[]).find(function(i){
+    return i.intervenant_id===MY_IV_ID || (i.email||'').toLowerCase()===ME.toLowerCase();
+  });
+}
+
+function togglePhaseNew(etudeId, phaseId) {
+  var e = myMissions.find(function(x){return x.id===etudeId;});
+  if (!e) return;
+  var phases = JSON.parse(JSON.stringify(e.phases||[]));
+  var phIdx = phases.findIndex(function(p){return p.id===phaseId;});
+  if (phIdx < 0) return;
+  var ivIdx = (phases[phIdx].intervenants||[]).findIndex(function(i){
+    return i.intervenant_id===MY_IV_ID || (i.email||'').toLowerCase()===ME.toLowerCase();
+  });
+  if (ivIdx < 0) return;
+  var pd = phases[phIdx].intervenants[ivIdx].phases_done || [];
+  if (pd.includes(phaseId)) {
+    pd = pd.filter(function(p){return p!==phaseId;});
+  } else {
+    pd.push(phaseId);
+    if (!phases[phIdx].intervenants[ivIdx].phase_dates) phases[phIdx].intervenants[ivIdx].phase_dates = {};
+    phases[phIdx].intervenants[ivIdx].phase_dates[phaseId] = new Date().toISOString().split('T')[0];
+  }
+  phases[phIdx].intervenants[ivIdx].phases_done = pd;
+  var updates = {phases: phases};
+  if (pd.length > 0 && e.statut === 'Signé') updates.statut = 'En cours';
+  db.collection('etudes').doc(etudeId).update(updates);
+}
+
+function savePNNew(etudeId, phaseId, val) {
+  var e = myMissions.find(function(x){return x.id===etudeId;});
+  if (!e) return;
+  var phases = JSON.parse(JSON.stringify(e.phases||[]));
+  var phIdx = phases.findIndex(function(p){return p.id===phaseId;});
+  if (phIdx < 0) return;
+  var ivIdx = (phases[phIdx].intervenants||[]).findIndex(function(i){
+    return i.intervenant_id===MY_IV_ID || (i.email||'').toLowerCase()===ME.toLowerCase();
+  });
+  if (ivIdx < 0) return;
+  if (!phases[phIdx].intervenants[ivIdx].phase_notes) phases[phIdx].intervenants[ivIdx].phase_notes = {};
+  phases[phIdx].intervenants[ivIdx].phase_notes[phaseId] = val;
+  db.collection('etudes').doc(etudeId).update({phases:phases});
+}
+
+function savePLNew(etudeId, phaseId, val) {
+  var e = myMissions.find(function(x){return x.id===etudeId;});
+  if (!e) return;
+  var phases = JSON.parse(JSON.stringify(e.phases||[]));
+  var phIdx = phases.findIndex(function(p){return p.id===phaseId;});
+  if (phIdx < 0) return;
+  var ivIdx = (phases[phIdx].intervenants||[]).findIndex(function(i){
+    return i.intervenant_id===MY_IV_ID || (i.email||'').toLowerCase()===ME.toLowerCase();
+  });
+  if (ivIdx < 0) return;
+  if (!phases[phIdx].intervenants[ivIdx].phase_livrables) phases[phIdx].intervenants[ivIdx].phase_livrables = {};
+  phases[phIdx].intervenants[ivIdx].phase_livrables[phaseId] = val;
+  db.collection('etudes').doc(etudeId).update({phases:phases});
+}
 
 function getIvIdx(e){
   return(e.intervenants||[]).findIndex(function(i){
