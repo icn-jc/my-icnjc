@@ -490,7 +490,7 @@ function renderPhasesPanel(e, isSA, canEdit) {
           '<span style="flex:1;color:var(--navy);font-weight:600">' + (iv.nom||'') + '</span>' +
           '<span style="color:var(--text-tertiary)">' + (iv.jeh||0) + ' JEH</span>' +
           '<span style="color:var(--success);font-weight:600">' + fmtM(ivBrut) + '</span>' +
-          (canEdit ? '<button onclick="removeIvFromPhase(''+e.id+'',''+ph.id+'',''+iv.intervenant_id+'')" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:12px;padding:0">×</button>' : '') +
+           (canEdit ? '<button data-eid="'+e.id+'" data-pid="'+ph.id+'" data-ivid="'+iv.intervenant_id+'" onclick="handleRemoveIv(this)" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:12px;padding:0">×</button>' : '') +
         '</div>';
       });
       html += '</div>';
@@ -505,7 +505,7 @@ function renderPhasesPanel(e, isSA, canEdit) {
            jehRestant + ' JEH restants à assigner') +
         '</span>' +
         (jehRestant > 0 ?
-          '<button class="btn btn-secondary btn-sm" onclick="openAssignPhase(''+e.id+'',''+ph.id+'','+jehRestant+',''+ph.label+'',' + (ph.montant_jeh||0) + ')" style="font-size:11px;padding:3px 10px">+ Assigner intervenant</button>'
+          '<button data-eid="'+e.id+'" data-pid="'+ph.id+'" data-maxjeh="'+jehRestant+'" data-label="'+ph.label+'" data-montant="'+(ph.montant_jeh||0)+'" class="btn btn-secondary btn-sm" onclick="handleAssignPhase(this)" style="font-size:11px;padding:3px 10px">+ Assigner intervenant</button>'
           : '') +
       '</div>';
     }
@@ -518,6 +518,22 @@ function renderPhasesPanel(e, isSA, canEdit) {
 
 // ── Assigner intervenant à une phase ─────────────────────────
 var curAssignEtudeId = null, curAssignPhaseId = null, curAssignMaxJeh = 0, curAssignMontantJeh = 0;
+
+function handleRemoveIv(btn) {
+  var eid = btn.dataset.eid;
+  var pid = btn.dataset.pid;
+  var ivid = btn.dataset.ivid;
+  removeIvFromPhase(eid, pid, ivid);
+}
+
+function handleAssignPhase(btn) {
+  var eid = btn.dataset.eid;
+  var pid = btn.dataset.pid;
+  var maxJeh = parseFloat(btn.dataset.maxjeh)||0;
+  var label = btn.dataset.label;
+  var montant = parseFloat(btn.dataset.montant)||0;
+  openAssignPhase(eid, pid, maxJeh, label, montant);
+}
 
 function openAssignPhase(etudeId, phaseId, maxJeh, phaseLabel, montantJeh) {
   curAssignEtudeId = etudeId; curAssignPhaseId = phaseId;
