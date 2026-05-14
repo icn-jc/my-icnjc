@@ -259,9 +259,10 @@ initAuth('crm_intervenants', function(user, role, profile) {
 
 function loadData() {
   // Charger les mandats pour les filtres et le formulaire
-  db.collection('mandats').where('statut','in',['actif','clos']).orderBy('date_debut','desc').get().then(function(snap) {
+  db.collection('mandats').where('statut','in',['actif','clos']).get().then(function(snap) {
     var mandats = [];
     snap.forEach(function(doc){mandats.push(Object.assign({id:doc.id},doc.data()));});
+    mandats.sort(function(a,b){return (b.date_debut||'').localeCompare(a.date_debut||'');});
     // Filter select
     var fSel = document.getElementById('f-mandat-iv');
     mandats.forEach(function(m){
