@@ -212,7 +212,7 @@ tr:hover td{background:rgba(27,42,74,0.02);cursor:pointer;}
 
 <script>
 var ME = '', MY_ROLE = '', CAN_EDIT = false;
-var allEtudes = [], allClients = [], allUsers = [], allMandats = [];
+var allEtudes = [], allClients = [], allUsers = [], allMandats = [], allIntervenants = [];
 var curEtudeId = null;
 var EDIT_ROLES_E = ['super_admin','president','vice_president','responsable_commercial','responsable_qualite'];
 
@@ -255,6 +255,12 @@ function loadData() {
       var o1=document.createElement('option'); o1.value=u.email; o1.text=name; respSel.appendChild(o1);
       var o2=document.createElement('option'); o2.value=u.email; o2.text=name; neResp.appendChild(o2);
     });
+  });
+
+  db.collection('intervenants').get().then(function(snap) {
+    allIntervenants = [];
+    snap.forEach(function(doc){allIntervenants.push(Object.assign({id:doc.id},doc.data()));});
+    allIntervenants.sort(function(a,b){return (a.nom||'').localeCompare(b.nom||'');});
   });
 
   db.collection('clients').get().then(function(snap) {
@@ -376,6 +382,7 @@ function openEtude(id) {
 
   var canEdit = EDIT_ROLES_E.includes(MY_ROLE);
   var isSA = MY_ROLE === 'super_admin';
+  var canPhasesEdit = ['super_admin','president','vice_president','responsable_commercial'].includes(MY_ROLE);
   var statOpts = ['Prospection','Signé','En cours','Livré','Facturé','Clôturé'].map(function(s){
     return '<option'+(e.statut===s?' selected':'')+'>'+s+'</option>';
   }).join('');
@@ -411,6 +418,9 @@ function openEtude(id) {
       '</div>' +
       '<div><label class="input-label">Notes</label><textarea class="input" rows="2" style="font-size:12px;resize:vertical;width:100%;margin-bottom:12px" onblur="updEtude(\''+id+'\',\'notes\',this.value)">'+(e.notes||'')+'</textarea></div>'
     : '') +
+    (canPhasesEdit ?
+      '<div class="ep-section" style="margin-top:12px">Gérer les phases</div>' +
+      renderPhasesEditor(e) : '') +
     (isSA ?
       '<div class="ep-section" style="margin-top:4px">🔒 Super Admin</div>' +
       '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">' +
@@ -449,6 +459,104 @@ function updEtude(id, field, val) {
     u.a_completer = false;
   }
   db.collection('etudes').doc(id).update(u);
+}
+
+function renderPhasesEditor(e) {
+  // For studies without phases or where phases need to be added/managed
+  var phases = e.phases || [];
+  var typeKey = getTypeKey(e.type_etude||'');
+  var html = '';
+
+  if (!phases.length) {
+    // No phases yet - offer to generate from type
+    html += '<div style="background:#fef3c7;border-radius:var(--radius-md);padding:10px 14px;font-size:12px;color:#78350f;margin-bottom:10px">' +
+      '⚠️ Aucune phase définie. ' +
+      (e.type_etude ? 'Génère les phases depuis le type d\'étude ci-dessous.' : 'Définis d\'abord le type d\'étude.') +
+    '</div>';
+    if (e.type_etude) {
+      html += '<button class="btn btn-secondary btn-sm" onclick="generatePhasesForEtude(''+e.id+'')" style="margin-bottom:12px">⚡ Générer les phases depuis le type</button>';
+    }
+  }
+
+  // Phase list with JEH editor
+  html += '<div id="phase-editor-'+e.id+'"><div style="display:flex;flex-direction:column;gap:8px">';
+  phases.forEach(function(ph, idx) {
+    var phCalc = calcPhase(ph);
+    html += '<div style="background:var(--bg);border-radius:var(--radius-md);padding:10px 12px;border:1px solid var(--border);opacity:'+(ph.actif!==false?1:0.5)+'">' +
+      '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px">' +
+        '<input type="checkbox" '+(ph.actif!==false?'checked':'')+' data-eid="'+e.id+'" data-pidx="'+idx+'" onchange="togglePhaseActifExisting(this)" style="accent-color:var(--bordeaux)"/>' +
+        '<span style="font-weight:600;font-size:12px;flex:1">'+ph.label+'</span>' +
+        '<div style="display:flex;align-items:center;gap:6px">' +
+          '<input type="number" min="0" step="0.5" value="'+(ph.jeh_total||0)+'" placeholder="JEH" ' +
+            'data-eid="'+e.id+'" data-pidx="'+idx+'" data-field="jeh_total" ' +
+            'onblur="updateExistingPhaseField(this)" ' +
+            'style="width:65px;padding:4px 6px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:12px;font-family:Sora,sans-serif"/>' +
+          '<span style="font-size:11px;color:var(--text-tertiary)">JEH ×</span>' +
+          '<input type="number" min="0" value="'+(ph.montant_jeh||0)+'" placeholder="€/JEH" ' +
+            'data-eid="'+e.id+'" data-pidx="'+idx+'" data-field="montant_jeh" ' +
+            'onblur="updateExistingPhaseField(this)" ' +
+            'style="width:75px;padding:4px 6px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:12px;font-family:Sora,sans-serif"/>' +
+          '<span style="font-size:12px;font-weight:700;color:var(--bordeaux);min-width:70px;text-align:right">'+fmtM(phCalc.montant_total)+'</span>' +
+        '</div>' +
+      '</div>' +
+      '<div style="font-size:10px;color:var(--text-tertiary)">'+ph.sub+'</div>' +
+    '</div>';
+  });
+  html += '</div>';
+
+  // Add custom phase button
+  html += '<button class="btn btn-secondary btn-sm" style="margin-top:8px" onclick="addPhaseToExisting(''+e.id+'')">+ Phase personnalisée</button>';
+  html += '</div>';
+
+  return html;
+}
+
+function generatePhasesForEtude(etudeId) {
+  var e = allEtudes.find(function(x){return x.id===etudeId;});
+  if (!e || !e.type_etude) return;
+  var typeKey = getTypeKey(e.type_etude);
+  var phases = buildDefaultPhases(typeKey);
+  db.collection('etudes').doc(etudeId).update({phases:phases, a_completer:false}).then(function(){
+    openEtude(etudeId);
+  });
+}
+
+function togglePhaseActifExisting(cb) {
+  var eid = cb.dataset.eid; var pidx = parseInt(cb.dataset.pidx);
+  var e = allEtudes.find(function(x){return x.id===eid;});
+  if (!e) return;
+  var phases = JSON.parse(JSON.stringify(e.phases||[]));
+  if (!phases[pidx]) return;
+  phases[pidx].actif = cb.checked;
+  db.collection('etudes').doc(eid).update({phases:phases});
+}
+
+function updateExistingPhaseField(inp) {
+  var eid = inp.dataset.eid; var pidx = parseInt(inp.dataset.pidx); var field = inp.dataset.field;
+  var e = allEtudes.find(function(x){return x.id===eid;});
+  if (!e) return;
+  var phases = JSON.parse(JSON.stringify(e.phases||[]));
+  if (!phases[pidx]) return;
+  phases[pidx][field] = parseFloat(inp.value)||0;
+  // Recalc
+  var calc = calcEtude(phases);
+  db.collection('etudes').doc(eid).update({
+    phases: phases,
+    jeh_total_etude: calc.jeh_total,
+    montant_ht: calc.montant_ht,
+    a_completer: false
+  });
+}
+
+function addPhaseToExisting(etudeId) {
+  var e = allEtudes.find(function(x){return x.id===etudeId;});
+  if (!e) return;
+  var phases = JSON.parse(JSON.stringify(e.phases||[]));
+  phases.push({id:'custom_'+Date.now(),label:'Nouvelle phase',sub:'',ordre:phases.length+1,
+    jeh_total:0,montant_jeh:0,actif:true,intervenants:[]});
+  db.collection('etudes').doc(etudeId).update({phases:phases}).then(function(){
+    openEtude(etudeId);
+  });
 }
 
 function renderPhasesPanel(e, isSA, canEdit) {
@@ -655,7 +763,8 @@ function confirmAssignPhase() {
   var recalc = calcEtude(phases);
   db.collection('etudes').doc(curAssignEtudeId).update({
     phases: phases,
-    jeh_total_etude: recalc.jeh_total
+    jeh_total_etude: recalc.jeh_total,
+    a_completer: false
   }).then(function(){
     closeAssignPhase();
     openEtude(curAssignEtudeId); // refresh panel
