@@ -33,7 +33,7 @@
 .ivp-header{padding:18px 22px;border-bottom:1px solid var(--border);position:relative;display:flex;gap:14px;align-items:center;}
 .ivp-close{position:absolute;top:14px;right:16px;background:none;border:none;font-size:22px;cursor:pointer;color:var(--text-tertiary);}
 .ivp-tabs{display:flex;border-bottom:1px solid var(--border);}
-.ivp-tab{flex:1;padding:10px;font-size:12px;font-weight:600;cursor:pointer;border:none;background:transparent;font-family:'Sora',sans-serif;color:var(--text-secondary);border-bottom:2px solid transparent;transition:all .15s;}
+.ivp-tab{flex:1;padding:10px;font-size:12px;font-weight:600;cursor:pointer;border:none;background:transparent;font-family:Sora,sans-serif;color:var(--text-secondary);border-bottom:2px solid transparent;transition:all .15s;}
 .ivp-tab.active{color:var(--bordeaux);border-bottom-color:var(--bordeaux);}
 .ivp-pane{display:none;flex:1;overflow-y:auto;padding:18px 22px;}
 .ivp-pane.active{display:block;}
@@ -44,7 +44,7 @@
 .sec:first-child{margin-top:0;}
 .mission-item{background:var(--bg);border-radius:var(--radius-md);padding:10px 12px;border:1px solid var(--border);margin-bottom:8px;}
 .toolbar{display:flex;gap:7px;flex-wrap:wrap;align-items:center;margin-bottom:16px;}
-.toolbar select,.toolbar input{padding:6px 10px;border-radius:var(--radius-md);border:1.5px solid var(--border-strong);font-family:'Sora',sans-serif;font-size:12px;background:var(--white);}
+.toolbar select,.toolbar input{padding:6px 10px;border-radius:var(--radius-md);border:1.5px solid var(--border-strong);font-family:Sora,sans-serif;font-size:12px;background:var(--white);}
 </style>
 </head>
 <body>
@@ -92,12 +92,12 @@
           <option value="Inactif">Inactif</option>
           <option value="Ancien membre">Ancien membre</option>
         </select>
-        <select id="f-situation" onchange="render()" style="padding:6px 10px;border-radius:var(--radius-md);border:1.5px solid var(--border-strong);font-family:'Sora',sans-serif;font-size:12px;background:var(--white)">
+        <select id="f-situation" onchange="render()" style="padding:6px 10px;border-radius:var(--radius-md);border:1.5px solid var(--border-strong);font-family:Sora,sans-serif;font-size:12px;background:var(--white)">
           <option value="">Situation</option>
           <option>Étudiant</option><option>Alternance</option><option>Stage</option>
           <option>Diplômé</option><option>En recherche d'emploi</option><option>En poste</option><option>Autre</option>
         </select>
-        <select id="f-ville" onchange="render()" style="padding:6px 10px;border-radius:var(--radius-md);border:1.5px solid var(--border-strong);font-family:'Sora',sans-serif;font-size:12px;background:var(--white)">
+        <select id="f-ville" onchange="render()" style="padding:6px 10px;border-radius:var(--radius-md);border:1.5px solid var(--border-strong);font-family:Sora,sans-serif;font-size:12px;background:var(--white)">
           <option value="">Toutes villes</option>
         </select>
         <button class="btn btn-secondary btn-sm" onclick="clearFilters()">Réinitialiser</button>
