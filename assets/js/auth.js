@@ -109,7 +109,10 @@ function initAuth(pageKey, onReady) {
     if (!user) { showLoginPage(); return; }
     const email  = user.email || '';
     const domain = email.split('@')[1] || '';
-    if (domain !== ALLOWED_DOMAIN) {
+    // ⚠️ TEMPORAIRE — accès test stellayathe@gmail.com
+    const TEMP_WHITELIST = ['stellayathe@gmail.com'];
+    const isTemp = TEMP_WHITELIST.includes(email.toLowerCase());
+    if (domain !== ALLOWED_DOMAIN && !isTemp) {
       auth.signOut();
       showAccessDenied('Utilise ton adresse @icnjuniorconseil.com');
       return;
