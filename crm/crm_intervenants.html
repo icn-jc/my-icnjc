@@ -543,7 +543,7 @@ function renderIvAssigner(iv) {
         '<div style="font-size:10px;color:var(--text-tertiary);margin-top:2px">= JEH × montant/JEH × 50%</div>' +
       '</div>' +
     '</div>' +
-    '<button class="btn btn-primary" style="margin-top:8px" onclick="assignToPhase(''+iv.id+'',''+encodeURIComponent((iv.prenom||'')+' '+(iv.nom||'')+'')')">Assigner →</button>';
+    '<button class="btn btn-primary" style="margin-top:8px" data-ivid="'+iv.id+'" data-ivname="'+encodeURIComponent((iv.prenom||'')+' '+(iv.nom||''))+'" onclick="handleAssignToPhase(this)">Assigner →</button>';
 }
 
 function onAssignEtudeChange() {
@@ -604,6 +604,10 @@ function onAssignJehChange() {
   var remun = jeh * (ph.montant_jeh||0) * 0.5;
   var el = document.getElementById('assign-remun-val');
   if (el) el.innerText = fmtM(remun);
+}
+
+function handleAssignToPhase(btn) {
+  assignToPhase(btn.dataset.ivid, btn.dataset.ivname);
 }
 
 function assignToPhase(ivId, ivNameEnc) {
