@@ -560,7 +560,7 @@ function renderPhasesEditor(e) {
   var html = '';
   if (!isClos) {
     html += '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px">' +
-      '<select id="ep-type-sel-'+e.id+'" class="select-field" style="flex:1;font-size:12px" onchange="onEpTypeChange(''+e.id+'')">'+typeOpts+'</select>' +
+      '<select id="ep-type-sel-'+e.id+'" class="select-field" style="flex:1;font-size:12px" data-eid="'+e.id+'" onchange="onEpTypeChange(this)">'+typeOpts+'</select>' +
       '<button class="btn btn-secondary btn-sm" data-eid="'+e.id+'" data-action="genPhases" onclick="handleEtudeBtn(this)">Générer les phases</button>' +
     '</div>';
   }
@@ -592,9 +592,9 @@ function renderPhasesEditor(e) {
   return html;
 }
 
-function onEpTypeChange(etudeId) {
-  var sel = document.getElementById('ep-type-sel-'+etudeId);
-  if (!sel) return;
+function onEpTypeChange(sel) {
+  var etudeId = sel.dataset.eid;
+  if (!etudeId) return;
   updEtude(etudeId, 'type_etude', sel.value);
 }
 function generatePhasesForEtude(etudeId) {
