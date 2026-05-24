@@ -437,10 +437,19 @@ td[contenteditable=true]:hover{background:rgba(163,33,95,0.04);border-radius:3px
         <div class="toolbar">
           <select class="mandat-sel" onchange="changeMandatFilter(this.value)" style="padding:6px 10px;border-radius:var(--radius-md);border:1.5px solid var(--border-strong);font-family:'Sora',sans-serif;font-size:12px;background:var(--white);"></select>
           <input type="text" id="srch-all" placeholder="🔍 Rechercher…" oninput="renderAll()"/>
-          <select id="f-week-export" style="padding:6px 10px;border-radius:var(--radius-md);border:1.5px solid var(--border-strong);font-family:'Sora',sans-serif;font-size:12px;background:var(--white)">
-            <option value="">Toutes semaines</option>
+          <select id="f-activity" onchange="renderAll()" style="padding:6px 10px;border-radius:var(--radius-md);border:1.5px solid var(--border-strong);font-family:'Sora',sans-serif;font-size:12px;background:var(--white)">
+            <option value="">Toute période (activité récente)</option>
+            <option value="week">Activité cette semaine</option>
+            <option value="month">Activité ce mois</option>
+            <option value="quarter">Activité ce trimestre</option>
           </select>
-          <button class="btn btn-secondary btn-sm" onclick="exportAllProspects()">⬇ Excel</button>
+          <div style="display:flex;align-items:center;gap:6px;background:#f0fdf4;border:1px solid #86efac;border-radius:var(--radius-md);padding:4px 10px">
+            <span style="font-size:11px;font-weight:600;color:#14532d">Export par semaine :</span>
+            <select id="f-week-export" style="padding:4px 8px;border-radius:var(--radius-sm);border:1px solid #86efac;font-family:'Sora',sans-serif;font-size:11px;background:white;color:#14532d">
+              <option value="">Tous les prospects</option>
+            </select>
+            <button class="btn btn-secondary btn-sm" onclick="exportAllProspects()" style="font-size:11px;padding:4px 10px;background:#14532d;color:white;border-color:#14532d">⬇ Excel</button>
+          </div>
           <select id="f-member" onchange="renderAll()"><option value="">Tous les membres</option></select>
           <select id="f-statut" onchange="renderAll()">
             <option value="">Statut</option>
@@ -1700,7 +1709,9 @@ function renderAll() {
   var fs = document.getElementById('f-statut').value;
   var fp = document.getElementById('f-priority') ? document.getElementById('f-priority').value : '';
   var fse = document.getElementById('f-secteur').value;
+  var fActivity = document.getElementById('f-activity') ? document.getElementById('f-activity').value : '';
   var isMe = function(p) { return p.owner_email === ME; };
+  var today2 = new Date(); today2.setHours(0,0,0,0);
   var data = allProspects.filter(function(p) {
     if (!IS_CA && !isMe(p)) return false;
     if (srch && !(p.company_name||'').toLowerCase().includes(srch) && !(p.contact_name||'').toLowerCase().includes(srch)) return false;
@@ -1708,6 +1719,21 @@ function renderAll() {
     if (fs && p.status !== fs) return false;
     if (fp && p.priority !== fp) return false;
     if (fse && p.sector !== fse) return false;
+    // Activity filter — based on last_contact_at (current state)
+    if (fActivity) {
+      if (!p.last_contact_at) return false;
+      var d = new Date(p.last_contact_at); d.setHours(0,0,0,0);
+      if (fActivity === 'week') {
+        if (d < wkStart(0)) return false;
+      } else if (fActivity === 'month') {
+        var m1 = new Date(today2.getFullYear(),today2.getMonth(),1);
+        if (d < m1) return false;
+      } else if (fActivity === 'quarter') {
+        var qm = Math.floor(today2.getMonth()/3)*3;
+        var q1 = new Date(today2.getFullYear(),qm,1);
+        if (d < q1) return false;
+      }
+    }
     return true;
   });
   document.getElementById('f-note').innerText = data.length < allProspects.length ? 'Affichage de ' + data.length + ' / ' + allProspects.length : '';
@@ -2524,7 +2550,9 @@ function renderMineChart() {
 // FILTRES & EXPORT
 // ════════════════════════════════════════════════════════
 function clearFilters() {
-  ['srch-all','f-member','f-statut','f-priority','f-secteur'].forEach(function(i) { document.getElementById(i).value = ''; });
+  ['srch-all','f-member','f-statut','f-priority','f-secteur','f-activity'].forEach(function(i) {
+    var el = document.getElementById(i); if (el) el.value = '';
+  });
   renderAll();
 }
 var mineChartVisible = true;
