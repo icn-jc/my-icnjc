@@ -424,8 +424,8 @@ function openEtude(id) {
     (canPhasesEdit ?
       '<div class="ep-section" style="margin-top:12px">Gérer les phases</div>' +
       renderPhasesEditor(e) : '') +
-    // CRM link button
-    (e.prospect_id && e.a_completer !== false ?
+    // CRM link button — check both prospect_id presence AND a_completer flag
+    (e.prospect_id && e.a_completer ?
       '<div style="background:#e0f2fe;border-radius:var(--radius-md);padding:10px 14px;margin-bottom:10px;font-size:12px">' +
         '<div style="font-weight:600;color:#0c4a6e;margin-bottom:6px">🔗 Liée au CRM Prospection</div>' +
         '<div style="color:#0369a1;margin-bottom:8px">Cette étude a été créée automatiquement. Complète les phases et coupe le lien pour la finaliser.</div>' +
@@ -599,10 +599,18 @@ function onEpTypeChange(sel) {
 }
 function generatePhasesForEtude(etudeId) {
   var e = allEtudes.find(function(x){return x.id===etudeId;});
-  if (!e || !e.type_etude) return;
-  var typeKey = getTypeKey(e.type_etude);
+  if (!e) return;
+  // Read type from select if present, otherwise use stored type
+  var sel = document.getElementById('ep-type-sel-'+etudeId);
+  var typeEtude = (sel && sel.value) ? sel.value : e.type_etude;
+  if (!typeEtude) { alert('Choisis d\'abord un type d\'étude.'); return; }
+  var typeKey = getTypeKey(typeEtude);
   var phases = buildDefaultPhases(typeKey);
-  db.collection('etudes').doc(etudeId).update({phases:phases, a_completer:false}).then(function(){
+  db.collection('etudes').doc(etudeId).update({
+    phases: phases,
+    type_etude: typeEtude,
+    a_completer: false
+  }).then(function(){
     openEtude(etudeId);
   });
 }
@@ -638,9 +646,17 @@ function addPhaseToExisting(etudeId) {
   var e = allEtudes.find(function(x){return x.id===etudeId;});
   if (!e) return;
   var phases = JSON.parse(JSON.stringify(e.phases||[]));
-  phases.push({id:'custom_'+Date.now(),label:'Nouvelle phase',sub:'',ordre:phases.length+1,
-    jeh_total:0,montant_jeh:0,actif:true,intervenants:[]});
-  db.collection('etudes').doc(etudeId).update({phases:phases}).then(function(){
+  phases.push({
+    id: 'custom_'+Date.now(),
+    label: 'Nouvelle phase',
+    sub: 'Phase personnalisée',
+    ordre: phases.length+1,
+    jeh_total: 0,
+    montant_jeh: 0,
+    actif: true,
+    intervenants: []
+  });
+  db.collection('etudes').doc(etudeId).update({phases: phases, a_completer: false}).then(function(){
     openEtude(etudeId);
   });
 }
@@ -733,6 +749,31 @@ function renderPhasesPanel(e, isSA, canEdit) {
 
 // ── Assigner intervenant à une phase ─────────────────────────
 var curAssignEtudeId = null, curAssignPhaseId = null, curAssignMaxJeh = 0, curAssignMontantJeh = 0;
+
+function handleEtudeBtn(btn) {
+  var eid = btn.dataset.eid;
+  var action = btn.dataset.action;
+  if (action === 'genPhases') generatePhasesForEtude(eid);
+  else if (action === 'addPhase') addPhaseToExisting(eid);
+  else if (action === 'breakLink') breakCrmLink(eid);
+  else if (action === 'defreeze') defigerEtude(eid);
+}
+
+function breakCrmLink(etudeId) {
+  if (!confirm('Stopper le lien avec le CRM Prospection ?\nL\'étude sera indépendante et le badge "À compléter" disparaîtra.')) return;
+  var u = {a_completer: false, lien_crm_stoppe: true};
+  u.prospect_id = firebase.firestore.FieldValue.delete();
+  db.collection('etudes').doc(etudeId).update(u).then(function(){
+    openEtude(etudeId);
+  });
+}
+
+function defigerEtude(etudeId) {
+  if (!confirm('Défiger cette étude clôturée ? Elle sera à nouveau modifiable.')) return;
+  db.collection('etudes').doc(etudeId).update({defige: true}).then(function(){
+    openEtude(etudeId);
+  });
+}
 
 function handleRemoveIv(btn) {
   var eid = btn.dataset.eid;
