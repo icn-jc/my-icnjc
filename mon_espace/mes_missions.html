@@ -316,86 +316,153 @@ function getMyPhasesInEtude(e) {
 
 function renderList(list,cid,isActive){
   if(!list.length){
-    document.getElementById(cid).innerHTML='<div class="empty-state"><div class="empty-icon">'+(isActive?'🎯':'✅')+'</div><div class="empty-title">'+(isActive?'Aucune mission en cours':'Aucune mission terminée')+'</div><div class="empty-sub">'+(isActive?'Tu seras notifié dès qu\'une mission t\'est assignée.':'Tes missions terminées apparaîtront ici.')+'</div></div>';
+    document.getElementById(cid).innerHTML='<div class="empty-state">' +
+      '<div class="empty-icon">'+(isActive?'🎯':'✅')+'</div>' +
+      '<div class="empty-title">'+(isActive?'Aucune mission en cours':'Aucune mission terminée')+'</div>' +
+      '<div class="empty-sub">'+(isActive?'Tu seras notifié dès qu\'une mission t\'est assignée.':'Tes missions terminées apparaîtront ici.')+'</div>' +
+    '</div>';
     return;
   }
   var SC={Signé:'s-signe','En cours':'s-encours',Livré:'s-livre',Clôturé:'s-cloture',Facturé:'s-livre'};
   document.getElementById(cid).innerHTML=list.map(function(e){
-    var myIv=(e.intervenants||[]).find(function(i){return i.intervenant_id===MY_IV_ID||(i.email||'').toLowerCase()===ME.toLowerCase();})||{};
-    var tk=getTypeKey(e.type_etude||'');var td=STUDY_TYPES[tk];
-    var p=e.date_debut?e.date_debut.split('-'):null;
-    var day=p?p[2]:'—';var mo=p?MOIS_S[parseInt(p[1])-1]:'';
-    // Get my assigned phases from étude phases
     var myPhasesList = getMyPhasesInEtude(e);
     var totalMyJeh = myPhasesList.reduce(function(a,mp){return a+(parseFloat(mp.assignment.jeh)||0);},0);
     var totalMyBrut = myPhasesList.reduce(function(a,mp){return a+(parseFloat(mp.assignment.montant_brut)||0);},0);
-    var donePhasesCount = myPhasesList.filter(function(mp){return (mp.assignment.phases_done||[]).includes(mp.phase.id);}).length;
-    var pct = myPhasesList.length > 0 ? Math.round(donePhasesCount/myPhasesList.length*100) : 0;
-    var canQ = e.statut==='Livré' && questionnaire && !(myPhasesList[0]&&myPhasesList[0].assignment.questionnaire_soumis);
-    var bar = myPhasesList.map(function(mp){
-      var isDone = (mp.assignment.phases_done||[]).includes(mp.phase.id);
-      return '<div class="phase-seg" style="flex:1;border-radius:99px;height:6px;background:'+(isDone?'var(--bordeaux)':'var(--border)')+'"></div>';
+    var phaseLabels = myPhasesList.map(function(mp){return mp.phase.label;}).join(', ') || '—';
+    var tk=getTypeKey(e.type_etude||'');var td=STUDY_TYPES[tk];
+    var p=e.date_debut?e.date_debut.split('-'):null;
+    var day=p?p[2]:'—';var mo=p?MOIS_S[parseInt(p[1])-1]:'';
+
+    // Status options
+    var statuts = ['Signé','En cours','Livré'];
+    var statOpts = statuts.map(function(s){
+      return '<option value="'+s+'"'+(e.statut===s?' selected':'')+'>'+s+'</option>';
     }).join('');
-    var phList = myPhasesList.map(function(mp) {
-      var ph=mp.phase; var asn=mp.assignment;
-      var isDone=(asn.phases_done||[]).includes(ph.id);
-      var pNote=(asn.phase_notes||{})[ph.id]||'';
-      var pLiv=(asn.phase_livrables||{})[ph.id]||'';
-      var pDate=(asn.phase_dates||{})[ph.id]||'';
-      return '<div class="phase-item">'+
-        '<div class="phase-check '+(isDone?'done':'')+'" onclick="togglePhaseNew(\''+e.id+'\',\''+ph.id+'\')">'+(isDone?'✓':'')+'</div>'+
-        '<div style="flex:1;min-width:0">'+
-          '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">'+
-            '<div class="phase-name">'+ph.label+(pDate?' <span style="font-size:10px;color:var(--text-tertiary)">· '+fmtD(pDate)+'</span>':'')+'</div>'+
-            '<span style="font-size:11px;color:var(--bordeaux);font-weight:600">'+asn.jeh+' JEH</span>'+
-            '<span style="font-size:11px;color:var(--success);font-weight:600">'+fmtM(asn.montant_brut)+'</span>'+
-          '</div>'+
-          '<div class="phase-sub">'+ph.sub+'</div>'+
-          '<div class="phase-expand" onclick="toggleExtra(\'pe-'+e.id+'-'+ph.id+'\')">+ Notes & livrables</div>'+
-          '<div class="phase-extra '+(pNote||pLiv?'open':'')+'" id="pe-'+e.id+'-'+ph.id+'">'+
-            '<textarea class="phase-note" placeholder="Notes…" onblur="savePNNew(\''+e.id+'\',\''+ph.id+'\',this.value)">'+esc(pNote)+'</textarea>'+
-            '<input style="margin-top:4px;width:100%;padding:5px 8px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:12px;font-family:Sora,sans-serif;box-sizing:border-box" placeholder="Livrables produits…" value="'+esc(pLiv)+'" onblur="savePLNew(\''+e.id+'\',\''+ph.id+'\',this.value)"/>'+
-          '</div>'+
-        '</div>'+
-      '</div>';
-    }).join('');
-    return '<div class="mc '+(isActive?'active-mc':'done-mc')+'">'+
-      '<div class="mc-top">'+
-        '<div class="mc-date-box"><div class="mc-date-day">'+day+'</div><div class="mc-date-mo">'+mo+'</div></div>'+
-        '<div class="mc-info">'+
-          '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">'+
-            '<span class="mc-ref">'+esc(e.reference||'—')+'</span>'+
-            '<span class="badge '+(SC[e.statut]||'')+'">'+e.statut+'</span>'+
-            '<span class="mc-type-badge '+td.badge+'">'+td.icon+' '+td.label+'</span>'+
-          '</div>'+
-          '<div class="mc-title">'+esc(e.title||'Sans titre')+'</div>'+
-          '<div style="font-size:12px;color:var(--text-tertiary);margin-top:3px">'+esc(e.client_name||'—')+'</div>'+
-          (e.description?'<div style="font-size:13px;color:var(--text-secondary);margin-top:6px;line-height:1.5">'+esc(e.description)+'</div>':'')+
-          (e.type_etude?'<div style="font-size:11px;color:var(--text-tertiary);margin-top:4px">📌 '+esc(e.type_etude)+'</div>':'')+
-        '</div>'+
-        '<div style="text-align:right;flex-shrink:0">'+
-          '<div style="font-size:26px;font-weight:800;color:var(--bordeaux)">'+pct+'%</div>'+
-          '<div style="font-size:10px;color:var(--text-tertiary)">avancement</div>'+
-          (totalMyBrut?'<div style="font-size:13px;font-weight:700;color:var(--success);margin-top:6px">'+fmtM(totalMyBrut)+'</div><div style="font-size:10px;color:var(--text-tertiary)">brut total</div>':'')+
-        '</div>'+
-      '</div>'+
-      '<div class="mc-stats">'+
-        '<div class="mc-stat"><div class="mc-stat-val">'+fmtD(e.date_debut)+'</div><div class="mc-stat-lbl">Début</div></div>'+
-        '<div class="mc-stat"><div class="mc-stat-val">'+fmtD(e.date_fin)+'</div><div class="mc-stat-lbl">Fin prévue</div></div>'+
-        '<div class="mc-stat"><div class="mc-stat-val">'+totalMyJeh+'</div><div class="mc-stat-lbl">Mes JEH</div></div>'+
-        '<div class="mc-stat"><div class="mc-stat-val">'+fmtM(totalMyBrut)+'</div><div class="mc-stat-lbl">Brut total</div></div>'+
-        '<div class="mc-stat"><div class="mc-stat-val">'+myPhasesList.length+'</div><div class="mc-stat-lbl">Phase(s) assignée(s)</div></div>'+
-      '</div>'+
-      '<div class="phase-track">'+
-        '<div class="phase-title">Suivi des phases — '+td.label+'</div>'+
-        '<div class="phases-bar">'+bar+'</div>'+
-        phList+
-        (canQ?'<div style="margin-top:12px"><button class="btn btn-primary btn-sm" onclick="openQ(\''+e.id+'\')">Questionnaire de fin d\'étude</button></div>':'')+
-        (myPhasesList[0]&&myPhasesList[0].assignment.questionnaire_soumis?'<div style="margin-top:8px;font-size:12px;color:var(--success);font-weight:600">Questionnaire soumis</div>':'')+
-      '</div>'+
+
+    // Docs liés (RM avec lien GDrive)
+    var eid = encId(e.id);
+
+    return '<div class="mc '+(isActive?'active-mc':'done-mc')+'">' +
+      // Header
+      '<div class="mc-top">' +
+        '<div class="mc-date-box"><div class="mc-date-day">'+day+'</div><div class="mc-date-mo">'+mo+'</div></div>' +
+        '<div class="mc-info">' +
+          '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">' +
+            '<span class="mc-ref">'+esc(e.reference||'—')+'</span>' +
+            '<span class="badge '+(SC[e.statut]||'')+'">'+e.statut+'</span>' +
+            '<span class="mc-type-badge '+td.badge+'">'+td.icon+' '+td.label+'</span>' +
+          '</div>' +
+          '<div class="mc-title">'+esc(e.title||'Sans titre')+'</div>' +
+          '<div style="font-size:12px;color:var(--text-tertiary);margin-top:3px">'+esc(e.client_name||'—')+'</div>' +
+        '</div>' +
+      '</div>' +
+      // Info grid
+      '<div class="mc-stats">' +
+        '<div class="mc-stat"><div class="mc-stat-val">'+fmtD(e.date_debut)+'</div><div class="mc-stat-lbl">Début</div></div>' +
+        '<div class="mc-stat"><div class="mc-stat-val">'+fmtD(e.date_fin)+'</div><div class="mc-stat-lbl">Fin prévue</div></div>' +
+        '<div class="mc-stat"><div class="mc-stat-val">'+totalMyJeh+'</div><div class="mc-stat-lbl">Mes JEH</div></div>' +
+        '<div class="mc-stat"><div class="mc-stat-val" style="color:var(--success)">'+fmtM(totalMyBrut)+'</div><div class="mc-stat-lbl">Brut</div></div>' +
+      '</div>' +
+      // Phases assignées
+      '<div style="background:var(--bg);border-radius:var(--radius-md);padding:10px 12px;margin-bottom:12px;font-size:12px">' +
+        '<div style="font-weight:600;color:var(--navy);margin-bottom:4px">Mes phases</div>' +
+        (myPhasesList.length > 0
+          ? myPhasesList.map(function(mp){
+              return '<div style="display:flex;align-items:center;gap:8px;padding:3px 0;border-bottom:1px solid var(--border)">' +
+                '<span style="flex:1;color:var(--text-secondary)">'+mp.phase.label+'</span>' +
+                '<span style="font-size:11px;color:var(--bordeaux);font-weight:600">'+mp.assignment.jeh+' JEH</span>' +
+                '<span style="font-size:11px;color:var(--success);font-weight:600">'+fmtM(mp.assignment.montant_brut)+'</span>' +
+              '</div>';
+            }).join('')
+          : '<div style="color:var(--text-tertiary);font-style:italic">Aucune phase assignée.</div>'
+        ) +
+      '</div>' +
+      // Description
+      (e.description?'<div style="font-size:13px;color:var(--text-secondary);margin-bottom:10px;line-height:1.5">'+esc(e.description)+'</div>':'') +
+      // Lien documents (RM)
+      '<div id="docs-'+eid+'" style="margin-bottom:10px"><div style="font-size:11px;color:var(--text-tertiary)">Chargement liens…</div></div>' +
+      // Actions
+      (isActive
+        ? '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;border-top:1px solid var(--border);padding-top:10px">' +
+            '<button class="btn btn-danger btn-sm" data-eid="'+eid+'" onclick="marquerTerminee(this)" style="background:#dcfce7;color:#14532d;border-color:#86efac">✅ Marquer terminée</button>' +
+            '<span style="font-size:11px;color:var(--text-tertiary)">Elle passera dans l\'historique</span>' +
+          '</div>'
+        : '<div style="padding-top:10px;border-top:1px solid var(--border);display:flex;gap:8px;align-items:center">' +
+            '<span class="badge s-cloture">Mission terminée</span>' +
+            '<a id="sphinx-'+eid+'" style="display:none;font-size:12px;color:var(--bordeaux);font-weight:600;text-decoration:none" target="_blank">📋 Questionnaire de fin →</a>' +
+          '</div>'
+      ) +
     '</div>';
   }).join('');
+
+  // Load docs for each mission
+  list.forEach(function(e){
+    loadMissionDocs(e.id);
+  });
 }
+
+function loadMissionDocs(etudeId) {
+  var eid = encId(etudeId);
+  var el = document.getElementById('docs-'+eid);
+  if (!el) return;
+  db.collection('documents')
+    .where('etude_id','==',etudeId)
+    .where('intervenant_id','==',MY_IV_ID||'__')
+    .get().then(function(snap) {
+      var docs = [];
+      snap.forEach(function(d){docs.push(Object.assign({id:d.id},d.data()));});
+      // Also match by email
+      if (!docs.length) {
+        db.collection('documents').where('etude_id','==',etudeId).get().then(function(snap2) {
+          var byEmail = [];
+          snap2.forEach(function(d){
+            var dta = d.data();
+            if ((dta.intervenant_id===MY_IV_ID)||(dta.intervenant_email||'').toLowerCase()===ME.toLowerCase()) {
+              byEmail.push(Object.assign({id:d.id},dta));
+            }
+          });
+          renderMissionDocs(eid, byEmail);
+        });
+        return;
+      }
+      renderMissionDocs(eid, docs);
+    }).catch(function(){
+      if (el) el.innerHTML = '';
+    });
+}
+
+function renderMissionDocs(eid, docs) {
+  var el = document.getElementById('docs-'+eid);
+  if (!el) return;
+  if (!docs.length) { el.innerHTML = ''; return; }
+  var html = '<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text-tertiary);margin-bottom:6px">Mes documents</div>';
+  docs.forEach(function(d) {
+    html += '<div style="display:flex;align-items:center;gap:8px;padding:4px 0;font-size:12px">' +
+      '<span style="background:rgba(163,33,95,0.1);color:var(--bordeaux);padding:2px 6px;border-radius:4px;font-weight:700;font-size:10px">'+d.type+'</span>' +
+      '<span style="flex:1;color:var(--text-secondary)">'+esc(d.phase_label||d.nom_affiche||'Document')+'</span>' +
+      (d.lien_gdrive
+        ? '<a href="'+d.lien_gdrive+'" target="_blank" style="color:var(--bordeaux);font-weight:600;text-decoration:none;font-size:11px">Ouvrir →</a>'
+        : '<span style="color:var(--text-tertiary);font-size:10px;font-style:italic">En attente du lien</span>'
+      ) +
+    '</div>';
+  });
+  el.innerHTML = html;
+  // Sphinx link for historique
+  var sphinxEl = document.getElementById('sphinx-'+eid);
+  if (sphinxEl) {
+    sphinxEl.style.display = 'inline';
+    sphinxEl.href = "https://survey.sphinx.com"; // remplacer par vrai lien
+  }
+}
+
+function marquerTerminee(btn) {
+  var eid = btn.dataset.eid;
+  if (!confirm('Marquer cette mission comme terminée ? Elle passera dans l\'historique.')) return;
+  db.collection('etudes').doc(eid).update({statut: 'Livré'}).then(function(){
+    // Reload
+  });
+}
+
 
 function toggleExtra(id){var el=document.getElementById(id);if(el)el.classList.toggle('open');}
 
