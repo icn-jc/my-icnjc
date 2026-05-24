@@ -266,10 +266,12 @@ function loadData() {
     var mandats = allMandatsIV;
     // Filter select
     var fSel = document.getElementById('f-mandat-iv');
-    mandats.forEach(function(m){
-      var o=document.createElement('option');o.value=m.id;o.text=m.label+(m.statut==='actif'?' (actif)':'');
-      fSel.appendChild(o);
-    });
+    if (fSel) {
+      mandats.forEach(function(m){
+        var o=document.createElement('option');o.value=m.id;o.text=m.label+(m.statut==='actif'?' (actif)':'');
+        fSel.appendChild(o);
+      });
+    }
     // Add form select
     // Populate add form select (may not exist yet)
     var niSel = document.getElementById('ni-mandats');
