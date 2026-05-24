@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Partenariats — My-ICN-JC</title>
+<link rel="stylesheet" href="../assets/css/global.css"/>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script src="../assets/js/firebase.js"></script>
+<script src="../assets/js/auth.js"></script>
+<script src="../assets/js/sidebar.js"></script>
+<style>
+/* Tabs */
+.pt-tabs{display:flex;gap:3px;background:var(--bg);border-radius:var(--radius-lg);padding:4px;border:1px solid var(--border);width:fit-content;margin-bottom:24px;flex-wrap:wrap;}
+.pt-btn{padding:8px 18px;border-radius:var(--radius-md);font-size:13px;font-weight:500;cursor:pointer;border:none;background:transparent;color:var(--text-secondary);font-family:'Sora',sans-serif;transition:all .2s;}
+.pt-btn.active{background:var(--white);color:var(--bordeaux);box-shadow:var(--shadow-sm);font-weight:600;}
+.pt-pane{display:none;}.pt-pane.active{display:block;}
+/* Cards */
+.part-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px;}
+.part-card{background:var(--bg-card);border-radius:var(--radius-lg);padding:18px 20px;border:1px solid var(--border);box-shadow:var(--shadow-sm);transition:all .15s;cursor:pointer;}
+.part-card:hover{box-shadow:var(--shadow-md);border-color:var(--bordeaux);transform:translateY(-1px);}
+.part-card.entreprise{border-left:3px solid var(--bordeaux);}
+.part-card.junior_entreprise{border-left:3px solid #3b82f6;}
+.part-logo{width:44px;height:44px;border-radius:var(--radius-md);background:var(--bg);display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;color:var(--navy);flex-shrink:0;}
+.part-name{font-family:'Playfair Display',serif;font-size:16px;font-weight:700;color:var(--navy);}
+.part-type{font-size:10px;font-weight:700;padding:2px 8px;border-radius:99px;}
+.pt-ent{background:rgba(163,33,95,0.1);color:var(--bordeaux);}
+.pt-je{background:#dbeafe;color:#1e3a5f;}
+.service-tag{display:inline-flex;align-items:center;gap:4px;background:var(--bg);border:1px solid var(--border);border-radius:99px;padding:2px 8px;font-size:11px;color:var(--text-secondary);margin:2px;}
+.renew-badge{font-size:10px;font-weight:700;padding:2px 8px;border-radius:99px;}
+.rb-ok{background:#dcfce7;color:#14532d;}.rb-soon{background:#fef3c7;color:#78350f;}.rb-late{background:#fee2e2;color:#991b1b;}
+/* Panel */
+.part-panel{position:fixed;right:0;top:0;bottom:0;width:520px;max-width:96vw;background:var(--white);box-shadow:-8px 0 40px rgba(27,42,74,0.18);z-index:400;display:flex;flex-direction:column;transform:translateX(100%);transition:transform .25s ease;}
+.part-panel.open{transform:translateX(0);}
+.pp-hdr{padding:20px 22px;border-bottom:1px solid var(--border);position:relative;}
+.pp-close{position:absolute;top:14px;right:16px;background:none;border:none;font-size:22px;cursor:pointer;color:var(--text-tertiary);}
+.pp-body{flex:1;overflow-y:auto;padding:20px 22px;}
+.pp-tabs{display:flex;border-bottom:1px solid var(--border);}
+.pp-tab{flex:1;padding:10px;font-size:12px;font-weight:600;cursor:pointer;border:none;background:transparent;font-family:'Sora',sans-serif;color:var(--text-secondary);border-bottom:2px solid transparent;}
+.pp-tab.active{color:var(--bordeaux);border-bottom-color:var(--bordeaux);}
+.pp-pane{display:none;padding:16px 0;}.pp-pane.active{display:block;}
+.overlay{position:fixed;inset:0;background:rgba(15,25,35,.35);z-index:399;display:none;}
+.overlay.open{display:block;}
+.fld{display:flex;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);}
+.fld-l{font-size:12px;color:var(--text-tertiary);width:130px;flex-shrink:0;}
+.fld-v{font-size:13px;color:var(--text-primary);}
+.sec{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--text-tertiary);margin:14px 0 8px;display:flex;align-items:center;gap:8px;}
+.sec::after{content:'';flex:1;height:1px;background:var(--border);}
+/* Action logs */
+.action-item{background:var(--bg);border-radius:var(--radius-md);padding:10px 12px;border:1px solid var(--border);margin-bottom:8px;}
+.kpi-strip{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;margin-bottom:24px;}
+.kpi-c{background:var(--bg-card);border-radius:var(--radius-lg);padding:14px 16px;border:1px solid var(--border);}
+.kpi-v{font-size:22px;font-weight:800;color:var(--navy);}
+.kpi-l{font-size:10px;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:.07em;margin-top:3px;}
+</style>
+</head>
+<body>
+<div class="login-page" id="login-page">
+  <div class="login-box">
+    <div class="login-logo"><img src="../assets/images/ICN-Junior-Conseil_logo.png" style="height:54px;object-fit:contain"/></div>
+    <div class="login-title">Connexion</div>
+    <div class="login-sub">Accès réservé aux membres ICN Junior Conseil.</div>
+    <button class="google-btn" onclick="doGoogleLogin()">
+      <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google"/>Se connecter avec Google
+    </button>
+    <div class="denied-box" id="denied-box"><strong>Accès refusé</strong><p id="denied-msg"></p></div>
+    <div class="login-error" id="login-error"></div>
+  </div>
+</div>
+
+<div class="app-page" id="app-page">
+  <div id="sidebar-container"></div>
+  <div class="app-content">
+    <div class="page-header">
+      <div class="flex justify-between items-center" style="flex-wrap:wrap;gap:10px">
+        <div>
+          <div class="page-title">Partenariats</div>
+          <div class="page-subtitle" id="page-sub"></div>
+        </div>
+        <div class="flex gap-2">
+          <button class="btn btn-primary btn-sm" id="btn-add" onclick="openAdd()" style="display:none">+ Partenaire</button>
+        </div>
+      </div>
+    </div>
+    <div class="page-body">
+
+      <!-- KPI -->
+      <div class="kpi-strip" id="kpi-strip"></div>
+
+      <!-- Tabs -->
+      <div class="pt-tabs">
+        <button class="pt-btn active" onclick="switchTab('tous')" id="ptt-tous">Tous</button>
+        <button class="pt-btn" onclick="switchTab('entreprises')" id="ptt-entreprises">Entreprises</button>
+        <button class="pt-btn" onclick="switchTab('junior_entreprise')" id="ptt-junior_entreprise">Juniors-Entreprises</button>
+      </div>
+
+      <!-- Filters -->
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;align-items:center">
+        <input type="text" id="srch" placeholder="🔍 Rechercher…" oninput="render()" style="padding:6px 10px;border-radius:var(--radius-md);border:1.5px solid var(--border-strong);font-family:'Sora',sans-serif;font-size:12px;min-width:180px"/>
+        <select id="f-service" onchange="render()" style="padding:6px 10px;border-radius:var(--radius-md);border:1.5px solid var(--border-strong);font-family:'Sora',sans-serif;font-size:12px">
+          <option value="">Tous services</option>
+          <option>Échange de services</option>
+          <option>Formation</option>
+          <option>Audit blanc</option>
+          <option>Étude croisée</option>
+          <option>Sponsoring</option>
+          <option>Recrutement</option>
+        </select>
+        <select id="f-statut" onchange="render()" style="padding:6px 10px;border-radius:var(--radius-md);border:1.5px solid var(--border-strong);font-family:'Sora',sans-serif;font-size:12px">
+          <option value="">Tous statuts</option>
+          <option value="Actif">Actif</option>
+          <option value="En cours">En cours</option>
+          <option value="Expiré">Expiré</option>
+          <option value="Suspendu">Suspendu</option>
+        </select>
+        <span id="f-note" style="font-size:11px;color:var(--text-tertiary);font-style:italic"></span>
+      </div>
+
+      <!-- Grid -->
+      <div id="partenaires-grid" class="part-grid">
+        <div style="color:var(--text-tertiary);font-size:13px">Chargement…</div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="overlay" onclick="closePanel()"></div>
+
+<!-- PANNEAU PARTENAIRE -->
+<div class="part-panel" id="part-panel">
+  <div class="pp-hdr">
+    <div style="display:flex;gap:12px;align-items:center">
+      <div class="part-logo" id="pp-logo"></div>
+      <div>
+        <div style="font-family:'Playfair Display',serif;font-size:18px;color:var(--navy)" id="pp-name"></div>
+        <div style="display:flex;gap:6px;margin-top:4px;flex-wrap:wrap" id="pp-meta"></div>
+      </div>
+    </div>
+    <button class="pp-close" onclick="closePanel()">×</button>
+  </div>
+  <div class="pp-tabs">
+    <button class="pp-tab active" onclick="switchPpTab('infos')" id="ppt-infos">Infos</button>
+    <button class="pp-tab" onclick="switchPpTab('actions')" id="ppt-actions">Historique</button>
+    <button class="pp-tab" onclick="switchPpTab('edit')" id="ppt-edit" style="display:none">Modifier</button>
+  </div>
+  <div class="pp-pane active" id="ppp-infos"></div>
+  <div class="pp-pane" id="ppp-actions"></div>
+  <div class="pp-pane" id="ppp-edit"></div>
+</div>
+
+<!-- MODAL AJOUT -->
+<div class="modal-overlay" id="modal-add" onclick="if(event.target===this)closeAdd()">
+  <div class="modal-box" style="max-width:600px">
+    <div class="modal-header"><div class="modal-title" id="modal-add-title">Ajouter un partenaire</div><button class="modal-close" onclick="closeAdd()">×</button></div>
+    <div class="form-grid">
+      <div class="form-field full"><label class="input-label">Nom *</label><input class="input" id="np-name" placeholder="BNP Paribas, EPITECH JE…"/></div>
+      <div class="form-field"><label class="input-label">Type *</label>
+        <select class="select-field" id="np-type">
+          <option value="entreprise">Entreprise</option>
+          <option value="junior_entreprise">Junior-Entreprise</option>
+        </select></div>
+      <div class="form-field"><label class="input-label">Statut</label>
+        <select class="select-field" id="np-statut">
+          <option value="Actif">Actif</option>
+          <option value="En cours">En cours (négociation)</option>
+          <option value="Expiré">Expiré</option>
+          <option value="Suspendu">Suspendu</option>
+        </select></div>
+      <div class="form-field"><label class="input-label">Secteur</label>
+        <input class="input" id="np-secteur" placeholder="Finance, Tech, Conseil…"/></div>
+      <div class="form-field"><label class="input-label">Ville / Région</label>
+        <input class="input" id="np-ville"/></div>
+      <div class="form-field"><label class="input-label">Site web</label>
+        <input class="input" id="np-web" placeholder="https://…"/></div>
+      <div class="form-field"><label class="input-label">Email contact</label>
+        <input class="input" type="email" id="np-email"/></div>
+      <div class="form-field"><label class="input-label">Contact référent</label>
+        <input class="input" id="np-contact" placeholder="Prénom Nom — Poste"/></div>
+      <div class="form-field"><label class="input-label">Date début partenariat</label>
+        <input class="input" type="date" id="np-debut"/></div>
+      <div class="form-field"><label class="input-label">Date renouvellement</label>
+        <input class="input" type="date" id="np-renew"/></div>
+      <div class="form-field full">
+        <label class="input-label">Services échangés <span style="font-size:10px;color:var(--text-tertiary)">— cocher ce qui s'applique</span></label>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">
+          <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="checkbox" name="svc" value="Échange de services"/> Échange de services</label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="checkbox" name="svc" value="Formation"/> Formation</label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="checkbox" name="svc" value="Audit blanc"/> Audit blanc</label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="checkbox" name="svc" value="Étude croisée"/> Étude croisée</label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="checkbox" name="svc" value="Sponsoring"/> Sponsoring</label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="checkbox" name="svc" value="Recrutement"/> Recrutement</label>
+        </div>
+      </div>
+      <div class="form-field full"><label class="input-label">Description / accord</label>
+        <textarea class="input" id="np-desc" rows="3" style="resize:vertical" placeholder="Décris les termes du partenariat, ce qui est échangé, les obligations de chaque partie…"></textarea></div>
+      <div class="form-field full"><label class="input-label">Notes internes</label>
+        <textarea class="input" id="np-notes" rows="2" style="resize:vertical"></textarea></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeAdd()">Annuler</button>
+      <button class="btn btn-primary" onclick="confirmAdd()">Ajouter →</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL ACTION -->
+<div class="modal-overlay" id="modal-action" onclick="if(event.target===this)closeAction()">
+  <div class="modal-box" style="max-width:480px">
+    <div class="modal-header"><div class="modal-title">Ajouter une action</div><button class="modal-close" onclick="closeAction()">×</button></div>
+    <div class="form-grid">
+      <div class="form-field"><label class="input-label">Type d'action</label>
+        <select class="select-field" id="act-type">
+          <option>Contact</option><option>Réunion</option><option>Formation réalisée</option>
+          <option>Audit blanc</option><option>Étude croisée</option><option>Renouvellement</option><option>Autre</option>
+        </select></div>
+      <div class="form-field"><label class="input-label">Date</label>
+        <input class="input" type="date" id="act-date"/></div>
+      <div class="form-field full"><label class="input-label">Description *</label>
+        <textarea class="input" id="act-desc" rows="3" style="resize:vertical" placeholder="Décris ce qui s'est passé…"></textarea></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeAction()">Annuler</button>
+      <button class="btn btn-primary" onclick="confirmAction()">Ajouter →</button>
+    </div>
+  </div>
+</div>
+
+<script>
+var ME = '', MY_ROLE = '', CAN_EDIT = false;
+var allPartenaires = [], curId = null, curTab = 'tous';
+var EDIT_ROLES_P = ['super_admin','president','vice_president'];
+
+function fmtD(s){if(!s)return'—';var p=s.split('-');return p.length===3?p[2]+'/'+p[1]+'/'+p[0]:s;}
+function esc(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function todayStr(){return new Date().toISOString().split('T')[0];}
+
+function daysUntil(dateStr) {
+  if (!dateStr) return null;
+  var d = new Date(dateStr); var now = new Date();
+  return Math.ceil((d - now) / 864e5);
+}
+
+initAuth('crm_partenariats', function(user, role, profile) {
+  ME = user.email; MY_ROLE = role;
+  CAN_EDIT = EDIT_ROLES_P.includes(role);
+  renderSidebar(role, profile, user, 'crm_partenariats');
+  showAppPage(user, role, profile);
+  updateHealthIndicator();
+  if (CAN_EDIT) document.getElementById('btn-add').style.display = 'flex';
+  var now = new Date();
+  var M=['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
+  document.getElementById('page-sub').innerText = now.getDate()+' '+M[now.getMonth()]+' '+now.getFullYear();
+  loadData();
+});
+
+function loadData() {
+  db.collection('partenaires').onSnapshot(function(snap) {
+    allPartenaires = [];
+    snap.forEach(function(doc){allPartenaires.push(Object.assign({id:doc.id},doc.data()));});
+    allPartenaires.sort(function(a,b){return (a.nom||'').localeCompare(b.nom||'');});
+    render();
+    renderKPIs();
+  });
+}
+
+function renderKPIs() {
+  var total = allPartenaires.length;
+  var ent = allPartenaires.filter(function(p){return p.type==='entreprise';}).length;
+  var je = allPartenaires.filter(function(p){return p.type==='junior_entreprise';}).length;
+  var actifs = allPartenaires.filter(function(p){return p.statut==='Actif';}).length;
+  var aRenew = allPartenaires.filter(function(p){var d=daysUntil(p.date_renouvellement);return d!==null&&d>=0&&d<=60;}).length;
+  document.getElementById('kpi-strip').innerHTML = [
+    {l:'Partenaires total',v:total,c:''},
+    {l:'Entreprises',v:ent,c:'primary'},
+    {l:'Juniors-Entreprises',v:je,c:''},
+    {l:'Actifs',v:actifs,c:'success'},
+    {l:'Renouvellement < 60j',v:aRenew,c:aRenew>0?'warning':''},
+  ].map(function(k){
+    return '<div class="kpi-c"><div class="kpi-v" style="color:'+(k.c==='primary'?'var(--bordeaux)':k.c==='success'?'var(--success)':k.c==='warning'?'#d97706':'var(--navy)')+'">'+k.v+'</div><div class="kpi-l">'+k.l+'</div></div>';
+  }).join('');
+}
+
+function switchTab(t) {
+  curTab = t;
+  ['tous','entreprises','junior_entreprise'].forEach(function(k){
+    document.getElementById('ptt-'+k).classList.toggle('active',k===t);
+  });
+  render();
+}
+
+function render() {
+  var srch = (document.getElementById('srch').value||'').toLowerCase();
+  var fs = document.getElementById('f-service').value;
+  var fst = document.getElementById('f-statut').value;
+  var data = allPartenaires.filter(function(p) {
+    if (curTab !== 'tous' && p.type !== curTab) return false;
+    if (srch && !(p.nom||'').toLowerCase().includes(srch) && !(p.secteur||'').toLowerCase().includes(srch)) return false;
+    if (fs && !(p.services||[]).includes(fs)) return false;
+    if (fst && p.statut !== fst) return false;
+    return true;
+  });
+  document.getElementById('f-note').innerText = data.length < allPartenaires.length ? data.length+' / '+allPartenaires.length : '';
+  if (!data.length) {
+    document.getElementById('partenaires-grid').innerHTML = '<div style="color:var(--text-tertiary);font-size:13px">Aucun partenaire.</div>';
+    return;
+  }
+  document.getElementById('partenaires-grid').innerHTML = data.map(function(p) {
+    var initials = (p.nom||'?').slice(0,2).toUpperCase();
+    var typCls = p.type==='entreprise'?'entreprise':'junior_entreprise';
+    var typBadge = p.type==='entreprise'?'pt-ent':'pt-je';
+    var typLabel = p.type==='entreprise'?'Entreprise':'Junior-Entreprise';
+    var services = (p.services||[]).map(function(s){return '<span class="service-tag">'+esc(s)+'</span>';}).join('');
+    var days = daysUntil(p.date_renouvellement);
+    var renewHtml = '';
+    if (days !== null) {
+      var rbcls = days < 0 ? 'rb-late' : days <= 30 ? 'rb-soon' : 'rb-ok';
+      var rblbl = days < 0 ? 'Expiré' : days <= 30 ? 'Renouvellement dans '+days+'j' : 'Renouvellement '+fmtD(p.date_renouvellement);
+      renewHtml = '<div style="margin-top:8px"><span class="renew-badge '+rbcls+'">'+rblbl+'</span></div>';
+    }
+    var statBadge = {Actif:'#dcfce7',  'En cours':'#fef3c7', Expiré:'#fee2e2', Suspendu:'#f1f5f9'}[p.statut]||'#f1f5f9';
+    var statColor = {Actif:'#14532d', 'En cours':'#78350f', Expiré:'#991b1b', Suspendu:'#475569'}[p.statut]||'#475569';
+    return '<div class="part-card '+typCls+'" onclick="openPart(\''+p.id+'\')">' +
+      '<div style="display:flex;align-items:center;gap:12px;margin-bottom:10px">' +
+        '<div class="part-logo">'+initials+'</div>' +
+        '<div style="flex:1;min-width:0">' +
+          '<div class="part-name">'+esc(p.nom||'')+'</div>' +
+          '<div style="font-size:11px;color:var(--text-tertiary);margin-top:2px">'+esc(p.secteur||'')+(p.ville?' · '+esc(p.ville):'')+'</div>' +
+        '</div>' +
+        '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">' +
+          '<span class="part-type '+typBadge+'">'+typLabel+'</span>' +
+          '<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:99px;background:'+statBadge+';color:'+statColor+'">'+p.statut+'</span>' +
+        '</div>' +
+      '</div>' +
+      (services ? '<div style="margin-bottom:6px">'+services+'</div>' : '') +
+      renewHtml +
+    '</div>';
+  }).join('');
+}
+
+// ── Panel ─────────────────────────────────────────────────────
+function openPart(id) {
+  var p = allPartenaires.find(function(x){return x.id===id;});
+  if (!p) return;
+  curId = id;
+  document.getElementById('pp-logo').innerText = (p.nom||'?').slice(0,2).toUpperCase();
+  document.getElementById('pp-name').innerText = p.nom||'';
+  var typBadge = p.type==='entreprise'?'pt-ent':'pt-je';
+  var typLabel = p.type==='entreprise'?'Entreprise':'Junior-Entreprise';
+  var statBadge = {Actif:'#dcfce7','En cours':'#fef3c7',Expiré:'#fee2e2',Suspendu:'#f1f5f9'}[p.statut]||'#f1f5f9';
+  var statColor = {Actif:'#14532d','En cours':'#78350f',Expiré:'#991b1b',Suspendu:'#475569'}[p.statut]||'#475569';
+  document.getElementById('pp-meta').innerHTML =
+    '<span class="part-type '+typBadge+'">'+typLabel+'</span>' +
+    '<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:99px;background:'+statBadge+';color:'+statColor+'">'+p.statut+'</span>' +
+    (p.ville?'<span style="font-size:11px;color:var(--text-tertiary)">📍 '+esc(p.ville)+'</span>':'');
+
+  document.getElementById('ppt-edit').style.display = CAN_EDIT ? '' : 'none';
+  renderPpInfos(p);
+  renderPpActions(p);
+  renderPpEdit(p);
+  switchPpTab('infos');
+  document.getElementById('part-panel').classList.add('open');
+  document.getElementById('overlay').classList.add('open');
+}
+
+function closePanel() {
+  document.getElementById('part-panel').classList.remove('open');
+  document.getElementById('overlay').classList.remove('open');
+  curId = null;
+}
+
+function switchPpTab(k) {
+  ['infos','actions','edit'].forEach(function(t){
+    document.getElementById('ppt-'+t).classList.toggle('active',t===k);
+    document.getElementById('ppp-'+t).classList.toggle('active',t===k);
+  });
+}
+
+function renderPpInfos(p) {
+  var services = (p.services||[]).map(function(s){return '<span class="service-tag">'+esc(s)+'</span>';}).join('') || '—';
+  var days = daysUntil(p.date_renouvellement);
+  var renewInfo = days === null ? '—' : (days < 0 ? '<span style="color:var(--danger)">Expiré depuis '+Math.abs(days)+'j</span>' : days <= 30 ? '<span style="color:#d97706">Dans '+days+' jours</span>' : fmtD(p.date_renouvellement));
+  document.getElementById('ppp-infos').innerHTML =
+    fld('Secteur', esc(p.secteur||'—')) +
+    fld('Ville', esc(p.ville||'—')) +
+    fld('Site web', p.website ? '<a href="'+esc(p.website)+'" target="_blank" style="color:var(--bordeaux)">'+esc(p.website)+'</a>' : '—') +
+    fld('Email', esc(p.email||'—')) +
+    fld('Contact', esc(p.contact||'—')) +
+    fld('Début partenariat', fmtD(p.date_debut)) +
+    fld('Renouvellement', renewInfo) +
+    '<div class="sec">Services échangés</div><div>'+services+'</div>' +
+    (p.description ? '<div class="sec">Description accord</div><div style="font-size:13px;color:var(--text-secondary);line-height:1.6">'+esc(p.description)+'</div>' : '') +
+    (p.notes ? '<div class="sec">Notes internes</div><div style="font-size:12px;color:var(--text-secondary)">'+esc(p.notes)+'</div>' : '') +
+    (CAN_EDIT ? '<div style="margin-top:16px;display:flex;gap:8px">' +
+      '<button class="btn btn-secondary btn-sm" onclick="openAction()">+ Action</button>' +
+      '<button class="btn btn-secondary btn-sm" style="background:#fee2e2;color:#991b1b;border-color:#fca5a5" onclick="deletePartner(\''+p.id+'\')">🗑 Supprimer</button>' +
+    '</div>' : '');
+}
+
+function fld(l,v){return'<div class="fld"><div class="fld-l">'+l+'</div><div class="fld-v">'+v+'</div></div>';}
+
+function renderPpActions(p) {
+  var actions = (p.actions||[]).slice().reverse();
+  document.getElementById('ppp-actions').innerHTML =
+    (CAN_EDIT ? '<button class="btn btn-primary btn-sm" style="margin-bottom:14px" onclick="openAction()">+ Ajouter une action</button>' : '') +
+    (actions.length === 0
+      ? '<div style="color:var(--text-tertiary);font-size:13px">Aucune action enregistrée.</div>'
+      : actions.map(function(a) {
+          return '<div class="action-item">' +
+            '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px">' +
+              '<span style="font-weight:600;font-size:12px;color:var(--navy)">'+esc(a.type||'')+'</span>' +
+              '<span style="font-size:11px;color:var(--text-tertiary)">'+fmtD(a.date)+'</span>' +
+            '</div>' +
+            '<div style="font-size:13px;color:var(--text-secondary);line-height:1.5">'+esc(a.desc||'')+'</div>' +
+            '<div style="font-size:10px;color:var(--text-tertiary);margin-top:4px">Par '+esc(a.par||'')+'</div>' +
+          '</div>';
+        }).join(''));
+}
+
+function renderPpEdit(p) {
+  if (!CAN_EDIT) { document.getElementById('ppp-edit').innerHTML = ''; return; }
+  var id = p.id;
+  var statOpts = ['Actif','En cours','Expiré','Suspendu'].map(function(s){return '<option'+(p.statut===s?' selected':'')+'>'+s+'</option>';}).join('');
+  document.getElementById('ppp-edit').innerHTML =
+    '<div style="display:flex;flex-direction:column;gap:10px">' +
+    ef('Nom','text',p.nom||'','nom',id)+ef('Secteur','text',p.secteur||'','secteur',id)+
+    ef('Ville','text',p.ville||'','ville',id)+ef('Site web','text',p.website||'','website',id)+
+    ef('Email','email',p.email||'','email',id)+ef('Contact','text',p.contact||'','contact',id)+
+    ef('Début','date',p.date_debut||'','date_debut',id)+ef('Renouvellement','date',p.date_renouvellement||'','date_renouvellement',id)+
+    ef('Statut','select:'+statOpts,p.statut||'','statut',id)+
+    ef('Description','textarea',p.description||'','description',id)+
+    ef('Notes','textarea',p.notes||'','notes',id)+
+    '</div>';
+}
+
+function ef(label, type, val, field, id) {
+  var input;
+  if (type.startsWith('select:')) {
+    input = '<select class="select-field" style="font-size:12px" onchange="saveField(\''+id+'\',\''+field+'\',this.value)">'+type.slice(7)+'</select>';
+  } else if (type === 'textarea') {
+    input = '<textarea class="input" rows="2" style="font-size:12px;resize:vertical" onblur="saveField(\''+id+'\',\''+field+'\',this.value)">'+esc(val)+'</textarea>';
+  } else {
+    input = '<input class="input" type="'+type+'" value="'+esc(val)+'" style="font-size:12px" onblur="saveField(\''+id+'\',\''+field+'\',this.value)"/>';
+  }
+  return '<div><label class="input-label">'+label+'</label>'+input+'</div>';
+}
+
+function saveField(id, field, val) {
+  var u = {}; u[field] = val;
+  db.collection('partenaires').doc(id).update(u);
+}
+
+function deletePartner(id) {
+  if (!confirm('Supprimer ce partenaire ?')) return;
+  db.collection('partenaires').doc(id).delete().then(function(){closePanel();});
+}
+
+// ── Actions ───────────────────────────────────────────────────
+function openAction(){document.getElementById('act-date').value=todayStr();document.getElementById('modal-action').classList.add('open');}
+function closeAction(){document.getElementById('modal-action').classList.remove('open');}
+function confirmAction() {
+  if (!curId) return;
+  var desc = document.getElementById('act-desc').value.trim();
+  if (!desc) { alert('Description obligatoire.'); return; }
+  var p = allPartenaires.find(function(x){return x.id===curId;});
+  if (!p) return;
+  var actions = JSON.parse(JSON.stringify(p.actions||[]));
+  actions.push({
+    type: document.getElementById('act-type').value,
+    date: document.getElementById('act-date').value,
+    desc: desc,
+    par: ME,
+    created_at: todayStr()
+  });
+  db.collection('partenaires').doc(curId).update({actions:actions}).then(function(){
+    closeAction();
+    document.getElementById('act-desc').value = '';
+  });
+}
+
+// ── Ajout partenaire ──────────────────────────────────────────
+function openAdd(){document.getElementById('modal-add').classList.add('open');}
+function closeAdd(){document.getElementById('modal-add').classList.remove('open');}
+function confirmAdd() {
+  var nom = document.getElementById('np-name').value.trim();
+  if (!nom) { alert('Nom obligatoire.'); return; }
+  var services = Array.from(document.querySelectorAll('input[name="svc"]:checked')).map(function(c){return c.value;});
+  db.collection('partenaires').add({
+    nom: nom,
+    type: document.getElementById('np-type').value,
+    statut: document.getElementById('np-statut').value,
+    secteur: document.getElementById('np-secteur').value.trim(),
+    ville: document.getElementById('np-ville').value.trim(),
+    website: document.getElementById('np-web').value.trim(),
+    email: document.getElementById('np-email').value.trim(),
+    contact: document.getElementById('np-contact').value.trim(),
+    date_debut: document.getElementById('np-debut').value||null,
+    date_renouvellement: document.getElementById('np-renew').value||null,
+    services: services,
+    description: document.getElementById('np-desc').value.trim(),
+    notes: document.getElementById('np-notes').value.trim(),
+    actions: [],
+    created_by: ME,
+    created_at: firebase.firestore.FieldValue.serverTimestamp()
+  }).then(function(){
+    closeAdd();
+    // Reset checkboxes
+    document.querySelectorAll('input[name="svc"]').forEach(function(c){c.checked=false;});
+  });
+}
+</script>
+</body>
+</html>
