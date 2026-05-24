@@ -470,6 +470,18 @@ function epField(label, val) {
 
 function updEtude(id, field, val) {
   var u = {}; u[field] = val;
+  // Validate date coherence
+  if (field === 'date_debut' || field === 'date_fin') {
+    var e = allEtudes.find(function(x){return x.id===id;});
+    if (e) {
+      var debut = field === 'date_debut' ? val : e.date_debut;
+      var fin   = field === 'date_fin'   ? val : e.date_fin;
+      if (debut && fin && debut >= fin) {
+        alert('La date de début doit être antérieure à la date de fin.');
+        return; // Don't save
+      }
+    }
+  }
   if (['phases','date_debut','responsable_email'].includes(field) && val) {
     u.a_completer = false;
   }
