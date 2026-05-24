@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<title>My-ICN-JC</title>
+<title>My-ICN-JC — Hub</title>
 <link rel="stylesheet" href="assets/css/global.css"/>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
@@ -72,7 +72,7 @@
       <p id="denied-msg">Ce compte n'est pas autorisé.</p>
     </div>
     <div class="login-error" id="login-error"></div>
-    <div class="login-footer">My ICN JC</div>
+    <div class="login-footer">@icnjuniorconseil.com uniquement</div>
   </div>
 </div>
 
@@ -134,7 +134,7 @@ initAuth('index', function(user, role, profile) {
 });
 
 // ── Hub ───────────────────────────────────────────────────────
-async function loadHub(role, profile, user) {
+function loadHub(role, profile, user) {
   await Promise.all([
     loadAlerts(role),
     loadKpiSnap(role),
@@ -146,81 +146,143 @@ async function loadHub(role, profile, user) {
 
 // ── Alertes ───────────────────────────────────────────────────
 async function loadAlerts(role) {
-  const alerts = [];
-  const today  = new Date().toISOString().split('T')[0];
+  var today = new Date().toISOString().split('T')[0];
+  var alerts = [];
+  var pending = 0;
+  var done = function() {
+    pending--;
+    if (pending > 0) return;
+    renderAlerts(alerts);
+  };
 
-  try {
-    // Tâches en retard (tréso uniquement)
-    if (['super_admin','president','tresorerie'].includes(role)) {
-      const late = await COLLECTIONS.tasks
-        .where('status','!=','Terminé')
-        .where('date','<', today)
-        .get();
-      if (!late.empty) {
-        alerts.push({ type:'danger', msg: late.size + ' tâche(s) audit en retard' });
+  // ── 1. Études à compléter (CA + commercial) ──────────────────
+  if (['super_admin','president','vice_president','responsable_commercial'].includes(role)) {
+    pending++;
+    db.collection('etudes').where('a_completer','==',true).get().then(function(snap) {
+      if (!snap.empty) {
+        alerts.push({type:'warning', icon:'📋',
+          msg: snap.size+' étude(s) créée(s) depuis le CRM à compléter',
+          link:'etudes/etudes_index.html', linkLabel:'Voir les études'});
       }
-    }
-
-    // Études bloquées
-    if (['super_admin','president','responsable_commercial','responsable_qualite','secretaire'].includes(role)) {
-      const bloquees = await COLLECTIONS.etudes.where('statut','==','Bloquée').get();
-      if (!bloquees.empty) {
-        alerts.push({ type:'danger', msg: bloquees.size + ' étude(s) bloquée(s)' });
-      }
-    }
-  } catch(e) { /* silencieux */ }
-
-  const band = document.getElementById('alert-band');
-  const container = document.getElementById('alerts-container');
-
-  if (alerts.length === 0) {
-    band.style.display = 'none';
-    return;
+      done();
+    }).catch(done);
   }
-  band.style.display = 'block';
-  container.innerHTML = alerts.map(a =>
-    `<div class="alert alert-${a.type}">${a.msg}</div>`
-  ).join('');
+
+  // ── 2. Propositions d'événements en attente (CA) ────────────
+  if (['super_admin','president','vice_president','tresorier','secretaire',
+       'responsable_commercial','responsable_qualite','responsable_marketing'].includes(role)) {
+    pending++;
+    db.collection('propositions_evenements').where('statut','==','en_attente').get().then(function(snap) {
+      if (!snap.empty) {
+        alerts.push({type:'info', icon:'💡',
+          msg: snap.size+' proposition(s) d\'événement en attente de décision',
+          link:'evenements/evenements_index.html', linkLabel:'Voir les propositions'});
+      }
+      done();
+    }).catch(done);
+  }
+
+  // ── 3. Documents disponibles dans Mes liens ──────────────────
+  pending++;
+  db.collection('documents')
+    .where('vu_par_intervenant','==',false)
+    .where('lien_gdrive','!=','')
+    .get().then(function(snap) {
+      if (!snap.empty) {
+        alerts.push({type:'success', icon:'📂',
+          msg: snap.size+' document(s) disponible(s) dans Mes liens',
+          link:'mon_espace/mes_missions.html', linkLabel:'Voir mes liens'});
+      }
+      done();
+    }).catch(done);
+
+  // ── 4. Partenariats à renouveler dans 60j ───────────────────
+  if (['super_admin','president','vice_president'].includes(role)) {
+    pending++;
+    var in60 = new Date(); in60.setDate(in60.getDate()+60);
+    var in60str = in60.toISOString().split('T')[0];
+    db.collection('partenaires')
+      .where('date_renouvellement','<=',in60str)
+      .where('date_renouvellement','>=',today)
+      .get().then(function(snap) {
+        if (!snap.empty) {
+          alerts.push({type:'warning', icon:'🤝',
+            msg: snap.size+' partenariat(s) à renouveler dans moins de 60 jours',
+            link:'crm/crm_partenariats.html', linkLabel:'Voir les partenariats'});
+        }
+        done();
+      }).catch(done);
+  }
+
+  // ── 5. Objectif semaine (prospection) ──────────────────────
+  if (['super_admin','president','vice_president','responsable_commercial','commercial'].includes(role)) {
+    pending++;
+    db.collection('crm_config').doc('objectifs').get().then(function(doc) {
+      if (doc.exists) {
+        var obj = doc.data();
+        var wkObj = obj.objectif_hebdo || 0;
+        if (wkObj > 0) {
+          // Count prospects updated this week
+          var mon = new Date(); mon.setDate(mon.getDate()-(mon.getDay()||7)+1);
+          var monStr = mon.toISOString().split('T')[0];
+          db.collection('prospects').where('last_contact_at','>=',monStr).get().then(function(snap2) {
+            if (snap2.size < wkObj) {
+              alerts.push({type:'info', icon:'🎯',
+                msg: snap2.size+' / '+wkObj+' prospects contactés cette semaine',
+                link:'crm/crm_prospection.html', linkLabel:'Ouvrir la prospection'});
+            }
+            done();
+          }).catch(done);
+        } else { done(); }
+      } else { done(); }
+    }).catch(done);
+  }
+
+  // If no async operations, render immediately
+  if (pending === 0) renderAlerts([]);
 }
+
+function renderAlerts(alerts) {
+  var band = document.getElementById('alert-band');
+  var container = document.getElementById('alerts-container');
+  if (!band || !container) return;
+  if (!alerts.length) { band.style.display='none'; return; }
+  band.style.display = 'block';
+  var COLOR = {warning:'#fef3c7', info:'#e0f2fe', success:'#dcfce7', danger:'#fee2e2'};
+  var TEXT  = {warning:'#78350f', info:'#0c4a6e', success:'#14532d', danger:'#991b1b'};
+  container.innerHTML = alerts.map(function(a) {
+    return '<div style="display:flex;align-items:center;gap:10px;background:'+COLOR[a.type]+';border-radius:var(--radius-md);padding:10px 14px;border:1px solid '+TEXT[a.type]+'22">' +
+      '<span style="font-size:18px">'+a.icon+'</span>' +
+      '<span style="flex:1;font-size:13px;color:'+TEXT[a.type]+'">'+a.msg+'</span>' +
+      (a.link?'<a href="'+a.link+'" style="font-size:12px;font-weight:600;color:'+TEXT[a.type]+';text-decoration:none;white-space:nowrap">'+a.linkLabel+' →</a>':'') +
+    '</div>';
+  }).join('');
+}
+
 
 // ── KPI Snapshot ──────────────────────────────────────────────
-async function loadKpiSnap(role) {
-  const el = document.getElementById('kpi-snap');
-  let html = '';
-
-  try {
-    // CA signé — depuis kpi/dashboard
-    const kpiDoc = await db.collection('kpi').doc('dashboard').get();
-    const kpi = kpiDoc.exists ? kpiDoc.data() : {};
-
-    html += kpiTile('CA Signé', fmt(kpi['ca-signe'] || 0), '€', '', true);
-    html += kpiTile("Nb d'études", kpi['nb-etudes'] || 0, '', '');
-
-    // Taux de conversion
-    const tx = kpi['ca-signe'] ? Math.round((kpi['ca-encaisse']||0) / kpi['ca-signe'] * 100) : 0;
-    html += kpiTile('Taux conversion', tx, '%', 'signé → encaissé');
-
-    // Cash — CA uniquement
-    if (isCA()) {
-      html += kpiTile('Cash disponible', fmt(kpi['cash'] || 0), '€', 'trésorerie');
+function loadKpiSnap(role) {
+  var el = document.getElementById('kpi-snap');
+  if (!el) return;
+  // Load from active mandat
+  db.collection('mandats').where('statut','==','actif').limit(1).get().then(function(snap) {
+    var kpc = {}, kpt = {};
+    if (!snap.empty) {
+      var m = snap.docs[0].data();
+      kpc = m.kpi_commercial || {};
+      kpt = m.kpi_treso || {};
     }
-
-  } catch(e) {
-    html = '<div class="kpi-tile"><div class="kpi-label">Données indisponibles</div></div>';
-  }
-
-  el.innerHTML = html;
+    var html = '';
+    html += kpiTile('CA Signé', fmt(kpc.ca_signe||kpt.ca_signe||0), '', true);
+    html += kpiTile('Études signées', kpc.nb_etudes_signees||kpt.nb_etudes||0, '', false);
+    html += kpiTile('CA Encaissé', fmt(kpt.ca_encaisse||0), '', false);
+    if (isCA()) html += kpiTile('Cash disponible', fmt(kpt.cash_disponible||0), '', false);
+    el.innerHTML = html;
+  }).catch(function(){
+    el.innerHTML = '<div style="font-size:12px;color:var(--text-tertiary)">Données indisponibles.</div>';
+  });
 }
 
-function kpiTile(label, val, unit, sub, accent) {
-  return `<div class="kpi-tile${accent?' accent':''}">
-    <div class="kpi-label">${label}</div>
-    <div class="kpi-val">${val} <span class="kpi-unit">${unit}</span></div>
-    ${sub ? `<div class="kpi-sub">${sub}</div>` : ''}
-  </div>`;
-}
-
-function fmt(n) { return Number(n||0).toLocaleString('fr-FR'); }
 
 // ── Mes actions ───────────────────────────────────────────────
 async function loadMyActions(role, profile, user) {
