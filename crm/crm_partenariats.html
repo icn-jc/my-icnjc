@@ -407,11 +407,15 @@ function renderPpActions(p) {
     (CAN_EDIT ? '<button class="btn btn-primary btn-sm" style="margin-bottom:14px" onclick="openAction()">+ Ajouter une action</button>' : '') +
     (actions.length === 0
       ? '<div style="color:var(--text-tertiary);font-size:13px">Aucune action enregistrée.</div>'
-      : actions.map(function(a) {
-          return '<div class="action-item">' +
+      : actions.map(function(a, idx) {
+          var ai = actions.length - 1 - idx; // real index in original array
+          return '<div class="action-item" style="position:relative">' +
             '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px">' +
               '<span style="font-weight:600;font-size:12px;color:var(--navy)">'+esc(a.type||'')+'</span>' +
-              '<span style="font-size:11px;color:var(--text-tertiary)">'+fmtD(a.date)+'</span>' +
+              '<div style="display:flex;align-items:center;gap:8px">' +
+                '<span style="font-size:11px;color:var(--text-tertiary)">'+fmtD(a.date)+'</span>' +
+                (CAN_EDIT ? '<button onclick="deleteAction('+ai+')" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:14px;padding:0;line-height:1" title="Supprimer cette action">×</button>' : '') +
+              '</div>' +
             '</div>' +
             '<div style="font-size:13px;color:var(--text-secondary);line-height:1.5">'+esc(a.desc||'')+'</div>' +
             '<div style="font-size:10px;color:var(--text-tertiary);margin-top:4px">Par '+esc(a.par||'')+'</div>' +
@@ -460,6 +464,18 @@ function deletePartner(id) {
 // ── Actions ───────────────────────────────────────────────────
 function openAction(){document.getElementById('act-date').value=todayStr();document.getElementById('modal-action').classList.add('open');}
 function closeAction(){document.getElementById('modal-action').classList.remove('open');}
+function deleteAction(realIndex) {
+  if (!curId) return;
+  var p = allPartenaires.find(function(x){return x.id===curId;});
+  if (!p) return;
+  if (!confirm('Supprimer cette action ?')) return;
+  var actions = JSON.parse(JSON.stringify(p.actions||[]));
+  actions.splice(realIndex, 1);
+  db.collection('partenaires').doc(curId).update({actions: actions}).then(function(){
+    renderPpActions(allPartenaires.find(function(x){return x.id===curId;})||p);
+  });
+}
+
 function confirmAction() {
   if (!curId) return;
   var desc = document.getElementById('act-desc').value.trim();
