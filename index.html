@@ -142,6 +142,87 @@ function loadHub(role, profile, user) {
 }
 
 
+function loadAlerts(role) {
+  var today = new Date().toISOString().split('T')[0];
+  var alerts = [];
+  var pending = 0;
+  var done = function() {
+    pending--;
+    if (pending <= 0) renderAlerts(alerts);
+  };
+
+  // 1. Études à compléter (CA + commercial)
+  if (['super_admin','president','vice_president','responsable_commercial'].includes(role)) {
+    pending++;
+    db.collection('etudes').where('a_completer','==',true).get().then(function(snap) {
+      if (!snap.empty) alerts.push({type:'warning',icon:'📋',
+        msg:snap.size+' étude(s) à compléter',link:'etudes/etudes_index.html',linkLabel:'Voir'});
+      done();
+    }).catch(done);
+  }
+
+  // 2. Propositions événements en attente (CA)
+  if (['super_admin','president','vice_president','tresorier','secretaire',
+       'responsable_commercial','responsable_qualite','responsable_marketing'].includes(role)) {
+    pending++;
+    db.collection('propositions_evenements').where('statut','==','en_attente').get().then(function(snap) {
+      if (!snap.empty) alerts.push({type:'info',icon:'💡',
+        msg:snap.size+' proposition(s) d\'événement en attente',
+        link:'evenements/evenements_index.html',linkLabel:'Voir'});
+      done();
+    }).catch(done);
+  }
+
+  // 3. Documents disponibles (RM avec lien)
+  pending++;
+  db.collection('documents').where('vu_par_intervenant','==',false)
+    .where('lien_gdrive','!=','').limit(20).get().then(function(snap) {
+      if (!snap.empty) alerts.push({type:'success',icon:'📂',
+        msg:snap.size+' document(s) disponible(s) dans Mes liens',
+        link:'mon_espace/mes_missions.html',linkLabel:'Voir'});
+      done();
+    }).catch(done);
+
+  // 4. Partenariats à renouveler dans 60j
+  if (['super_admin','president','vice_president'].includes(role)) {
+    pending++;
+    var in60 = new Date(); in60.setDate(in60.getDate()+60);
+    var in60str = in60.toISOString().split('T')[0];
+    db.collection('partenaires').where('date_renouvellement','<=',in60str)
+      .where('date_renouvellement','>=',today).get().then(function(snap) {
+        if (!snap.empty) alerts.push({type:'warning',icon:'🤝',
+          msg:snap.size+' partenariat(s) à renouveler dans moins de 60 jours',
+          link:'crm/crm_partenariats.html',linkLabel:'Voir'});
+        done();
+      }).catch(done);
+  }
+
+  // 5. Objectif semaine prospection
+  if (['super_admin','president','vice_president','responsable_commercial','commercial'].includes(role)) {
+    pending++;
+    db.collection('crm_config').doc('objectifs').get().then(function(doc) {
+      if (doc.exists) {
+        var wkObj = (doc.data().objectif_semaine)||0;
+        if (wkObj > 0) {
+          var now = new Date(); var dow = now.getDay();
+          var toMon = (dow===0)?6:dow-1;
+          var monStr = new Date(now.getFullYear(),now.getMonth(),now.getDate()-toMon).toISOString().split('T')[0];
+          db.collection('prospects').where('first_contact_at','>=',monStr).get().then(function(snap2) {
+            if (snap2.size < wkObj) alerts.push({type:'info',icon:'🎯',
+              msg:snap2.size+' / '+wkObj+' prospects contactés cette semaine',
+              link:'crm/crm_prospection.html',linkLabel:'Ouvrir'});
+            done();
+          }).catch(done);
+          return;
+        }
+      }
+      done();
+    }).catch(done);
+  }
+
+  if (pending === 0) renderAlerts([]);
+}
+
 function renderAlerts(alerts) {
   var band = document.getElementById('alert-band');
   var container = document.getElementById('alerts-container');
