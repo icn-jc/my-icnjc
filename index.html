@@ -135,112 +135,12 @@ initAuth('index', function(user, role, profile) {
 
 // ── Hub ───────────────────────────────────────────────────────
 function loadHub(role, profile, user) {
-  await Promise.all([
-    loadAlerts(role),
-    loadKpiSnap(role),
-    loadMyActions(role, profile, user),
-    loadModules(role),
-  ]);
-  document.getElementById('last-sync').innerText = 'Mis à jour à ' + new Date().toLocaleTimeString('fr-FR', {hour:'2-digit',minute:'2-digit'});
+  loadAlerts(role);
+  loadKpiSnap(role);
+  loadMyActions(role, profile, user);
+  loadModules(role);
 }
 
-// ── Alertes ───────────────────────────────────────────────────
-async function loadAlerts(role) {
-  var today = new Date().toISOString().split('T')[0];
-  var alerts = [];
-  var pending = 0;
-  var done = function() {
-    pending--;
-    if (pending > 0) return;
-    renderAlerts(alerts);
-  };
-
-  // ── 1. Études à compléter (CA + commercial) ──────────────────
-  if (['super_admin','president','vice_president','responsable_commercial'].includes(role)) {
-    pending++;
-    db.collection('etudes').where('a_completer','==',true).get().then(function(snap) {
-      if (!snap.empty) {
-        alerts.push({type:'warning', icon:'📋',
-          msg: snap.size+' étude(s) créée(s) depuis le CRM à compléter',
-          link:'etudes/etudes_index.html', linkLabel:'Voir les études'});
-      }
-      done();
-    }).catch(done);
-  }
-
-  // ── 2. Propositions d'événements en attente (CA) ────────────
-  if (['super_admin','president','vice_president','tresorier','secretaire',
-       'responsable_commercial','responsable_qualite','responsable_marketing'].includes(role)) {
-    pending++;
-    db.collection('propositions_evenements').where('statut','==','en_attente').get().then(function(snap) {
-      if (!snap.empty) {
-        alerts.push({type:'info', icon:'💡',
-          msg: snap.size+' proposition(s) d\'événement en attente de décision',
-          link:'evenements/evenements_index.html', linkLabel:'Voir les propositions'});
-      }
-      done();
-    }).catch(done);
-  }
-
-  // ── 3. Documents disponibles dans Mes liens ──────────────────
-  pending++;
-  db.collection('documents')
-    .where('vu_par_intervenant','==',false)
-    .where('lien_gdrive','!=','')
-    .get().then(function(snap) {
-      if (!snap.empty) {
-        alerts.push({type:'success', icon:'📂',
-          msg: snap.size+' document(s) disponible(s) dans Mes liens',
-          link:'mon_espace/mes_missions.html', linkLabel:'Voir mes liens'});
-      }
-      done();
-    }).catch(done);
-
-  // ── 4. Partenariats à renouveler dans 60j ───────────────────
-  if (['super_admin','president','vice_president'].includes(role)) {
-    pending++;
-    var in60 = new Date(); in60.setDate(in60.getDate()+60);
-    var in60str = in60.toISOString().split('T')[0];
-    db.collection('partenaires')
-      .where('date_renouvellement','<=',in60str)
-      .where('date_renouvellement','>=',today)
-      .get().then(function(snap) {
-        if (!snap.empty) {
-          alerts.push({type:'warning', icon:'🤝',
-            msg: snap.size+' partenariat(s) à renouveler dans moins de 60 jours',
-            link:'crm/crm_partenariats.html', linkLabel:'Voir les partenariats'});
-        }
-        done();
-      }).catch(done);
-  }
-
-  // ── 5. Objectif semaine (prospection) ──────────────────────
-  if (['super_admin','president','vice_president','responsable_commercial','commercial'].includes(role)) {
-    pending++;
-    db.collection('crm_config').doc('objectifs').get().then(function(doc) {
-      if (doc.exists) {
-        var obj = doc.data();
-        var wkObj = obj.objectif_hebdo || 0;
-        if (wkObj > 0) {
-          // Count prospects updated this week
-          var mon = new Date(); mon.setDate(mon.getDate()-(mon.getDay()||7)+1);
-          var monStr = mon.toISOString().split('T')[0];
-          db.collection('prospects').where('last_contact_at','>=',monStr).get().then(function(snap2) {
-            if (snap2.size < wkObj) {
-              alerts.push({type:'info', icon:'🎯',
-                msg: snap2.size+' / '+wkObj+' prospects contactés cette semaine',
-                link:'crm/crm_prospection.html', linkLabel:'Ouvrir la prospection'});
-            }
-            done();
-          }).catch(done);
-        } else { done(); }
-      } else { done(); }
-    }).catch(done);
-  }
-
-  // If no async operations, render immediately
-  if (pending === 0) renderAlerts([]);
-}
 
 function renderAlerts(alerts) {
   var band = document.getElementById('alert-band');
@@ -286,90 +186,39 @@ function loadKpiSnap(role) {
 
 // ── Mes actions ───────────────────────────────────────────────
 async function loadMyActions(role, profile, user) {
-  const el = document.getElementById('actions-grid');
-  let html = '';
+  var el = document.getElementById('my-actions');
+  if (!el) return;
+  var today = new Date().toISOString().split('T')[0];
+  var email = user.email;
 
-  // Bloc 1 : tâches en retard (si tréso/admin)
-  if (['super_admin','president','tresorerie'].includes(role)) {
-    const today = new Date().toISOString().split('T')[0];
-    try {
-      const late = await COLLECTIONS.tasks
-        .where('status','!=','Terminé')
-        .where('date','<', today)
-        .limit(5)
-        .get();
-      html += `<div class="action-card">
-        <div class="action-card-title">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/></svg>
-          Tâches en retard
-        </div>`;
-      if (late.empty) {
-        html += '<div class="empty-state">✓ Aucune tâche en retard</div>';
-      } else {
-        late.forEach(doc => {
-          const t = doc.data();
-          html += `<div class="action-item"><span class="action-item-label">${t.name}</span><span class="action-item-meta badge badge-danger">${t.resp}</span></div>`;
-        });
+  // Mes prospects avec relance dépassée
+  db.collection('prospects').where('owner_email','==',email).get().then(function(snap) {
+    var html = '';
+    var relances = [];
+    snap.forEach(function(doc) {
+      var p = doc.data();
+      if (p.next_action_at && p.next_action_at <= today && p.status !== 'Signé' && p.status !== 'Perdu') {
+        relances.push(p);
       }
-      html += '</div>';
-    } catch(e) { html += '<div class="action-card"><div class="empty-state">Indisponible</div></div>'; }
-  }
-
-  // Bloc 2 : mes prospects à relancer
-  if (profile.prospecte) {
-    try {
-      const email = user.email;
-      const myProspects = await COLLECTIONS.prospects
-        .where('owner_email','==', email)
-        .where('statut','in',['À relancer','À contacter'])
-        .limit(5)
-        .get();
-      html += `<div class="action-card">
-        <div class="action-card-title">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
-          Mes prospects à relancer
-        </div>`;
-      if (myProspects.empty) {
-        html += '<div class="empty-state">Aucun prospect à relancer</div>';
-      } else {
-        myProspects.forEach(doc => {
-          const p = doc.data();
-          html += `<div class="action-item"><span class="action-item-label">${p.entreprise || p.contact}</span><span class="action-item-meta badge badge-warning">${p.statut}</span></div>`;
-        });
-      }
-      html += '</div>';
-    } catch(e) { html += '<div class="action-card"><div class="empty-state">Indisponible</div></div>'; }
-  }
-
-  // Bloc 3 : mes études (chargé d'étude)
-  if (['super_admin','president','responsable_commercial','responsable_qualite','secretaire'].includes(role)) {
-    try {
-      const etudes = await COLLECTIONS.etudes
-        .where('statut','in',['En cours','En négociation'])
-        .limit(5)
-        .get();
-      html += `<div class="action-card">
-        <div class="action-card-title">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
-          Études actives
-        </div>`;
-      if (etudes.empty) {
-        html += '<div class="empty-state">Aucune étude active</div>';
-      } else {
-        etudes.forEach(doc => {
-          const e = doc.data();
-          const badge = e.statut === 'Bloquée' ? 'danger' : e.statut === 'En cours' ? 'success' : 'warning';
-          html += `<div class="action-item"><span class="action-item-label">${e.titre||'Sans titre'}</span><span class="action-item-meta badge badge-${badge}">${e.statut}</span></div>`;
-        });
-      }
-      html += '</div>';
-    } catch(e) { html += ''; }
-  }
-
-  el.innerHTML = html || '<div class="action-card"><div class="empty-state">Aucune action pour toi pour l\'instant.</div></div>';
+    });
+    if (relances.length > 0) {
+      html += '<div style="font-size:12px;margin-bottom:8px"><strong style="color:var(--danger)">' + relances.length + ' relance(s) en retard</strong></div>';
+      relances.slice(0,3).forEach(function(p) {
+        html += '<div style="font-size:12px;padding:6px 0;border-bottom:1px solid var(--border)">' +
+          '📞 <strong>' + (p.company_name||'') + '</strong> — ' + (p.status||'') +
+          '<span style="float:right;font-size:10px;color:var(--danger)">' + (p.next_action_at||'') + '</span>' +
+        '</div>';
+      });
+    } else {
+      html = '<div style="font-size:13px;color:var(--text-tertiary)">Aucune relance en retard.</div>';
+    }
+    el.innerHTML = html;
+  }).catch(function() {
+    el.innerHTML = '<div style="font-size:12px;color:var(--text-tertiary)">Chargement…</div>';
+  });
 }
 
-// ── Modules rapides ───────────────────────────────────────────
+
 function loadModules(role) {
   const basePath = './';
   const all = [
