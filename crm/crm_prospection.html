@@ -437,6 +437,10 @@ td[contenteditable=true]:hover{background:rgba(163,33,95,0.04);border-radius:3px
         <div class="toolbar">
           <select class="mandat-sel" onchange="changeMandatFilter(this.value)" style="padding:6px 10px;border-radius:var(--radius-md);border:1.5px solid var(--border-strong);font-family:'Sora',sans-serif;font-size:12px;background:var(--white);"></select>
           <input type="text" id="srch-all" placeholder="🔍 Rechercher…" oninput="renderAll()"/>
+          <select id="f-week-export" style="padding:6px 10px;border-radius:var(--radius-md);border:1.5px solid var(--border-strong);font-family:'Sora',sans-serif;font-size:12px;background:var(--white)">
+            <option value="">Toutes semaines</option>
+          </select>
+          <button class="btn btn-secondary btn-sm" onclick="exportAllProspects()">⬇ Excel</button>
           <select id="f-member" onchange="renderAll()"><option value="">Tous les membres</option></select>
           <select id="f-statut" onchange="renderAll()">
             <option value="">Statut</option>
@@ -688,6 +692,65 @@ td[contenteditable=true]:hover{background:rgba(163,33,95,0.04);border-radius:3px
 
 <script>
 // ── Helpers dates (définis en premier — utilisés partout) ──────
+// ── EXPORT PROSPECTS ──────────────────────────────────────────
+function populateWeekExportFilter() {
+  var sel = document.getElementById('f-week-export');
+  if (!sel) return;
+  var weeks = {};
+  allProspects.forEach(function(p) {
+    var fca = p.first_contact_at || p.last_contact_at;
+    if (!fca) return;
+    var d = new Date(fca);
+    for (var w = 0; w >= -51; w--) {
+      var s = wkStart(w); var en = wkEnd(w);
+      if (d >= s && d < en) {
+        var yn = isoWk(s); var yr = s.getFullYear();
+        var key = yr+'-W'+String(yn).padStart(2,'0');
+        weeks[key] = 'S'+yn+' '+yr+' ('+fmtD(localDateStr(s))+')';
+        break;
+      }
+    }
+  });
+  var cur = sel.value;
+  sel.innerHTML = '<option value="">Toutes semaines</option>';
+  Object.keys(weeks).sort().reverse().forEach(function(k){
+    var o=document.createElement('option');o.value=k;o.text=weeks[k];
+    if(k===cur)o.selected=true;sel.appendChild(o);
+  });
+}
+
+function exportAllProspects() {
+  var weekKey = document.getElementById('f-week-export') ? document.getElementById('f-week-export').value : '';
+  var data = allProspects;
+  if (weekKey) {
+    var parts = weekKey.split('-W');
+    var yr=parseInt(parts[0]);var wn=parseInt(parts[1]);
+    var found=null;
+    for (var w=0;w>=-51;w--){
+      var ws2=wkStart(w);
+      if(ws2.getFullYear()===yr&&isoWk(ws2)===wn){found=w;break;}
+    }
+    if (found!==null){
+      var s=wkStart(found);var en=wkEnd(found);
+      data=allProspects.filter(function(p){
+        if(!p.last_contact_at)return false;
+        var fca2=p.first_contact_at||p.last_contact_at;if(!fca2)return false;var d=new Date(fca2);return d>=s&&d<en;
+      });
+    }
+  }
+  if (!data.length){alert('Aucun prospect à exporter.');return;}
+  var rows=[['Entreprise','Contact','Email','Téléphone','Statut','Priorité','Secteur','Montant estimé','Dernier contact','Commercial','Mandat']];
+  data.forEach(function(p){
+    rows.push([p.company_name||'',p.contact_name||'',p.contact_email||'',p.contact_phone||'',
+      p.status||'',p.priority||'',p.sector||'',p.estimated_amount||0,
+      p.last_contact_at||'',p.owner_name||'',p.mandat_id||'']);
+  });
+  var ws3=XLSX.utils.aoa_to_sheet(rows);
+  var wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws3,weekKey?'S_'+weekKey.replace('-','_'):'Tous_prospects');
+  XLSX.writeFile(wb,'Prospects_ICN_JC'+(weekKey?'_'+weekKey:'')+'.xlsx');
+}
+
 function localDateStr(d) {
   var yr = d.getFullYear();
   var mo = String(d.getMonth() + 1).padStart(2, '0');
@@ -1102,16 +1165,15 @@ function switchApTab(key) {
 // LOGIQUE MÉTIER — OBJECTIFS
 // ════════════════════════════════════════════════════════
 function countVal(email, off) {
+  // On compte sur first_contact_at (date immuable du 1er contact)
+  // jamais sur last_contact_at qui change à chaque action
   return allProspects.filter(function(p) {
     if (p.owner_email !== email) return false;
-    if (!inWk(p.last_contact_at, off)) return false;
-    // À contacter = jamais valorisé
+    var contactDate = p.first_contact_at || p.last_contact_at;
+    if (!inWk(contactDate, off)) return false;
     if (p.status === 'À contacter') return false;
-    // Pas de réponse = valorisé seulement si au moins un contact favorable dans l'historique
     if (p.status === 'Pas de réponse') return p.had_valuable_contact === true;
-    // Perdu = valorisé seulement si au moins un contact favorable dans l'historique
     if (p.status === 'Perdu') return p.had_valuable_contact === true;
-    // Tous les autres statuts = valorisés
     return STATUTS_VALORISES.includes(p.status);
   }).length;
 }
@@ -1159,8 +1221,10 @@ function getRankingRange() {
 
 function countValPeriod(email, range) {
   return allProspects.filter(function(p) {
-    if (p.owner_email !== email || !p.last_contact_at) return false;
-    var d = new Date(p.last_contact_at);
+    if (p.owner_email !== email) return false;
+    var contactDate = p.first_contact_at || p.last_contact_at;
+    if (!contactDate) return false;
+    var d = new Date(contactDate);
     if (d < range.from || d >= range.to) return false;
     if (p.status === 'À contacter') return false;
     if (p.status === 'Pas de réponse') return p.had_valuable_contact === true;
@@ -1382,12 +1446,15 @@ function renderCA() {
   }).reduce(function(a, p) { return a + (parseFloat(p.estimated_amount)||0); }, 0);
   var pipPeriodFiable = allProspects.filter(function(p) {
     if (p.status === 'Perdu' || p.status === 'À contacter') return false;
-    if (!p.last_contact_at || inactiveEmails.includes(p.owner_email)) return false;
-    var d = new Date(p.last_contact_at); return d >= range.from && d < range.to;
+    var cpd2 = p.first_contact_at || p.last_contact_at;
+    if (!cpd2 || inactiveEmails.includes(p.owner_email)) return false;
+    var d = new Date(cpd2); return d >= range.from && d < range.to;
   }).reduce(function(a, p) { return a + (parseFloat(p.estimated_amount)||0); }, 0);
   var signesPeriod = allProspects.filter(function(p) {
-    if (p.status !== 'Signé' || !p.last_contact_at) return false;
-    var d = new Date(p.last_contact_at); return d >= range.from && d < range.to;
+    if (p.status !== 'Signé') return false;
+    var cpd3 = p.first_contact_at || p.last_contact_at;
+    if (!cpd3) return false;
+    var d = new Date(cpd3); return d >= range.from && d < range.to;
   }).length;
   var ppHtml = kpiCard('Pipeline période', fmtM(pipPeriod), '') +
     kpiCard('Fiable période', fmtM(pipPeriodFiable), 'kc-success') +
@@ -1439,8 +1506,9 @@ function renderCA() {
   var pipPeriodFiable = 0, pipPeriodIncertain = 0;
   allProspects.filter(function(p) {
     if (p.status === 'Perdu' || p.status === 'À contacter') return false;
-    if (!p.last_contact_at) return false;
-    return pCols.some(function(col) { var d = new Date(p.last_contact_at); return d >= col.from && d < col.to; });
+    var cpd = p.first_contact_at || p.last_contact_at;
+    if (!cpd) return false;
+    return pCols.some(function(col) { var d = new Date(cpd); return d >= col.from && d < col.to; });
   }).forEach(function(p) {
     var amt = parseFloat(p.estimated_amount) || 0;
     if (inactiveEmails.includes(p.owner_email)) pipPeriodIncertain += amt;
@@ -1861,7 +1929,15 @@ function saveAction() {
 
   db.collection('prospects').doc(curProspectId).collection('actions').add(actionEntry).then(function() {
     // Mettre à jour le prospect (statut dérivé de l'action)
-    var prospUpdate = { last_contact_at: date, updated_at: firebase.firestore.FieldValue.serverTimestamp() };
+    var curP = allProspects.find(function(x){return x.id===curProspectId;});
+    var prospUpdate = {
+      last_contact_at: date,
+      updated_at: firebase.firestore.FieldValue.serverTimestamp()
+    };
+    // first_contact_at = immuable, on le pose seulement si absent
+    if (!curP || !curP.first_contact_at) {
+      prospUpdate.first_contact_at = date;
+    }
     // Marquer qu'il y a eu un contact valorisable si applicable
     if (result && STATUTS_VALORISES.includes(result) && result !== 'Perdu') {
       prospUpdate.had_valuable_contact = true;
@@ -2041,6 +2117,7 @@ function confirmAddProspect() {
     actif_pipeline: st !== 'À contacter',
     had_valuable_contact: st !== 'À contacter',
     last_contact_at: contactDate,
+    first_contact_at: contactDate,  // immuable — ne jamais modifier
     mandat_id: mandatId,
     created_at: firebase.firestore.FieldValue.serverTimestamp(),
     updated_at: firebase.firestore.FieldValue.serverTimestamp()
@@ -2367,7 +2444,8 @@ function renderCAChart() {
         return allProspects.filter(function(p) {
           if (p.owner_email !== u.email || !p.last_contact_at) return false;
           if (!STATUTS_VALORISES.includes(p.status)) return false;
-          var d = new Date(p.last_contact_at); return d >= col.from && d < col.to;
+          var contactDate2 = p.first_contact_at || p.last_contact_at;
+          var d = new Date(contactDate2); return d >= col.from && d < col.to;
         }).length;
       })
     };
@@ -2391,7 +2469,8 @@ function renderMineChart() {
         return allProspects.filter(function(p) {
           if (p.owner_email !== email || !p.last_contact_at) return false;
           if (!STATUTS_VALORISES.includes(p.status)) return false;
-          var d = new Date(p.last_contact_at); return d >= col.from && d < col.to;
+          var contactDate2 = p.first_contact_at || p.last_contact_at;
+          var d = new Date(contactDate2); return d >= col.from && d < col.to;
         }).length;
       })
     });
