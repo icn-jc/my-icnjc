@@ -13,7 +13,7 @@
 <script src="../assets/js/sidebar.js"></script>
 <style>
 .mm-tabs{display:flex;gap:3px;background:var(--bg);border-radius:var(--radius-lg);padding:4px;border:1px solid var(--border);width:fit-content;margin-bottom:24px;flex-wrap:wrap;}
-.mm-tab{padding:8px 18px;border-radius:var(--radius-md);font-size:13px;font-weight:500;cursor:pointer;border:none;background:transparent;color:var(--text-secondary);font-family:'Sora',sans-serif;transition:all .2s;}
+.mm-tab{padding:8px 18px;border-radius:var(--radius-md);font-size:13px;font-weight:500;cursor:pointer;border:none;background:transparent;color:var(--text-secondary);font-family:Sora,sans-serif;transition:all .2s;}
 .mm-tab.active{background:var(--white);color:var(--bordeaux);box-shadow:var(--shadow-sm);font-weight:600;}
 .mm-pane{display:none;}.mm-pane.active{display:block;}
 .mc{background:var(--bg-card);border-radius:var(--radius-lg);border:1px solid var(--border);box-shadow:var(--shadow-sm);overflow:hidden;margin-bottom:16px;}
@@ -46,7 +46,7 @@
 .phase-expand{font-size:11px;color:var(--bordeaux);cursor:pointer;margin-top:3px;}
 .phase-extra{display:none;margin-top:8px;}
 .phase-extra.open{display:block;}
-.phase-note{width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:var(--radius-sm);font-family:'Sora',sans-serif;font-size:12px;resize:vertical;min-height:48px;}
+.phase-note{width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:var(--radius-sm);font-family:Sora,sans-serif;font-size:12px;resize:vertical;min-height:48px;}
 .phase-note:focus{outline:none;border-color:var(--bordeaux);}
 .lien-card{background:var(--bg-card);border-radius:var(--radius-lg);padding:16px 18px;border:1px solid var(--border);margin-bottom:12px;display:flex;align-items:center;gap:14px;}
 .lien-card.nouveau{border-left:3px solid var(--bordeaux);background:rgba(163,33,95,0.02);}
@@ -354,7 +354,7 @@ function renderList(list,cid,isActive){
           '<div class="phase-expand" onclick="toggleExtra(\'pe-'+e.id+'-'+ph.id+'\')">+ Notes & livrables</div>'+
           '<div class="phase-extra '+(pNote||pLiv?'open':'')+'" id="pe-'+e.id+'-'+ph.id+'">'+
             '<textarea class="phase-note" placeholder="Notes…" onblur="savePNNew(\''+e.id+'\',\''+ph.id+'\',this.value)">'+esc(pNote)+'</textarea>'+
-            '<input style="margin-top:4px;width:100%;padding:5px 8px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:12px;font-family:\'Sora\',sans-serif;box-sizing:border-box" placeholder="Livrables produits…" value="'+esc(pLiv)+'" onblur="savePLNew(\''+e.id+'\',\''+ph.id+'\',this.value)"/>'+
+            '<input style="margin-top:4px;width:100%;padding:5px 8px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:12px;font-family:Sora,sans-serif;box-sizing:border-box" placeholder="Livrables produits…" value="'+esc(pLiv)+'" onblur="savePLNew(\''+e.id+'\',\''+ph.id+'\',this.value)"/>'+
           '</div>'+
         '</div>'+
       '</div>';
@@ -389,10 +389,9 @@ function renderList(list,cid,isActive){
       '<div class="phase-track">'+
         '<div class="phase-title">Suivi des phases — '+td.label+'</div>'+
         '<div class="phases-bar">'+bar+'</div>'+
-        phases.map(function(ph,i){return phList.split('</div></div></div>')[i]||'';}).join('')+
         phList+
-        (canQ?'<div style="margin-top:12px"><button class="btn btn-primary btn-sm" onclick="openQ(\''+e.id+'\')">📋 Questionnaire de fin d\'étude</button></div>':'')+
-        (myIv.questionnaire_soumis?'<div style="margin-top:8px;font-size:12px;color:var(--success);font-weight:600">✅ Questionnaire soumis</div>':'')+
+        (canQ?'<div style="margin-top:12px"><button class="btn btn-primary btn-sm" onclick="openQ(\''+e.id+'\')">Questionnaire de fin d\'étude</button></div>':'')+
+        (myPhasesList[0]&&myPhasesList[0].assignment.questionnaire_soumis?'<div style="margin-top:8px;font-size:12px;color:var(--success);font-weight:600">Questionnaire soumis</div>':'')+
       '</div>'+
     '</div>';
   }).join('');
@@ -462,44 +461,9 @@ function savePLNew(etudeId, phaseId, val) {
   db.collection('etudes').doc(etudeId).update({phases:phases});
 }
 
-function getIvIdx(e){
-  return(e.intervenants||[]).findIndex(function(i){
-    return i.intervenant_id===MY_IV_ID||(i.email||'').toLowerCase()===ME.toLowerCase();
-  });
-}
 
-function togglePhase(eid,pid,idx,total){
-  var e=myMissions.find(function(x){return x.id===eid;});if(!e)return;
-  var ivs=JSON.parse(JSON.stringify(e.intervenants||[]));
-  var ii=getIvIdx(e);if(ii<0)return;
-  var pd=ivs[ii].phases_done||[];
-  var dates=ivs[ii].phase_dates||{};
-  if(pd.includes(pid)){pd=pd.filter(function(p){return p!==pid;});delete dates[pid];}
-  else{pd.push(pid);dates[pid]=new Date().toISOString().split('T')[0];}
-  ivs[ii].phases_done=pd;ivs[ii].phase_dates=dates;
-  ivs[ii].avancement=Math.round(pd.length/total*100);
-  var updates={intervenants:ivs};
-  if(pd.length>0&&e.statut==='Signé')updates.statut='En cours';
-  db.collection('etudes').doc(eid).update(updates);
-}
 
-function savePN(eid,pid,val){
-  var e=myMissions.find(function(x){return x.id===eid;});if(!e)return;
-  var ivs=JSON.parse(JSON.stringify(e.intervenants||[]));
-  var ii=getIvIdx(e);if(ii<0)return;
-  if(!ivs[ii].phase_notes)ivs[ii].phase_notes={};
-  ivs[ii].phase_notes[pid]=val;
-  db.collection('etudes').doc(eid).update({intervenants:ivs});
-}
 
-function savePL(eid,pid,val){
-  var e=myMissions.find(function(x){return x.id===eid;});if(!e)return;
-  var ivs=JSON.parse(JSON.stringify(e.intervenants||[]));
-  var ii=getIvIdx(e);if(ii<0)return;
-  if(!ivs[ii].phase_livrables)ivs[ii].phase_livrables={};
-  ivs[ii].phase_livrables[pid]=val;
-  db.collection('etudes').doc(eid).update({intervenants:ivs});
-}
 
 function renderLiens(){
   var nCount=myDocs.filter(function(d){return!d.vu_par_intervenant&&d.lien_gdrive;}).length;
