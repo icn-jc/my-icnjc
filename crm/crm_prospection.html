@@ -696,27 +696,69 @@ td[contenteditable=true]:hover{background:rgba(163,33,95,0.04);border-radius:3px
 function populateWeekExportFilter() {
   var sel = document.getElementById('f-week-export');
   if (!sel) return;
+  // Build weeks from first_contact_at (immuable)
   var weeks = {};
   allProspects.forEach(function(p) {
     var fca = p.first_contact_at || p.last_contact_at;
     if (!fca) return;
-    var d = new Date(fca);
-    for (var w = 0; w >= -51; w--) {
-      var s = wkStart(w); var en = wkEnd(w);
-      if (d >= s && d < en) {
-        var yn = isoWk(s); var yr = s.getFullYear();
-        var key = yr+'-W'+String(yn).padStart(2,'0');
-        weeks[key] = 'S'+yn+' '+yr+' ('+fmtD(localDateStr(s))+')';
-        break;
-      }
+    var d = new Date(fca); d.setHours(0,0,0,0);
+    // Find which week this date belongs to
+    var dow = d.getDay(); var toMon = (dow===0)?6:dow-1;
+    var mon = new Date(d.getFullYear(),d.getMonth(),d.getDate()-toMon);
+    var yn = isoWk(mon); var yr = mon.getFullYear();
+    var key = yr+'-W'+String(yn).padStart(2,'0');
+    var we = new Date(mon.getFullYear(),mon.getMonth(),mon.getDate()+6);
+    if (!weeks[key]) {
+      weeks[key] = {
+        label: 'S'+String(yn).padStart(2,'0')+' '+yr+' · '+fmtD(localDateStr(mon))+' → '+fmtD(localDateStr(we)),
+        from: mon,
+        to: new Date(mon.getFullYear(),mon.getMonth(),mon.getDate()+7)
+      };
     }
   });
   var cur = sel.value;
-  sel.innerHTML = '<option value="">Toutes semaines</option>';
+  sel.innerHTML = '<option value="">Toutes semaines (tous les prospects)</option>';
   Object.keys(weeks).sort().reverse().forEach(function(k){
-    var o=document.createElement('option');o.value=k;o.text=weeks[k];
+    var o=document.createElement('option');o.value=k;o.text=weeks[k].label;
     if(k===cur)o.selected=true;sel.appendChild(o);
   });
+  // Store for use in export
+  window._weekRanges = weeks;
+}
+
+function exportAllProspects() {
+  var weekKey = document.getElementById('f-week-export') ? document.getElementById('f-week-export').value : '';
+  var data = allProspects;
+  if (weekKey && window._weekRanges && window._weekRanges[weekKey]) {
+    var range = window._weekRanges[weekKey];
+    data = allProspects.filter(function(p) {
+      var fca = p.first_contact_at || p.last_contact_at;
+      if (!fca) return false;
+      var d = new Date(fca); d.setHours(0,0,0,0);
+      return d >= range.from && d < range.to;
+    });
+  }
+  if (!data.length) { alert('Aucun prospect à exporter pour cette sélection.'); return; }
+  var rows = [['Entreprise','Contact','Email','Téléphone','Statut','Priorité','Secteur',
+    'Montant estimé','1er contact','Dernier contact','Commercial','Mandat']];
+  data.forEach(function(p){
+    rows.push([
+      p.company_name||'', p.contact_name||'', p.contact_email||'', p.contact_phone||'',
+      p.status||'', p.priority||'', p.sector||'', p.estimated_amount||0,
+      p.first_contact_at||'', p.last_contact_at||'',
+      p.owner_name||'', p.mandat_id||''
+    ]);
+  });
+  var ws2 = XLSX.utils.aoa_to_sheet(rows);
+  // Auto column widths
+  var colWidths = rows[0].map(function(_,ci){
+    return {wch: Math.max.apply(null, rows.map(function(r){return String(r[ci]||'').length;}))};
+  });
+  ws2['!cols'] = colWidths;
+  var wb = XLSX.utils.book_new();
+  var sheetName = weekKey ? 'S_'+weekKey.replace('-W','_W') : 'Tous_prospects';
+  XLSX.utils.book_append_sheet(wb, ws2, sheetName);
+  XLSX.writeFile(wb, 'Prospects_ICN_JC'+(weekKey?'_'+weekKey:'')+'.xlsx');
 }
 
 function exportAllProspects() {
