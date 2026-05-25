@@ -439,6 +439,7 @@ function addWhitelist() {
   });
 }
 
+function handleRemoveWl(btn) { removeWhitelist(btn.dataset.wid); }
 function removeWhitelist(email) {
   if (!confirm('Supprimer l\'accès de ' + email + ' ?')) return;
   db.collection('whitelist_emails').doc(email).delete().then(loadWhitelist);
