@@ -231,7 +231,7 @@
 <script>
 var ME = '', MY_ROLE = '', CAN_EDIT = false;
 var allPartenaires = [], curId = null, curTab = 'tous';
-var EDIT_ROLES_P = ['super_admin','president','vice_president'];
+var EDIT_ROLES_P = ['super_admin','vice_president'];
 
 function fmtD(s){if(!s)return'—';var p=s.split('-');return p.length===3?p[2]+'/'+p[1]+'/'+p[0]:s;}
 function esc(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
