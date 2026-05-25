@@ -162,6 +162,18 @@ function loadData() {
     snap.forEach(function(doc) { allUsers.push(Object.assign({email: doc.id}, doc.data())); });
     populatePresidentSelect('nm-president');
   });
+  db.collection('etudes').get().then(function(snap) {
+    allEtudes = [];
+    snap.forEach(function(doc){allEtudes.push(Object.assign({id:doc.id},doc.data()));});
+  });
+  db.collection('prospects').get().then(function(snap) {
+    allProspects = [];
+    snap.forEach(function(doc){allProspects.push(Object.assign({id:doc.id},doc.data()));});
+  });
+  db.collection('intervenants').get().then(function(snap) {
+    allIntervenants = [];
+    snap.forEach(function(doc){allIntervenants.push(Object.assign({id:doc.id},doc.data()));});
+  });
   db.collection('mandats').orderBy('date_debut', 'desc').onSnapshot(function(snap) {
     allMandats = [];
     snap.forEach(function(doc) { allMandats.push(Object.assign({id: doc.id}, doc.data())); });
@@ -228,6 +240,14 @@ function renderMandatCard(m) {
     locked = !isPresident; // lecture seule si pas président du mandat
   }
   var mid = m.id;
+
+  // Bouton recalcul automatique (super_admin uniquement)
+  var recalcBtn = MY_ROLE_MANDATS === 'super_admin'
+    ? '<div style="display:flex;gap:8px;margin-bottom:16px;align-items:center">' +
+        '<button onclick="recalculerKpi(''+mid+'')" style="background:var(--navy);color:white;border:none;border-radius:var(--radius-md);padding:8px 16px;font-size:12px;font-weight:600;cursor:pointer;font-family:'Sora',sans-serif">⚡ Recalculer tous les KPI depuis Firestore</button>' +
+        '<span style="font-size:11px;color:var(--text-tertiary)">Filtre sur la plage de dates du mandat</span>' +
+      '</div>'
+    : '';
 
   // KPI fields tréso
   var kpiTreso = [
@@ -350,6 +370,76 @@ function renderMandatCard(m) {
 }
 
 // ── ACTIONS ────────────────────────────────────────────────────
+function recalculerKpi(mandatId) {
+  var m = allMand.find(function(x){return x.id===mandatId;});
+  if (!m) return;
+  var debut = m.date_debut||'';
+  var fin = m.date_fin||'9999-12-31';
+
+  // ── Études dans la plage de dates ──
+  var etudes = allEtudes.filter(function(e) {
+    var d = e.date_signature || e.created_at_str || '';
+    return d >= debut && d <= fin;
+  });
+  var etudesSignees = etudes.filter(function(e){
+    return ['Signé','En cours','Livré','Facturé','Clôturé'].includes(e.statut);
+  });
+  var caSign = etudesSignees.reduce(function(a,e){return a+(parseFloat(e.montant_ht)||0);},0);
+  var caEnc = etudesSignees.reduce(function(a,e){return a+(parseFloat(e.montant_encaisse)||0);},0);
+  var panierMoyen = etudesSignees.length>0 ? Math.round(caSign/etudesSignees.length) : 0;
+
+  // ── Prospects dans la plage ──
+  var prospects = allProspects.filter(function(p) {
+    var d = p.first_contact_at || p.last_contact_at || '';
+    return d >= debut && d <= fin;
+  });
+  var prospContactes = prospects.filter(function(p){return p.status!=='À contacter';});
+  var prospSignes = prospects.filter(function(p){return p.status==='Signé';});
+  var tauxConv = prospects.length>0 ? Math.round(prospSignes.length/prospects.length*100) : 0;
+  var nbRdv = prospects.filter(function(p){return p.rdv_date;}).length;
+
+  // ── Intervenants qui ont des phases sur ces études ──
+  var ivIds = new Set();
+  etudesSignees.forEach(function(e){
+    (e.phases||[]).forEach(function(ph){
+      (ph.intervenants||[]).forEach(function(iv){if(iv.intervenant_id)ivIds.add(iv.intervenant_id);});
+    });
+    (e.intervenants||[]).forEach(function(iv){if(iv.intervenant_id)ivIds.add(iv.intervenant_id);});
+  });
+  var nbIntervenants = ivIds.size || allIntervenants.filter(function(iv){
+    return (iv.statut==='Actif')&&(iv.mandats_ids||[]).includes(mandatId);
+  }).length;
+
+  // ── Membres du bureau ──
+  var membres = (m.membres||[]).length || allUsers.filter(function(u){return u.prospecte;}).length;
+
+  var update = {
+    'kpi_treso.ca_signe': caSign,
+    'kpi_treso.ca_encaisse': caEnc,
+    'kpi_treso.nb_etudes': etudesSignees.length,
+    'kpi_treso.panier_moyen': panierMoyen,
+    'kpi_treso.nb_intervenants': nbIntervenants,
+    'kpi_commercial.ca_signe': caSign,
+    'kpi_commercial.ca_encaisse': caEnc,
+    'kpi_commercial.nb_etudes_signees': etudesSignees.length,
+    'kpi_commercial.panier_moyen': panierMoyen,
+    'kpi_commercial.nb_prospects': prospContactes.length,
+    'kpi_commercial.taux_conversion': tauxConv,
+    'kpi_commercial.nb_rdv': nbRdv,
+    'kpi_commercial.nb_membres_bureau': membres,
+  };
+
+  db.collection('mandats').doc(mandatId).update(update).then(function(){
+    alert('KPI recalculés depuis Firestore :\n' +
+      '• CA signé : ' + caSign.toLocaleString('fr-FR') + ' €\n' +
+      '• CA encaissé : ' + caEnc.toLocaleString('fr-FR') + ' €\n' +
+      '• Études signées : ' + etudesSignees.length + '\n' +
+      '• Panier moyen : ' + panierMoyen.toLocaleString('fr-FR') + ' €\n' +
+      '• Prospects contactés : ' + prospContactes.length + '\n' +
+      '• Nb intervenants : ' + nbIntervenants);
+  });
+}
+
 function saveKpi(mandatId, type, key, val) {
   var update = {};
   var field = type === 'treso' ? 'kpi_treso.' + key : 'kpi_commercial.' + key;
