@@ -180,6 +180,41 @@
   </div>
 </div>
 
+<!-- Section Accès externes -->
+<div class="card" style="margin-top:20px;padding:24px">
+  <div class="section-sep">Accès externes (tuteurs, partenaires…)</div>
+  <div style="font-size:13px;color:var(--text-secondary);margin-bottom:16px;line-height:1.6">
+    Ajoute ici des adresses email hors domaine <strong>@icnjuniorconseil.com</strong> pour leur donner un accès limité.
+    Ces personnes se connectent avec leur compte Google habituel.
+  </div>
+  <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;align-items:flex-end">
+    <div>
+      <label class="input-label">Email *</label>
+      <input class="input" id="wl-email" type="email" placeholder="tuteur@exemple.fr" style="width:220px"/>
+    </div>
+    <div>
+      <label class="input-label">Prénom</label>
+      <input class="input" id="wl-prenom" placeholder="Prénom" style="width:130px"/>
+    </div>
+    <div>
+      <label class="input-label">Nom</label>
+      <input class="input" id="wl-nom" placeholder="Nom" style="width:130px"/>
+    </div>
+    <div>
+      <label class="input-label">Rôle</label>
+      <select class="select-field" id="wl-role" style="width:200px">
+        <option value="tuteur">Tuteur (lecture prospection)</option>
+        <option value="intervenant">Intervenant (mes missions)</option>
+        <option value="membre_cos">Membre COS</option>
+      </select>
+    </div>
+    <button class="btn btn-primary" onclick="addWhitelist()">Ajouter →</button>
+  </div>
+  <div id="whitelist-list">
+    <div style="color:var(--text-tertiary);font-size:13px">Chargement…</div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
