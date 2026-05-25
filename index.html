@@ -127,7 +127,7 @@ document.getElementById('welcome-date').innerText =
 // ── Auth ──────────────────────────────────────────────────────
 initAuth('index', function(user, role, profile) {
   renderSidebar(role, profile, user, 'home');
-  showAppPage(user, role, profile);
+  showAppPage(user, role, profile); window._CURRENT_ROLE = role;
   document.getElementById('welcome-title').innerText = 'Bonjour, ' + (profile.prenom || user.displayName || 'vous') + ' 👋';
   loadHub(role, profile, user);
   updateHealthIndicator();
@@ -242,31 +242,74 @@ function renderAlerts(alerts) {
 
 
 // ── KPI Snapshot ──────────────────────────────────────────────
+function fmt(n) {
+  return Number(n||0).toLocaleString('fr-FR',{minimumFractionDigits:0,maximumFractionDigits:0})+' €';
+}
+function isCA() {
+  var CA_ROLES = ['super_admin','president','vice_president','tresorier','secretaire',
+    'responsable_commercial','responsable_qualite','responsable_marketing'];
+  return CA_ROLES.includes(window._CURRENT_ROLE||'');
+}
+function kpiTile(label, val, color, primary) {
+  var colors = {
+    bordeaux:'var(--bordeaux)', navy:'var(--navy)',
+    success:'#16a34a', warn:'#d97706', danger:'#dc2626'
+  };
+  var c2 = colors[color]||'var(--navy)';
+  return '<div class="kpi-tile" style="'+(primary?'border-color:var(--bordeaux);':'')+'">' +
+    '<div class="kpi-tile-val" style="color:'+c2+'">'+val+'</div>' +
+    '<div class="kpi-tile-lbl">'+label+'</div>' +
+  '</div>';
+}
+
 function loadKpiSnap(role) {
   var el = document.getElementById('kpi-snap');
   if (!el) return;
-  // Load from active mandat
-  db.collection('mandats').where('statut','==','actif').limit(1).get().then(function(snap) {
-    var kpc = {}, kpt = {};
-    if (!snap.empty) {
-      var m = snap.docs[0].data();
-      kpc = m.kpi_commercial || {};
-      kpt = m.kpi_treso || {};
-    }
+  el.innerHTML = '<div style="font-size:12px;color:var(--text-tertiary)">Chargement…</div>';
+  // Load active mandat + études + prospects in parallel
+  var mandatData = {}, etudes = [], prospects = [];
+  var pending = 3;
+  var done = function() {
+    pending--;
+    if (pending > 0) return;
+    var kpc = mandatData.kpi_commercial || {};
+    var kpt = mandatData.kpi_treso || {};
+    // Calculate from études
+    var etudesSignees = etudes.filter(function(e){return ['Signé','En cours','Livré','Facturé','Clôturé'].includes(e.statut);});
+    var caSign = etudesSignees.reduce(function(a,e){return a+(parseFloat(e.montant_ht)||0);},0);
+    var caEnc = etudes.reduce(function(a,e){return a+(parseFloat(e.montant_encaisse)||0);},0);
+    // Prospects
+    var prospectsActifs = prospects.filter(function(p){return p.status!=='À contacter'&&p.status!=='Perdu';});
+    var prospSigne = prospects.filter(function(p){return p.status==='Signé';});
+    var taux = prospects.length>0?Math.round(prospSigne.length/prospects.length*100):0;
     var html = '';
-    html += kpiTile('CA Signé', fmt(kpc.ca_signe||kpt.ca_signe||0), '', true);
-    html += kpiTile('Études signées', kpc.nb_etudes_signees||kpt.nb_etudes||0, '', false);
-    html += kpiTile('CA Encaissé', fmt(kpt.ca_encaisse||0), '', false);
-    if (isCA()) html += kpiTile('Cash disponible', fmt(kpt.cash_disponible||0), '', false);
-    el.innerHTML = html;
-  }).catch(function(){
-    el.innerHTML = '<div style="font-size:12px;color:var(--text-tertiary)">Données indisponibles.</div>';
-  });
+    html += kpiTile('CA signé', fmt(caSign||kpc.ca_signe||kpt.ca_signe||0), 'bordeaux', true);
+    html += kpiTile('Études signées', etudesSignees.length||(kpc.nb_etudes_signees||kpt.nb_etudes||0), 'navy', false);
+    html += kpiTile('CA encaissé', fmt(caEnc||kpt.ca_encaisse||0), 'success', false);
+    if (isCA()) {
+      html += kpiTile('Cash disponible', fmt(kpt.cash_disponible||0), 'navy', false);
+      html += kpiTile('Prospects actifs', prospectsActifs.length, 'navy', false);
+      html += kpiTile('Taux conversion', taux+'%', taux>=20?'success':taux>=10?'warn':'danger', false);
+    }
+    el.innerHTML = html || '<div style="font-size:12px;color:var(--text-tertiary)">Aucune donnée.</div>';
+  };
+  db.collection('mandats').where('statut','==','actif').limit(1).get().then(function(snap){
+    if(!snap.empty) mandatData = snap.docs[0].data();
+    done();
+  }).catch(done);
+  db.collection('etudes').get().then(function(snap){
+    snap.forEach(function(doc){etudes.push(Object.assign({id:doc.id},doc.data()));});
+    done();
+  }).catch(done);
+  db.collection('prospects').get().then(function(snap){
+    snap.forEach(function(doc){prospects.push(Object.assign({id:doc.id},doc.data()));});
+    done();
+  }).catch(done);
 }
 
 
 // ── Mes actions ───────────────────────────────────────────────
-async function loadMyActions(role, profile, user) {
+function loadMyActions(role, profile, user) {
   var el = document.getElementById('my-actions');
   if (!el) return;
   var today = new Date().toISOString().split('T')[0];
