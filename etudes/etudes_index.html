@@ -285,7 +285,7 @@ function loadData() {
 function renderKPIs() {
   var total = allEtudes.length;
   var encours = allEtudes.filter(function(e){return e.statut==='En cours';}).length;
-  var signes = allEtudes.filter(function(e){return e.statut==='Signé';}).length;
+  var signes = allEtudes.filter(function(e){return ['Signé','En cours','Livré','Facturé','Clôturé'].includes(e.statut);}).length;
   var actives = allEtudes.filter(function(e){return ['Signé','En cours','Livré'].includes(e.statut);}).length;
   var ca = allEtudes.filter(function(e){return ['Signé','En cours','Livré','Facturé','Clôturé'].includes(e.statut);})
     .reduce(function(a,e){return a+(parseFloat(e.montant_ht)||0);},0);
