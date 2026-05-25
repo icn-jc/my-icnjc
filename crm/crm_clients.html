@@ -305,6 +305,7 @@ function openClient(id) {
   renderCpInfos(c);
   renderCpEtudes(id);
   renderCpContacts(c);
+  renderCpPerso(c);
   renderCpEdit(c);
   switchCpTab('infos');
   document.getElementById('client-panel').classList.add('open');
@@ -515,9 +516,8 @@ function exportXLSX() {
   XLSX.utils.book_append_sheet(wb, ws, 'Clients');
   XLSX.writeFile(wb, 'Clients_ICN_JC.xlsx');
 }
-</script>
-</body>
-</html>function renderCpPerso(client) {
+
+function renderCpPerso(client) {
   var el = document.getElementById('cpp-perso'); if(!el)return;
   var cid=client.id; var p=client.personnalite||{};
   var stylesList=['Directif','Collaboratif','Analytique','Creatif','Pragmatique','Exigeant','Flexible','Formel','Informel'];
@@ -565,3 +565,7 @@ function savePersoNote(cid,note){
 }
 
 
+
+</script>
+</body>
+</html>
