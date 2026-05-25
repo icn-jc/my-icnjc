@@ -448,7 +448,7 @@ td[contenteditable=true]:hover{background:rgba(163,33,95,0.04);border-radius:3px
             <select id="f-week-export" style="padding:4px 8px;border-radius:var(--radius-sm);border:1px solid #86efac;font-family:'Sora',sans-serif;font-size:11px;background:white;color:#14532d">
               <option value="">Tous les prospects</option>
             </select>
-            <button class="btn btn-secondary btn-sm" onclick="exportAllProspects()" style="font-size:11px;padding:4px 10px;background:#14532d;color:white;border-color:#14532d">⬇ Excel</button>
+
           </div>
           <select id="f-member" onchange="renderAll()"><option value="">Tous les membres</option></select>
           <select id="f-statut" onchange="renderAll()">
@@ -1588,9 +1588,6 @@ function renderCA() {
     else pipPeriodFiable += amt;
   });
   var pHtml2 = '<div class="kpi-card"><div class="kpi-label">Pipeline ' + pLabel + '</div><div class="kpi-val">' + fmtM(pipPeriodFiable + pipPeriodIncertain) + '</div></div>';
-  if (pipPeriodIncertain > 0) {
-    pHtml2 += '<div class="kpi-card kc-uncertain"><div class="kpi-label">Orphelins ' + pLabel + '</div><div class="kpi-val">' + fmtM(pipPeriodIncertain) + '</div><div style="font-size:9px;color:#92400e;margin-top:2px">Commercial inactif</div></div>';
-  }
   document.getElementById('ca-stats-period').innerHTML = pHtml2;
 
   renderCAChart();
