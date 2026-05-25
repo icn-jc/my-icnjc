@@ -416,7 +416,7 @@ function loadWhitelist() {
         return '<tr><td style="padding:7px 10px;border-bottom:1px solid var(--border)">' + w.id + '</td>' +
           '<td style="padding:7px 10px;border-bottom:1px solid var(--border)">' + ((w.prenom||'')+' '+(w.nom||'')).trim() + '</td>' +
           '<td style="padding:7px 10px;border-bottom:1px solid var(--border)"><span style="background:#e0f2fe;color:#0c4a6e;padding:2px 8px;border-radius:99px;font-size:11px;font-weight:600">' + (w.role||'tuteur') + '</span></td>' +
-          '<td style="padding:7px 10px;border-bottom:1px solid var(--border);text-align:center"><button onclick="removeWhitelist('' + w.id + '')" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:16px" title="Supprimer">×</button></td></tr>';
+          '<td style="padding:7px 10px;border-bottom:1px solid var(--border);text-align:center"><button data-wid="' + w.id + '" onclick="handleRemoveWl(this)" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:16px" title="Supprimer">×</button></td></tr>';
       }).join('') + '</tbody></table>';
   });
 }
