@@ -158,8 +158,28 @@ function initAuth(pageKey, onReady) {
         showAccessDenied('Accès non autorisé. Contacte l\'administrateur pour être ajouté(e).');
         return;
       } catch(e) {
+        // Firestore permission denied for whitelist — try users collection directly
+        try {
+          const userDoc2 = await COLLECTIONS.users.doc(email).get();
+          if (userDoc2.exists) {
+            CURRENT_USER = user;
+            CURRENT_PROFILE = userDoc2.data();
+            var profileRoles3 = Array.isArray(CURRENT_PROFILE.roles)
+              ? CURRENT_PROFILE.roles
+              : (CURRENT_PROFILE.role ? [CURRENT_PROFILE.role] : ['intervenant']);
+            CURRENT_ROLE = getHighestRoleAuth(profileRoles3);
+            const allowed3 = PAGE_ACCESS[pageKey] || [];
+            if (!allowed3.includes(CURRENT_ROLE)) {
+              auth.signOut();
+              showAccessDenied('Tu n\'as pas accès à cette page.');
+              return;
+            }
+            if (onReady) onReady(user, CURRENT_ROLE, CURRENT_PROFILE);
+            return;
+          }
+        } catch(e2) {}
         auth.signOut();
-        showAccessDenied('Erreur de vérification d\'accès.');
+        showAccessDenied('Accès non autorisé. Vérifie avec l\'administrateur que ton adresse est bien enregistrée.');
         return;
       }
     }
