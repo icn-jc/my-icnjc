@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Comptabilité — My-ICN-JC</title>
+<link rel="stylesheet" href="../assets/css/global.css"/>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+<script src="../assets/js/firebase.js"></script>
+<script src="../assets/js/auth.js"></script>
+<script src="../assets/js/sidebar.js"></script>
+<style>
+.tabs{display:flex;gap:3px;background:var(--bg);border-radius:var(--radius-lg);padding:4px;border:1px solid var(--border);width:fit-content;margin-bottom:20px;flex-wrap:wrap;}
+.tab-btn{padding:8px 16px;border-radius:var(--radius-md);font-size:13px;font-weight:500;cursor:pointer;border:none;background:transparent;color:var(--text-secondary);font-family:'Sora',sans-serif;transition:all .2s;}
+.tab-btn.active{background:var(--white);color:var(--bordeaux);box-shadow:var(--shadow-sm);font-weight:600;}
+.tab-pane{display:none;}.tab-pane.active{display:block;}
+.kpi-strip{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;margin-bottom:20px;}
+.kpi-c{background:var(--bg-card);border-radius:var(--radius-lg);padding:14px 18px;border:1px solid var(--border);box-shadow:var(--shadow-sm);}
+.kpi-v{font-size:22px;font-weight:800;color:var(--navy);}
+.kpi-l{font-size:10px;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:.07em;margin-top:3px;}
+.tbl-wrap{background:var(--bg-card);border-radius:var(--radius-lg);border:1px solid var(--border);overflow:hidden;box-shadow:var(--shadow-sm);}
+.tbl-scroll{overflow-x:auto;}
+table{width:100%;border-collapse:collapse;font-size:13px;min-width:700px;}
+th{background:#f8f7f5;font-weight:600;font-size:10px;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:.07em;padding:10px 12px;text-align:left;border-bottom:1px solid var(--border);}
+td{padding:9px 12px;border-bottom:1px solid var(--border);vertical-align:middle;}
+tr:last-child td{border-bottom:none;}
+tr:hover td{background:rgba(27,42,74,.02);}
+.badge{padding:2px 8px;border-radius:99px;font-size:11px;font-weight:600;}
+.b-ok{background:#dcfce7;color:#14532d;}
+.b-att{background:#fef3c7;color:#78350f;}
+.b-late{background:#fee2e2;color:#991b1b;}
+.b-part{background:#dbeafe;color:#1e3a5f;}
+.toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px;}
+.toolbar input,.toolbar select{padding:6px 10px;border-radius:var(--radius-md);border:1.5px solid var(--border-strong);font-family:'Sora',sans-serif;font-size:12px;background:var(--white);}
+.progress-bar{height:6px;background:var(--border);border-radius:99px;overflow:hidden;width:80px;}
+.progress-fill{height:100%;border-radius:99px;background:linear-gradient(90deg,var(--bordeaux),#d4527f);}
+</style>
+</head>
+<body>
+<div class="login-page" id="login-page">
+  <div class="login-box">
+    <div class="login-logo"><img src="../assets/images/ICN-Junior-Conseil_logo.png" style="height:54px;object-fit:contain"/></div>
+    <div class="login-title">Connexion</div>
+    <div class="login-sub">Accès réservé — Trésorerie ICN Junior Conseil.</div>
+    <button class="google-btn" onclick="doGoogleLogin()">
+      <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google"/>Se connecter avec Google
+    </button>
+    <div class="denied-box" id="denied-box"><strong>Accès refusé</strong><p id="denied-msg"></p></div>
+  </div>
+</div>
+<div class="app-page" id="app-page">
+  <div id="sidebar-container"></div>
+  <div class="app-content">
+    <div class="page-header">
+      <div class="flex justify-between items-center" style="flex-wrap:wrap;gap:10px">
+        <div><div class="page-title">Comptabilité</div><div class="page-subtitle" id="page-sub"></div></div>
+        <button class="btn btn-secondary btn-sm" onclick="exportXLSX()">Export Excel</button>
+      </div>
+    </div>
+    <div class="page-body">
+      <div class="kpi-strip" id="kpi-strip"></div>
+      <div class="tabs">
+        <button class="tab-btn active" onclick="switchTab('etudes')" id="tbt-etudes">Par étude</button>
+        <button class="tab-btn" onclick="switchTab('factures')" id="tbt-factures">Factures</button>
+        <button class="tab-btn" onclick="switchTab('impayes')" id="tbt-impayes">Impayés</button>
+        <button class="tab-btn" onclick="switchTab('import')" id="tbt-import">Import SAGE</button>
+      </div>
+
+      <!-- PAR ÉTUDE -->
+      <div class="tab-pane active" id="tp-etudes">
+        <div class="toolbar">
+          <select id="ef-statut" onchange="renderEtudes()"><option value="">Tous statuts</option><option>Signé</option><option>En cours</option><option>Livré</option><option>Facturé</option><option>Clôturé</option></select>
+          <input type="text" id="ef-srch" placeholder="Client, référence…" oninput="renderEtudes()"/>
+          <button class="btn btn-secondary btn-sm" onclick="document.getElementById('ef-statut').value='';document.getElementById('ef-srch').value='';renderEtudes()">Réinitialiser</button>
+        </div>
+        <div class="tbl-wrap"><div class="tbl-scroll">
+          <table><thead><tr>
+            <th>Référence</th><th>Client</th><th>Montant HT</th>
+            <th>Encaissé</th><th>Progression</th><th>Reste</th>
+            <th>Statut</th><th>Actions</th>
+          </tr></thead>
+          <tbody id="etudes-tbody"></tbody></table>
+        </div></div>
+      </div>
+
+      <!-- FACTURES -->
+      <div class="tab-pane" id="tp-factures">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px">
+          <span style="font-size:13px;color:var(--text-secondary)">Factures émises vers les clients</span>
+          <button class="btn btn-primary btn-sm" onclick="openAddFacture()">+ Facture</button>
+        </div>
+        <div class="tbl-wrap"><div class="tbl-scroll">
+          <table><thead><tr>
+            <th>N° Facture</th><th>Étude</th><th>Client</th><th>Montant HT</th>
+            <th>Date émission</th><th>Échéance</th><th>Statut</th><th>Actions</th>
+          </tr></thead>
+          <tbody id="factures-tbody"></tbody></table>
+        </div></div>
+      </div>
+
+      <!-- IMPAYÉS -->
+      <div class="tab-pane" id="tp-impayes">
+        <div id="impayes-alert" style="margin-bottom:14px"></div>
+        <div class="tbl-wrap"><div class="tbl-scroll">
+          <table><thead><tr>
+            <th>N° Facture</th><th>Client</th><th>Montant</th>
+            <th>Échéance</th><th>Retard</th><th>Actions</th>
+          </tr></thead>
+          <tbody id="impayes-tbody"></tbody></table>
+        </div></div>
+      </div>
+
+      <!-- IMPORT SAGE -->
+      <div class="tab-pane" id="tp-import">
+        <div style="max-width:560px">
+          <div style="font-size:14px;font-weight:600;color:var(--navy);margin-bottom:8px">Import SAGE — Balance</div>
+          <div style="font-size:13px;color:var(--text-secondary);margin-bottom:16px;line-height:1.6">
+            Importe ton fichier Excel SAGE avec les colonnes : <strong>Date</strong>, <strong>Code client</strong>, <strong>Nom client</strong>.<br/>
+            Le système mettra à jour automatiquement le montant encaissé des études correspondantes.
+          </div>
+          <div id="sage-zone" onclick="document.getElementById('sage-file').click()"
+            style="border:2px dashed var(--border);border-radius:var(--radius-lg);padding:40px;text-align:center;cursor:pointer;color:var(--text-tertiary);transition:border-color .2s"
+            ondragover="event.preventDefault();this.style.borderColor='var(--bordeaux)'"
+            ondragleave="this.style.borderColor=''"
+            ondrop="handleDrop(event)">
+            <div style="font-size:32px;margin-bottom:8px">📂</div>
+            <div style="font-size:14px;font-weight:600">Glisse ton fichier ici</div>
+            <div style="font-size:12px;margin-top:4px">ou clique pour sélectionner (XLS, XLSX, CSV)</div>
+          </div>
+          <input type="file" id="sage-file" accept=".csv,.xls,.xlsx" style="display:none" onchange="handleSageFile(this)"/>
+          <div id="sage-preview" style="display:none;margin-top:16px"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL ENCAISSEMENT -->
+<div class="modal-overlay" id="modal-enc" onclick="if(event.target===this)closeEnc()">
+  <div class="modal-box" style="max-width:440px">
+    <div class="modal-header"><div class="modal-title">Enregistrer un encaissement</div><button class="modal-close" onclick="closeEnc()">×</button></div>
+    <div id="enc-content"></div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeEnc()">Annuler</button>
+      <button class="btn btn-primary" onclick="saveEnc()">Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL FACTURE -->
+<div class="modal-overlay" id="modal-fact" onclick="if(event.target===this)closeFacture()">
+  <div class="modal-box" style="max-width:500px">
+    <div class="modal-header"><div class="modal-title" id="fact-title">Nouvelle facture</div><button class="modal-close" onclick="closeFacture()">×</button></div>
+    <div class="form-grid">
+      <div class="form-field"><label class="input-label">N° Facture *</label><input class="input" id="nf-num" placeholder="FA-2025-001"/></div>
+      <div class="form-field"><label class="input-label">Étude liée</label>
+        <select class="select-field" id="nf-etude" onchange="onFactEtudeChange()"><option value="">— Choisir —</option></select></div>
+      <div class="form-field"><label class="input-label">Montant HT (€) *</label><input class="input" type="number" id="nf-montant" placeholder="0"/></div>
+      <div class="form-field"><label class="input-label">Date émission *</label><input class="input" type="date" id="nf-date-em"/></div>
+      <div class="form-field"><label class="input-label">Date échéance *</label><input class="input" type="date" id="nf-date-ech"/></div>
+      <div class="form-field"><label class="input-label">Statut</label>
+        <select class="select-field" id="nf-statut">
+          <option value="En attente">En attente</option>
+          <option value="Encaissée">Encaissée</option>
+          <option value="Impayée">Impayée</option>
+        </select></div>
+      <div class="form-field full"><label class="input-label">Notes</label><textarea class="input" id="nf-notes" rows="2" style="resize:vertical"></textarea></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeFacture()">Annuler</button>
+      <button class="btn btn-primary" onclick="confirmFacture()">Enregistrer →</button>
+    </div>
+  </div>
+</div>
+
+<script>
+var ME = '', MY_ROLE = '';
+var allEtudes = [], allFactures = [], curEncId = null;
+
+function fmtM(n){return Number(n||0).toLocaleString('fr-FR',{minimumFractionDigits:0,maximumFractionDigits:0})+' €';}
+function fmtD(s){if(!s)return'—';var p=s.split('-');return p.length===3?p[2]+'/'+p[1]+'/'+p[0]:s;}
+function esc(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;');}
+function today(){return new Date().toISOString().split('T')[0];}
+
+initAuth('crm_compta',function(user,role,profile){
+  ME=user.email; MY_ROLE=role;
+  renderSidebar(role,profile,user,'crm_compta');
+  showAppPage(user,role,profile);
+  updateHealthIndicator();
+  var now=new Date();
+  var M=['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
+  document.getElementById('page-sub').innerText=now.getDate()+' '+M[now.getMonth()]+' '+now.getFullYear();
+  loadData();
+});
+
+function loadData(){
+  db.collection('etudes').onSnapshot(function(snap){
+    allEtudes=[];
+    snap.forEach(function(doc){allEtudes.push(Object.assign({id:doc.id},doc.data()));});
+    renderKPIs(); renderEtudes();
+    populateEtudeSelect();
+  });
+  db.collection('factures').orderBy('date_emission','desc').onSnapshot(function(snap){
+    allFactures=[];
+    snap.forEach(function(doc){allFactures.push(Object.assign({id:doc.id},doc.data()));});
+    renderFactures(); renderImpayes(); renderKPIs();
+  });
+}
+
+function switchTab(k){
+  ['etudes','factures','impayes','import'].forEach(function(t){
+    document.getElementById('tbt-'+t).classList.toggle('active',t===k);
+    document.getElementById('tp-'+t).classList.toggle('active',t===k);
+  });
+}
+
+function renderKPIs(){
+  var clos=allEtudes.filter(function(e){return['Clôturé','Facturé','Livré','En cours','Signé'].includes(e.statut);});
+  var totalHT=clos.reduce(function(a,e){return a+(parseFloat(e.montant_ht)||0);},0);
+  var totalEnc=clos.reduce(function(a,e){return a+(parseFloat(e.montant_encaisse)||0);},0);
+  var reste=totalHT-totalEnc;
+  var impayes=allFactures.filter(function(f){return f.statut==='Impayée'||(f.statut==='En attente'&&f.date_echeance&&f.date_echeance<today());});
+  var totalImp=impayes.reduce(function(a,f){return a+(parseFloat(f.montant_ht)||0);},0);
+  document.getElementById('kpi-strip').innerHTML=[
+    {l:'CA total signé',v:fmtM(totalHT),c:'var(--bordeaux)'},
+    {l:'CA encaissé',v:fmtM(totalEnc),c:'var(--success)'},
+    {l:'Reste à encaisser',v:fmtM(reste),c:reste>0?'#d97706':'var(--success)'},
+    {l:'Impayés',v:fmtM(totalImp),c:totalImp>0?'var(--danger)':'var(--success)'},
+    {l:'Études actives',v:clos.length,c:'var(--navy)'},
+  ].map(function(k){return'<div class="kpi-c"><div class="kpi-v" style="color:'+k.c+'">'+k.v+'</div><div class="kpi-l">'+k.l+'</div></div>';}).join('');
+}
+
+function renderEtudes(){
+  var fs=document.getElementById('ef-statut').value;
+  var fq=(document.getElementById('ef-srch').value||'').toLowerCase();
+  var data=allEtudes.filter(function(e){
+    if(!['Signé','En cours','Livré','Facturé','Clôturé'].includes(e.statut))return false;
+    if(fs&&e.statut!==fs)return false;
+    if(fq&&!(e.reference||'').toLowerCase().includes(fq)&&!(e.client_name||'').toLowerCase().includes(fq))return false;
+    return true;
+  });
+  // Enrich with factures data
+  var html=data.length===0
+    ?'<tr><td colspan="8" style="text-align:center;padding:2rem;color:var(--text-tertiary)">Aucune étude.</td></tr>'
+    :data.map(function(e){
+      var mht=parseFloat(e.montant_ht)||0;
+      // Sum encaissé from factures for this étude
+      var menc=allFactures.filter(function(f){return f.etude_id===e.id&&f.statut==='Encaissée';})
+        .reduce(function(a,f){return a+(parseFloat(f.montant_ht)||0);},0);
+      // Also include stored montant_encaisse
+      menc=Math.max(menc,parseFloat(e.montant_encaisse)||0);
+      var reste=mht-menc;
+      var pct=mht>0?Math.min(100,Math.round(menc/mht*100)):0;
+      var bc=menc>=mht?'b-ok':menc>0?'b-part':'b-att';
+      var bl=menc>=mht?'Encaissé':menc>0?'Partiel ('+pct+'%)':'En attente';
+      return'<tr>'+
+        '<td><span style="font-family:monospace;font-weight:700;color:var(--bordeaux)">'+(e.reference||'—')+'</span></td>'+
+        '<td style="font-weight:600">'+(e.client_name||'—')+'</td>'+
+        '<td style="font-weight:700;color:var(--navy)">'+fmtM(mht)+'</td>'+
+        '<td style="color:var(--success);font-weight:600">'+fmtM(menc)+'</td>'+
+        '<td><div class="progress-bar"><div class="progress-fill" style="width:'+pct+'%"></div></div><span style="font-size:10px;color:var(--text-tertiary);margin-left:6px">'+pct+'%</span></td>'+
+        '<td style="color:'+(reste>0?'#d97706':'var(--success)')+'">'+fmtM(reste)+'</td>'+
+        '<td><span class="badge '+bc+'">'+bl+'</span></td>'+
+        '<td><button class="btn btn-secondary btn-sm" style="font-size:11px" data-eid="'+e.id+'" onclick="openEnc(this.dataset.eid)">Encaissement</button></td>'+
+      '</tr>';
+    }).join('');
+  document.getElementById('etudes-tbody').innerHTML=html;
+}
+
+function renderFactures(){
+  var t=today();
+  var html=allFactures.length===0
+    ?'<tr><td colspan="8" style="text-align:center;padding:2rem;color:var(--text-tertiary)">Aucune facture.</td></tr>'
+    :allFactures.map(function(f){
+      var late=f.statut==='En attente'&&f.date_echeance&&f.date_echeance<t;
+      var sc=f.statut==='Encaissée'?'b-ok':late?'b-late':'b-att';
+      return'<tr>'+
+        '<td style="font-weight:600;font-family:monospace">'+(f.numero||'—')+'</td>'+
+        '<td style="font-size:11px;color:var(--text-tertiary)">'+(f.etude_ref||'—')+'</td>'+
+        '<td>'+(f.client_name||'—')+'</td>'+
+        '<td style="font-weight:700;color:var(--bordeaux)">'+fmtM(f.montant_ht)+'</td>'+
+        '<td style="font-size:11px">'+fmtD(f.date_emission)+'</td>'+
+        '<td style="font-size:11px;color:'+(late?'var(--danger)':'var(--text-secondary)')+'">'+fmtD(f.date_echeance)+'</td>'+
+        '<td><select style="padding:3px 6px;border-radius:var(--radius-sm);border:1px solid var(--border);font-size:11px;font-family:Sora,sans-serif" data-fid="'+f.id+'" onchange="updateFactureStatut(this)">'+
+          ['En attente','Encaissée','Impayée'].map(function(s){return'<option'+(f.statut===s?' selected':'')+'>'+s+'</option>';}).join('')+
+        '</select></td>'+
+        '<td><button data-fid="'+f.id+'" onclick="deleteFacture(this.dataset.fid)" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:13px">×</button></td>'+
+      '</tr>';
+    }).join('');
+  document.getElementById('factures-tbody').innerHTML=html;
+}
+
+function updateFactureStatut(sel){
+  var fid=sel.dataset.fid;
+  var val=sel.value;
+  db.collection('factures').doc(fid).update({statut:val}).then(function(){
+    // If marked Encaissée, update étude montant_encaisse
+    var f=allFactures.find(function(x){return x.id===fid;});
+    if(f&&f.etude_id&&val==='Encaissée'){
+      var enc=allFactures.filter(function(x){return x.etude_id===f.etude_id&&(x.id===fid?val:x.statut)==='Encaissée';})
+        .reduce(function(a,x){return a+(parseFloat(x.montant_ht)||0);},0);
+      db.collection('etudes').doc(f.etude_id).update({montant_encaisse:enc});
+    }
+  });
+}
+
+function deleteFacture(fid){
+  if(!confirm('Supprimer cette facture ?'))return;
+  db.collection('factures').doc(fid).delete();
+}
+
+function renderImpayes(){
+  var t=today();
+  var imp=allFactures.filter(function(f){
+    return f.statut==='Impayée'||(f.statut==='En attente'&&f.date_echeance&&f.date_echeance<t);
+  });
+  var total=imp.reduce(function(a,f){return a+(parseFloat(f.montant_ht)||0);},0);
+  document.getElementById('impayes-alert').innerHTML=imp.length>0
+    ?'<div style="background:#fee2e2;border-radius:var(--radius-lg);padding:12px 16px;border:1px solid #fca5a5"><span style="font-weight:700;color:#991b1b">'+imp.length+' facture(s) en retard</span> — Total : '+fmtM(total)+'</div>'
+    :'<div style="background:#dcfce7;border-radius:var(--radius-lg);padding:12px 16px;border:1px solid #86efac;color:#14532d;font-weight:600">Aucun impayé.</div>';
+  var html=imp.length===0
+    ?'<tr><td colspan="6" style="text-align:center;padding:2rem;color:var(--success)">Aucun impayé.</td></tr>'
+    :imp.map(function(f){
+      var diff=f.date_echeance?Math.floor((new Date(t)-new Date(f.date_echeance))/864e5):0;
+      return'<tr>'+
+        '<td style="font-weight:600;font-family:monospace">'+(f.numero||'—')+'</td>'+
+        '<td>'+(f.client_name||'—')+'</td>'+
+        '<td style="font-weight:700;color:var(--danger)">'+fmtM(f.montant_ht)+'</td>'+
+        '<td style="color:var(--danger);font-size:11px">'+fmtD(f.date_echeance)+'</td>'+
+        '<td><span style="background:#fee2e2;color:#991b1b;padding:2px 8px;border-radius:99px;font-size:11px;font-weight:700">'+diff+'j de retard</span></td>'+
+        '<td><button data-fid="'+f.id+'" onclick="markEncaissee(this.dataset.fid)" class="btn btn-secondary btn-sm" style="font-size:11px">Marquer encaissée</button></td>'+
+      '</tr>';
+    }).join('');
+  document.getElementById('impayes-tbody').innerHTML=html;
+}
+
+function markEncaissee(fid){
+  db.collection('factures').doc(fid).update({statut:'Encaissée'});
+}
+
+// ── Encaissement depuis étude ──────────────────────────────────
+function openEnc(etudeId){
+  curEncId=etudeId;
+  var e=allEtudes.find(function(x){return x.id===etudeId;});
+  if(!e)return;
+  var mht=parseFloat(e.montant_ht)||0;
+  var menc=parseFloat(e.montant_encaisse)||0;
+  document.getElementById('enc-content').innerHTML=
+    '<div style="margin-bottom:14px">'+
+      '<div style="font-weight:600;font-size:14px;color:var(--navy)">'+(e.reference||'')+' — '+(e.client_name||'')+'</div>'+
+      '<div style="font-size:12px;color:var(--text-tertiary);margin-top:3px">HT : '+fmtM(mht)+' · Encaissé : '+fmtM(menc)+' · Reste : '+fmtM(mht-menc)+'</div>'+
+    '</div>'+
+    '<div class="form-field"><label class="input-label">Montant encaissé (€)</label>'+
+      '<input class="input" type="number" id="enc-montant" value="'+menc+'" max="'+mht+'" step="0.01"/>'+
+      '<div style="font-size:10px;color:var(--text-tertiary);margin-top:3px">Max : '+fmtM(mht)+'</div>'+
+    '</div>'+
+    '<div class="form-field"><label class="input-label">Date</label><input class="input" type="date" id="enc-date" value="'+today()+'"/></div>'+
+    '<div class="form-field"><label class="input-label">Note (référence virement…)</label><input class="input" id="enc-note"/></div>';
+  document.getElementById('modal-enc').classList.add('open');
+}
+function closeEnc(){document.getElementById('modal-enc').classList.remove('open');curEncId=null;}
+function saveEnc(){
+  if(!curEncId)return;
+  var montant=parseFloat(document.getElementById('enc-montant').value)||0;
+  var date=document.getElementById('enc-date').value;
+  var note=document.getElementById('enc-note').value.trim();
+  var e=allEtudes.find(function(x){return x.id===curEncId;});
+  if(!e)return;
+  var mht=parseFloat(e.montant_ht)||0;
+  if(montant>mht){alert('Le montant ne peut pas dépasser '+fmtM(mht));return;}
+  var hist=(e.historique_encaissements||[]).concat([{montant:montant,date:date,note:note,par:ME}]);
+  db.collection('etudes').doc(curEncId).update({montant_encaisse:montant,historique_encaissements:hist}).then(function(){closeEnc();});
+}
+
+// ── Facture ────────────────────────────────────────────────────
+function populateEtudeSelect(){
+  var sel=document.getElementById('nf-etude'); if(!sel)return;
+  sel.innerHTML='<option value="">— Choisir —</option>'+
+    allEtudes.filter(function(e){return['Signé','En cours','Livré','Facturé','Clôturé'].includes(e.statut);})
+    .map(function(e){return'<option value="'+e.id+'">'+esc(e.reference||'')+' — '+esc(e.client_name||'')+'</option>';}).join('');
+}
+function onFactEtudeChange(){
+  var eid=document.getElementById('nf-etude').value;
+  if(!eid)return;
+  var e=allEtudes.find(function(x){return x.id===eid;});
+  if(e&&e.montant_ht)document.getElementById('nf-montant').value=e.montant_ht;
+}
+function openAddFacture(){document.getElementById('fact-title').innerText='Nouvelle facture';document.getElementById('modal-fact').classList.add('open');}
+function closeFacture(){document.getElementById('modal-fact').classList.remove('open');['nf-num','nf-montant','nf-notes'].forEach(function(id){document.getElementById(id).value='';});}
+function confirmFacture(){
+  var num=document.getElementById('nf-num').value.trim();
+  var montant=parseFloat(document.getElementById('nf-montant').value)||0;
+  var dateEm=document.getElementById('nf-date-em').value;
+  var dateEch=document.getElementById('nf-date-ech').value;
+  if(!num||montant<=0||!dateEm||!dateEch){alert('Numéro, montant et dates obligatoires.');return;}
+  var eid=document.getElementById('nf-etude').value;
+  var etude=eid?allEtudes.find(function(e){return e.id===eid;}):null;
+  db.collection('factures').add({
+    numero:num,etude_id:eid||'',etude_ref:etude?(etude.reference||''):'',
+    client_name:etude?(etude.client_name||''):'',
+    montant_ht:montant,date_emission:dateEm,date_echeance:dateEch,
+    statut:document.getElementById('nf-statut').value,
+    notes:document.getElementById('nf-notes').value.trim(),
+    created_by:ME,created_at:firebase.firestore.FieldValue.serverTimestamp()
+  }).then(closeFacture);
+}
+
+// ── Import SAGE ────────────────────────────────────────────────
+var sageData=[];
+function handleDrop(evt){evt.preventDefault();var f=evt.dataTransfer.files[0];if(f)processSage(f);}
+function handleSageFile(inp){if(inp.files[0])processSage(inp.files[0]);}
+function processSage(file){
+  var r=new FileReader();
+  r.onload=function(e){
+    var wb=XLSX.read(e.target.result,{type:'binary'});
+    var ws=wb.Sheets[wb.SheetNames[0]];
+    sageData=XLSX.utils.sheet_to_json(ws,{defval:''});
+    var keys=Object.keys(sageData[0]||{});
+    var preview='<div style="font-size:13px;font-weight:600;color:var(--navy);margin-bottom:8px">'+sageData.length+' ligne(s) détectées</div>'+
+      '<div style="overflow-x:auto;margin-bottom:14px"><table style="width:100%;border-collapse:collapse;font-size:11px">'+
+      '<thead><tr>'+keys.map(function(k){return'<th style="padding:6px 8px;background:#f8f7f5;border:1px solid var(--border)">'+k+'</th>';}).join('')+'</tr></thead>'+
+      '<tbody>'+sageData.slice(0,5).map(function(row){
+        return'<tr>'+keys.map(function(k){return'<td style="padding:5px 8px;border:1px solid var(--border)">'+row[k]+'</td>';}).join('')+'</tr>';
+      }).join('')+'</tbody></table></div>'+
+      '<div style="display:flex;gap:8px">'+
+        '<button class="btn btn-primary" onclick="importSage()">Importer</button>'+
+        '<button class="btn btn-secondary" onclick="cancelSage()">Annuler</button>'+
+      '</div>';
+    document.getElementById('sage-preview').innerHTML=preview;
+    document.getElementById('sage-preview').style.display='block';
+  };
+  r.readAsBinaryString(file);
+}
+function cancelSage(){sageData=[];document.getElementById('sage-preview').style.display='none';}
+function importSage(){
+  if(!sageData.length)return;
+  var keys=Object.keys(sageData[0]);
+  // Detect columns: Date, Code client, Nom client
+  var dateKey=keys.find(function(k){return k.toLowerCase().includes('date');});
+  var codeKey=keys.find(function(k){return k.toLowerCase().includes('code');});
+  var nomKey=keys.find(function(k){return k.toLowerCase().includes('nom')||k.toLowerCase().includes('client');});
+  var matched=0;
+  sageData.forEach(function(row){
+    var nom=(row[nomKey]||'').toLowerCase().trim();
+    if(!nom)return;
+    var etude=allEtudes.find(function(e){return(e.client_name||'').toLowerCase().trim()===nom;});
+    if(etude){
+      matched++;
+      db.collection('etudes').doc(etude.id).update({sage_imported:true,sage_date:row[dateKey]||'',sage_code_client:row[codeKey]||''});
+    }
+  });
+  alert(matched+' étude(s) mise(s) à jour depuis SAGE.');
+  cancelSage();
+}
+
+// ── Export ─────────────────────────────────────────────────────
+function exportXLSX(){
+  var rows=[['Référence','Client','Montant HT','Encaissé','Reste','Statut']];
+  allEtudes.filter(function(e){return['Signé','En cours','Livré','Facturé','Clôturé'].includes(e.statut);})
+    .forEach(function(e){
+      var mht=parseFloat(e.montant_ht)||0;
+      var menc=parseFloat(e.montant_encaisse)||0;
+      rows.push([e.reference||'',e.client_name||'',mht,menc,mht-menc,e.statut||'']);
+    });
+  var rows2=[['N° Facture','Client','Étude','Montant HT','Date émission','Échéance','Statut']];
+  allFactures.forEach(function(f){rows2.push([f.numero||'',f.client_name||'',f.etude_ref||'',f.montant_ht||0,f.date_emission||'',f.date_echeance||'',f.statut||'']);});
+  var wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(rows),'Encaissements');
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(rows2),'Factures');
+  XLSX.writeFile(wb,'Comptabilite_ICN_JC.xlsx');
+}
+</script>
+</body>
+</html>
