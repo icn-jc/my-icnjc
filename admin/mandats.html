@@ -244,7 +244,7 @@ function renderMandatCard(m) {
   // Bouton recalcul automatique (super_admin uniquement)
   var recalcBtn = MY_ROLE_MANDATS === 'super_admin'
     ? '<div style="display:flex;gap:8px;margin-bottom:16px;align-items:center">' +
-        '<button onclick="recalculerKpi(''+mid+'')" style="background:var(--navy);color:white;border:none;border-radius:var(--radius-md);padding:8px 16px;font-size:12px;font-weight:600;cursor:pointer;font-family:'Sora',sans-serif">⚡ Recalculer tous les KPI depuis Firestore</button>' +
+        '<button data-mid="'+mid+'" onclick="handleRecalcKpi(this)" style="background:var(--navy);color:white;border:none;border-radius:var(--radius-md);padding:8px 16px;font-size:12px;font-weight:600;cursor:pointer;font-family:Sora,sans-serif">Recalculer tous les KPI depuis Firestore</button>' +
         '<span style="font-size:11px;color:var(--text-tertiary)">Filtre sur la plage de dates du mandat</span>' +
       '</div>'
     : '';
@@ -370,6 +370,11 @@ function renderMandatCard(m) {
 }
 
 // ── ACTIONS ────────────────────────────────────────────────────
+function handleRecalcKpi(btn) {
+  recalculerKpi(btn.dataset.mid);
+}
+
+function handleRecalcKpi(btn) { recalculerKpi(btn.dataset.mid); }
 function recalculerKpi(mandatId) {
   var m = allMand.find(function(x){return x.id===mandatId;});
   if (!m) return;
