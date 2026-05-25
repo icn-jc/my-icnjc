@@ -886,6 +886,9 @@ initAuth('crm_prospection', function(user, role, profile) {
     document.getElementById('btn-edit-goal').style.display = 'flex';
     switchTab('ca');
   }
+  // Hide "Mes prospects" tab if user is not a prospector
+  // Will be checked after users load — for now show it, hide after
+  window._initTab = IS_CA ? 'ca' : 'mine';
 
   document.getElementById('af-date').value = localDateStr(now);
   initPeriods();
@@ -929,6 +932,23 @@ function loadData() {
     });
     selectedPersonsMine = [ME]; // init with self
     initPersonSelectors();
+    // Hide "Mes prospects" if not a prospector
+    var meUser = allUsers.find(function(u){return u.email===ME;});
+    if (meUser && !meUser.prospecte) {
+      var tabMine = document.getElementById('tab-mine');
+      var paneMine = document.getElementById('pane-mine');
+      if (tabMine) tabMine.style.display = 'none';
+      if (paneMine) paneMine.style.display = 'none';
+      // If currently on mine tab, switch to all
+      if (document.getElementById('tab-mine').classList && document.getElementById('tab-mine').classList.contains('active')) {
+        switchTab('all');
+      }
+    }
+    // Hide CA tab if not CA role
+    if (!IS_CA) {
+      var tabCA = document.getElementById('tab-ca');
+      if (tabCA) tabCA.style.display = 'none';
+    }
   });
 
   // Prospects (temps réel)
@@ -1457,9 +1477,11 @@ function renderCA() {
   var signesP = allProspects.filter(function(p) { return p.status === 'Signé'; }).length;
   var tauxC = totP > 0 ? Math.round(signesP / totP * 100) : 0;
 
-  var pHtml = kpiCard('Pipeline total', fmtM(pipTotal), '') +
-    kpiCard('Pipeline fiable', fmtM(pipFiable), 'kc-success');
-  if (pipIncertain > 0) pHtml += kpiCard('Pipeline incertain', fmtM(pipIncertain), 'kc-uncertain');
+  var pHtml = kpiCard('Pipeline total', fmtM(pipTotal), '');
+  // "Orphelins" = prospects dont le commercial ne prospecte plus
+  if (pipIncertain > 0) {
+    pHtml += kpiCard('Orphelins à réaffecter', fmtM(pipIncertain), 'kc-uncertain');
+  }
   pHtml += kpiCard('Taux conversion', tauxC + '%', tauxC >= 20 ? 'kc-success' : tauxC >= 10 ? 'kc-warn' : 'kc-danger');
   document.getElementById('ca-stats-pipeline').innerHTML = pHtml;
 
@@ -1566,7 +1588,9 @@ function renderCA() {
     else pipPeriodFiable += amt;
   });
   var pHtml2 = '<div class="kpi-card"><div class="kpi-label">Pipeline ' + pLabel + '</div><div class="kpi-val">' + fmtM(pipPeriodFiable + pipPeriodIncertain) + '</div></div>';
-  if (pipPeriodIncertain > 0) pHtml2 += '<div class="kpi-card kc-uncertain"><div class="kpi-label">Incertain ' + pLabel + '</div><div class="kpi-val">' + fmtM(pipPeriodIncertain) + '</div></div>';
+  if (pipPeriodIncertain > 0) {
+    pHtml2 += '<div class="kpi-card kc-uncertain"><div class="kpi-label">Orphelins ' + pLabel + '</div><div class="kpi-val">' + fmtM(pipPeriodIncertain) + '</div><div style="font-size:9px;color:#92400e;margin-top:2px">Commercial inactif</div></div>';
+  }
   document.getElementById('ca-stats-period').innerHTML = pHtml2;
 
   renderCAChart();
@@ -1947,8 +1971,35 @@ function renderDetailForm(p) {
     '<div class="detail-field"><label>Priorité</label><select class="select-field" onchange="upd(\'' + pid + '\',\'priority\',this.value)" style="font-size:12px">' + priOpts + '</select></div>' +
     '<div class="detail-field"><label>Tags (virgules)</label><input class="input" value="' + (p.tags ? (p.tags.join ? p.tags.join(', ') : p.tags) : '') + '" onblur="upd(\'' + pid + '\',\'tags\',this.value.split(\',\').map(function(s){return s.trim();}).filter(Boolean))" style="font-size:12px"/></div>' +
     '<div class="detail-field"><label>Notes</label><textarea class="input" rows="3" onblur="upd(\'' + pid + '\',\'notes\',this.value)" style="font-size:12px;resize:vertical">' + (p.notes||'') + '</textarea></div>' +
-    (IS_CA ? '<div class="detail-field"><label>Responsable</label><input class="input" value="' + (p.owner_name||p.owner_email||'') + '" disabled style="font-size:12px;opacity:.6"/></div>' : '') :
+    (IS_CA ? '<div class="detail-field"><label>Responsable</label><input class="input" value="' + (p.owner_name||p.owner_email||'') + '" disabled style="font-size:12px;opacity:.6"/></div>' : '') +
+    (MY_ROLE === 'super_admin' ?
+      '<div class="detail-field" style="background:#fef3c7;border-radius:var(--radius-md);padding:10px 12px;border:1px solid #fde68a"><label style="color:#78350f">Réaffecter à un autre commercial</label>' +
+      '<select class="select-field" id="reassign-sel" style="font-size:12px"><option value="">— Choisir —</option>' +
+      allUsers.filter(function(u){return u.prospecte;}).map(function(u){
+        return '<option value="' + u.email + '" data-name="' + ((u.prenom||'')+' '+(u.nom||'')).trim() + '"' +
+               (p.owner_email===u.email?' selected':'') + '>' + ((u.prenom||'')+' '+(u.nom||'')) + '</option>';
+      }).join('') +
+      '</select>' +
+      '<button onclick="reassignProspect('' + pid + '')" class="btn btn-secondary btn-sm" style="margin-top:6px;background:#78350f;color:white;border-color:#78350f">Réaffecter</button>' +
+      '</div>' : '') :
     '<div style="font-size:13px;color:var(--text-tertiary);padding:12px 0">Lecture seule — ce prospect appartient à ' + (p.owner_name||p.owner_email||'un autre membre') + '.</div>';
+}
+
+function reassignProspect(id) {
+  var sel = document.getElementById('reassign-sel');
+  if (!sel || !sel.value) { alert('Choisis un commercial.'); return; }
+  var email = sel.value;
+  var opt = sel.options[sel.selectedIndex];
+  var name = opt ? (opt.dataset.name||email) : email;
+  if (!confirm('Réaffecter ce prospect à ' + name + ' ?')) return;
+  db.collection('prospects').doc(id).update({
+    owner_email: email,
+    owner_name: name,
+    reassigned_by: ME,
+    reassigned_at: new Date().toISOString().split('T')[0]
+  });
+  alert('Prospect réaffecté à ' + name);
+  closeActionPanel();
 }
 
 function upd(id, field, val) {
