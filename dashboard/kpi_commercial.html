@@ -351,25 +351,23 @@ function renderComparison() {
     var mid = m.id;
     var isActif = m.statut === 'actif';
     if (isActif) {
-      // Temps réel depuis Firestore
+      // Temps réel depuis Firestore études
+      var etudes = allEtudes.filter(function(e){return e.mandat_id===mid;});
+      var etudesSign = etudes.filter(function(e){return['Signé','En cours','Livré','Facturé','Clôturé'].includes(e.statut);});
+      var caSign = etudesSign.reduce(function(a,e){return a+(parseFloat(e.montant_ht)||0);},0);
       var prospects = allProspects.filter(function(p){return p.mandat_id===mid||!p.mandat_id;});
-      var signes = prospects.filter(function(p){return p.status==='Signé';});
+      var prospectsSign = prospects.filter(function(p){return p.status==='Signé';});
       var contactes = prospects.filter(function(p){return p.status!=='À contacter';});
-      var caSigneActif = signes.reduce(function(a,p){return a+(parseFloat(p.estimated_amount)||0);},0);
       switch(metric) {
-        case 'ca_signe': return caSigneActif;
-        case 'nb_etudes_signees': return signes.length;
+        case 'ca_signe': return caSign;
+        case 'nb_etudes_signees': return etudesSign.length;
         case 'nb_prospects': return contactes.length;
-        case 'taux_conversion': return prospects.length>0?Math.round(signes.length/prospects.length*100):0;
-        case 'panier_moyen': {
-        var esActif = allEtudes.filter(function(e){return e.mandat_id===mandatActif.id&&['Signé','En cours','Livré','Facturé','Clôturé'].includes(e.statut);});
-        var caEt = esActif.reduce(function(a,e){return a+(parseFloat(e.montant_ht)||0);},0);
-        return esActif.length>0?Math.round(caEt/esActif.length):(signes.length>0?Math.round(caSigneActif/signes.length):0);
-      }
+        case 'taux_conversion': return prospects.length>0?Math.round(prospectsSign.length/prospects.length*100):0;
+        case 'panier_moyen': return etudesSign.length>0?Math.round(caSign/etudesSign.length):0;
         default: return (m.kpi_commercial&&m.kpi_commercial[metric]) || 0;
       }
     } else {
-      // Données saisies manuellement
+      // Mandats passés — données saisies manuellement depuis historique mandats
       var kc = m.kpi_commercial || {};
       return parseFloat(kc[metric]) || 0;
     }
