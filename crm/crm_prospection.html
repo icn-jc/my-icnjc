@@ -1980,11 +1980,12 @@ function renderDetailForm(p) {
                (p.owner_email===u.email?' selected':'') + '>' + ((u.prenom||'')+' '+(u.nom||'')) + '</option>';
       }).join('') +
       '</select>' +
-      '<button onclick="reassignProspect('' + pid + '')" class="btn btn-secondary btn-sm" style="margin-top:6px;background:#78350f;color:white;border-color:#78350f">Réaffecter</button>' +
+      '<button data-pid="'+pid+'" onclick="handleReassign(this)" class="btn btn-secondary btn-sm" style="margin-top:6px;background:#78350f;color:white;border-color:#78350f">Réaffecter</button>' +
       '</div>' : '') :
     '<div style="font-size:13px;color:var(--text-tertiary);padding:12px 0">Lecture seule — ce prospect appartient à ' + (p.owner_name||p.owner_email||'un autre membre') + '.</div>';
 }
 
+function handleReassign(btn) { reassignProspect(btn.dataset.pid); }
 function reassignProspect(id) {
   var sel = document.getElementById('reassign-sel');
   if (!sel || !sel.value) { alert('Choisis un commercial.'); return; }
