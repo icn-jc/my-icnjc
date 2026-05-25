@@ -332,8 +332,8 @@ function markEncaissee(fid){
   db.collection('factures').doc(fid).update({statut:'Encaissée'});
 }
 
-// ── Encaissement depuis étude ──────────────────────────────────
-);
+function openEnc(etudeId){
+  var e=allEtudes.find(function(x){return x.id===etudeId;});
   if(!e)return;
   var mht=parseFloat(e.montant_ht)||0;
   var menc=parseFloat(e.montant_encaisse)||0;
