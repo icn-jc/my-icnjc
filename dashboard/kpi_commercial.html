@@ -163,6 +163,13 @@ function loadData() {
     renderActif();
   });
 
+  // Charger études (pour CA réel signé + encaissé)
+  db.collection('etudes').onSnapshot(function(snap) {
+    allEtudes = [];
+    snap.forEach(function(doc){allEtudes.push(Object.assign({id:doc.id},doc.data()));});
+    renderActif();
+  });
+
   db.collection('users').get().then(function(snap) {
     allUsers = [];
     snap.forEach(function(doc){allUsers.push(Object.assign({email:doc.id},doc.data()));});
@@ -183,7 +190,12 @@ function renderActif() {
   var prospects = allProspects.filter(function(p){return p.mandat_id===mid||!p.mandat_id;});
   var signes = prospects.filter(function(p){return p.status==='Signé';});
   var contactes = prospects.filter(function(p){return p.status!=='À contacter';});
-  var caTotal = signes.reduce(function(a,p){return a+(parseFloat(p.estimated_amount)||0);},0);
+  // CA depuis études (plus précis que les montants estimés prospects)
+  var etudesMid = allEtudes.filter(function(e){return e.mandat_id===mid||!e.mandat_id;});
+  var etudesSignees = etudesMid.filter(function(e){return['Signé','En cours','Livré','Facturé','Clôturé'].includes(e.statut);});
+  var caEtudes = etudesSignees.reduce(function(a,e){return a+(parseFloat(e.montant_ht)||0);},0);
+  var caEncaisse = etudesSignees.reduce(function(a,e){return a+(parseFloat(e.montant_encaisse)||0);},0);
+  var caTotal = caEtudes || signes.reduce(function(a,p){return a+(parseFloat(p.estimated_amount)||0);},0);
   var pipeline = prospects.filter(function(p){return p.status!=='Perdu'&&p.status!=='À contacter';})
     .reduce(function(a,p){return a+(parseFloat(p.estimated_amount)||0);},0);
   var tauxConv = prospects.length>0 ? Math.round(signes.length/prospects.length*100) : 0;
