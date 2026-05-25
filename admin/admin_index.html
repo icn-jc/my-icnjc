@@ -395,6 +395,54 @@ function showToast(msg) {
   t.style.display = 'block';
   setTimeout(function() { t.style.display = 'none'; }, 3000);
 }
+
+// ── Whitelist Firestore ───────────────────────────────────────
+function loadWhitelist() {
+  db.collection('whitelist_emails').get().then(function(snap) {
+    var list = [];
+    snap.forEach(function(doc){list.push(Object.assign({id:doc.id},doc.data()));});
+    var el = document.getElementById('whitelist-list');
+    if (!el) return;
+    if (!list.length) {
+      el.innerHTML = '<div style="color:var(--text-tertiary);font-size:13px">Aucune adresse externe ajoutée.</div>';
+      return;
+    }
+    el.innerHTML = '<table style="width:100%;border-collapse:collapse;font-size:13px">' +
+      '<thead><tr style="background:#f8f7f5"><th style="padding:8px 10px;text-align:left;border-bottom:1px solid var(--border)">Email</th>' +
+      '<th style="padding:8px 10px;text-align:left;border-bottom:1px solid var(--border)">Nom</th>' +
+      '<th style="padding:8px 10px;text-align:left;border-bottom:1px solid var(--border)">Rôle</th>' +
+      '<th style="padding:8px 10px;border-bottom:1px solid var(--border)"></th></tr></thead><tbody>' +
+      list.map(function(w) {
+        return '<tr><td style="padding:7px 10px;border-bottom:1px solid var(--border)">' + w.id + '</td>' +
+          '<td style="padding:7px 10px;border-bottom:1px solid var(--border)">' + ((w.prenom||'')+' '+(w.nom||'')).trim() + '</td>' +
+          '<td style="padding:7px 10px;border-bottom:1px solid var(--border)"><span style="background:#e0f2fe;color:#0c4a6e;padding:2px 8px;border-radius:99px;font-size:11px;font-weight:600">' + (w.role||'tuteur') + '</span></td>' +
+          '<td style="padding:7px 10px;border-bottom:1px solid var(--border);text-align:center"><button onclick="removeWhitelist('' + w.id + '')" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:16px" title="Supprimer">×</button></td></tr>';
+      }).join('') + '</tbody></table>';
+  });
+}
+
+function addWhitelist() {
+  var email = (document.getElementById('wl-email').value||'').trim().toLowerCase();
+  var prenom = (document.getElementById('wl-prenom').value||'').trim();
+  var nom = (document.getElementById('wl-nom').value||'').trim();
+  var role = document.getElementById('wl-role').value;
+  if (!email || !email.includes('@')) { alert('Email invalide.'); return; }
+  db.collection('whitelist_emails').doc(email).set({
+    prenom: prenom, nom: nom, role: role,
+    added_by: ME_ADMIN, added_at: new Date().toISOString().split('T')[0]
+  }).then(function() {
+    document.getElementById('wl-email').value = '';
+    document.getElementById('wl-prenom').value = '';
+    document.getElementById('wl-nom').value = '';
+    loadWhitelist();
+    showToast(email + ' ajouté(e) avec le rôle ' + role);
+  });
+}
+
+function removeWhitelist(email) {
+  if (!confirm('Supprimer l\'accès de ' + email + ' ?')) return;
+  db.collection('whitelist_emails').doc(email).delete().then(loadWhitelist);
+}
 </script>
 </body>
 </html>
