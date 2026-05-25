@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Clients — My-ICN-JC</title>
+<link rel="stylesheet" href="../assets/css/global.css"/>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+<script src="../assets/js/firebase.js"></script>
+<script src="../assets/js/auth.js"></script>
+<script src="../assets/js/sidebar.js"></script>
+<style>
+.clients-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;}
+.client-card{background:var(--bg-card);border-radius:var(--radius-lg);padding:16px 18px;border:1px solid var(--border);cursor:pointer;transition:all .15s;box-shadow:var(--shadow-sm);}
+.client-card:hover{box-shadow:var(--shadow-md);border-color:var(--bordeaux);transform:translateY(-1px);}
+.client-card.actif{border-left:3px solid var(--success);}
+.client-card.inactif{border-left:3px solid var(--text-tertiary);}
+.client-card.prospect{border-left:3px solid #f59e0b;}
+.cc-name{font-family:'Playfair Display',serif;font-size:15px;font-weight:700;color:var(--navy);margin-bottom:4px;}
+.cc-sector{font-size:11px;color:var(--text-tertiary);margin-bottom:8px;}
+.cc-stats{display:flex;gap:12px;font-size:12px;}
+.cc-stat{display:flex;flex-direction:column;gap:2px;}
+.cc-stat-val{font-weight:700;color:var(--navy);}
+.cc-stat-lbl{font-size:10px;color:var(--text-tertiary);}
+.status-badge{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:99px;font-size:10px;font-weight:700;}
+.sb-actif{background:#dcfce7;color:#14532d;}
+.sb-inactif{background:#f1f5f9;color:#475569;}
+.sb-prospect{background:#fef3c7;color:#78350f;}
+/* Panel */
+.client-panel{position:fixed;right:0;top:0;bottom:0;width:520px;max-width:96vw;background:var(--white);box-shadow:-8px 0 40px rgba(27,42,74,0.18);z-index:400;display:flex;flex-direction:column;transform:translateX(100%);transition:transform .25s ease;}
+.client-panel.open{transform:translateX(0);}
+.cp-header{padding:18px 22px;border-bottom:1px solid var(--border);}
+.cp-name{font-family:'Playfair Display',serif;font-size:19px;color:var(--navy);}
+.cp-meta{display:flex;gap:8px;margin-top:6px;flex-wrap:wrap;align-items:center;}
+.cp-close{position:absolute;top:16px;right:18px;background:none;border:none;font-size:22px;cursor:pointer;color:var(--text-tertiary);}
+.cp-tabs{display:flex;border-bottom:1px solid var(--border);}
+.cp-tab{flex:1;padding:10px;font-size:12px;font-weight:600;cursor:pointer;border:none;background:transparent;font-family:'Sora',sans-serif;color:var(--text-secondary);border-bottom:2px solid transparent;transition:all .15s;}
+.cp-tab.active{color:var(--bordeaux);border-bottom-color:var(--bordeaux);}
+.cp-pane{display:none;flex:1;overflow-y:auto;padding:18px 22px;}
+.cp-pane.active{display:block;}
+.overlay{position:fixed;inset:0;background:rgba(15,25,35,0.35);z-index:399;display:none;}
+.overlay.open{display:block;}
+/* Sections */
+.sec{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--text-tertiary);margin-bottom:8px;margin-top:16px;display:flex;align-items:center;gap:8px;}
+.sec::after{content:'';flex:1;height:1px;background:var(--border);}
+.sec:first-child{margin-top:0;}
+/* Contact chips */
+.contact-list{display:flex;flex-direction:column;gap:8px;}
+.contact-item{background:var(--bg);border-radius:var(--radius-md);padding:10px 12px;border:1px solid var(--border);}
+.contact-name{font-weight:600;font-size:13px;color:var(--navy);}
+.contact-meta{font-size:11px;color:var(--text-tertiary);margin-top:2px;}
+/* Études list */
+.etude-item{background:var(--bg);border-radius:var(--radius-md);padding:10px 12px;border:1px solid var(--border);margin-bottom:8px;}
+.etude-ref{font-size:11px;font-weight:700;color:var(--bordeaux);font-family:monospace;}
+.etude-title{font-weight:600;font-size:13px;color:var(--navy);margin-top:2px;}
+.etude-meta{display:flex;gap:10px;margin-top:4px;flex-wrap:wrap;font-size:11px;color:var(--text-tertiary);}
+/* KPI strip */
+.kpi-strip{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px;}
+.kpi-mini{background:var(--bg-card);padding:10px 14px;border-radius:var(--radius-lg);border:1px solid var(--border);flex:1;min-width:100px;}
+.kpi-mini-val{font-size:18px;font-weight:700;color:var(--navy);}
+.kpi-mini-lbl{font-size:10px;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:.06em;}
+/* Toolbar */
+.toolbar{display:flex;gap:7px;flex-wrap:wrap;align-items:center;margin-bottom:16px;}
+.toolbar select,.toolbar input{padding:6px 10px;border-radius:var(--radius-md);border:1.5px solid var(--border-strong);font-family:'Sora',sans-serif;font-size:12px;background:var(--white);}
+.toolbar select:focus,.toolbar input:focus{outline:none;border-color:var(--bordeaux);}
+</style>
+</head>
+<body>
+<div class="login-page" id="login-page">
+  <div class="login-box">
+    <div class="login-logo"><img src="../assets/images/ICN-Junior-Conseil_logo.png" style="height:54px;object-fit:contain"/></div>
+    <div class="login-title">Connexion</div>
+    <div class="login-sub">Accès réservé aux membres ICN Junior Conseil.</div>
+    <button class="google-btn" onclick="doGoogleLogin()">
+      <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google"/>Se connecter avec Google
+    </button>
+    <div class="denied-box" id="denied-box"><strong>Accès refusé</strong><p id="denied-msg"></p></div>
+    <div class="login-error" id="login-error"></div>
+  </div>
+</div>
+
+<div class="app-page" id="app-page">
+  <div id="sidebar-container"></div>
+  <div class="app-content">
+    <div class="page-header">
+      <div class="flex justify-between items-center" style="flex-wrap:wrap;gap:10px">
+        <div><div class="page-title">Clients</div><div class="page-subtitle" id="page-subtitle"></div></div>
+        <div class="flex gap-2">
+          <button class="btn btn-primary btn-sm" id="btn-add-client" onclick="openAddClient()" style="display:none">+ Client</button>
+          <button class="btn btn-secondary btn-sm" onclick="exportXLSX()">⬇ Excel</button>
+        </div>
+      </div>
+    </div>
+    <div class="page-body">
+      <div class="kpi-strip" id="kpi-strip"></div>
+      <div class="toolbar">
+        <input type="text" id="srch" placeholder="🔍 Rechercher…" oninput="render()"/>
+        <select id="f-status" onchange="render()">
+          <option value="">Tous statuts</option>
+          <option value="Actif">Actif</option>
+          <option value="Inactif">Inactif</option>
+          <option value="Prospect converti">Prospect converti</option>
+        </select>
+        <select id="f-sector" onchange="render()">
+          <option value="">Secteur</option>
+          <option>Industrie</option><option>Services</option><option>Commerce</option>
+          <option>Tech</option><option>Santé</option><option>Éducation</option><option>Autre</option>
+        </select>
+        <select id="f-mandat" onchange="render()"><option value="">Tous mandats</option></select>
+        <button class="btn btn-secondary btn-sm" onclick="clearFilters()">Réinitialiser</button>
+        <span style="font-size:11px;color:var(--text-tertiary);font-style:italic" id="f-note"></span>
+      </div>
+      <div class="clients-grid" id="clients-grid">
+        <div style="color:var(--text-tertiary);font-size:13px">Chargement…</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="overlay" onclick="closePanel()"></div>
+
+<!-- PANNEAU CLIENT -->
+<div class="client-panel" id="client-panel">
+  <div class="cp-header" style="position:relative">
+    <div class="cp-name" id="cp-name"></div>
+    <div class="cp-meta" id="cp-meta"></div>
+    <button class="cp-close" onclick="closePanel()">×</button>
+  </div>
+  <div class="cp-tabs">
+    <button class="cp-tab active" onclick="switchCpTab('infos')" id="cpt-infos">Infos</button>
+    <button class="cp-tab" onclick="switchCpTab('etudes')" id="cpt-etudes">Études</button>
+    <button class="cp-tab" onclick="switchCpTab('contacts')" id="cpt-contacts">Contacts</button>
+    <button class="cp-tab" onclick="switchCpTab('perso')" id="cpt-perso">Personnalité</button>
+    <button class="cp-tab" onclick="switchCpTab('edit')" id="cpt-edit" style="display:none">✏ Modifier</button>
+  </div>
+  <div class="cp-pane active" id="cpp-infos">
+    <div id="cp-infos-content"></div>
+  </div>
+  <div class="cp-pane" id="cpp-etudes">
+    <div id="cp-etudes-content"></div>
+  </div>
+  <div class="cp-pane" id="cpp-contacts">
+    <div id="cp-contacts-content"></div>
+  </div>
+  <div class="cp-pane" id="cpp-perso"></div>
+  <div class="cp-pane" id="cpp-edit">
+    <div id="cp-edit-content"></div>
+  </div>
+</div>
+
+<!-- MODAL AJOUT CLIENT -->
+<div class="modal-overlay" id="modal-add" onclick="if(event.target===this)closeAddClient()">
+  <div class="modal-box" style="max-width:560px">
+    <div class="modal-header"><div class="modal-title">Ajouter un client</div><button class="modal-close" onclick="closeAddClient()">×</button></div>
+    <div class="form-grid">
+      <div class="form-field full"><label class="input-label">Nom de l'entreprise *</label><input class="input" id="nc-name"/></div>
+      <div class="form-field"><label class="input-label">Secteur *</label>
+        <select class="select-field" id="nc-sector"><option value="">—</option>
+          <option>Industrie</option><option>Services</option><option>Commerce</option>
+          <option>Tech</option><option>Santé</option><option>Éducation</option><option>Autre</option>
+        </select></div>
+      <div class="form-field"><label class="input-label">Statut</label>
+        <select class="select-field" id="nc-status">
+          <option value="Actif">Actif</option>
+          <option value="Prospect converti">Prospect converti</option>
+          <option value="Inactif">Inactif</option>
+        </select></div>
+      <div class="form-field"><label class="input-label">Ville *</label><input class="input" id="nc-ville"/></div>
+      <div class="form-field"><label class="input-label">Email</label><input class="input" type="email" id="nc-email"/></div>
+      <div class="form-field"><label class="input-label">Téléphone</label><input class="input" id="nc-tel"/></div>
+      <div class="form-field"><label class="input-label">Site web</label><input class="input" id="nc-web" placeholder="https://"/></div>
+      <div class="form-field"><label class="input-label">Code comptable</label><input class="input" id="nc-code-compta" placeholder="CLI001…"/></div>
+      <div class="form-field full"><label class="input-label">Notes</label><textarea class="input" id="nc-notes" rows="2" style="resize:vertical"></textarea></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeAddClient()">Annuler</button>
+      <button class="btn btn-primary" onclick="confirmAddClient()">Ajouter →</button>
+    </div>
+  </div>
+</div>
+
+<script>
+var ME = '', MY_ROLE = '', CAN_EDIT = false;
+var allClients = [], allEtudes = [], allMandats = [];
+var curClientId = null;
+
+var EDIT_ROLES_CLIENTS = ['super_admin','president','vice_president','responsable_commercial'];
+
+function localDateStr(d) {
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+function fmtD(s) { if (!s) return '—'; var p = s.split('-'); return p.length===3 ? p[2]+'/'+p[1]+'/'+p[0] : s; }
+function fmtM(n) { return Number(n||0).toLocaleString('fr-FR',{minimumFractionDigits:0,maximumFractionDigits:0})+' €'; }
+
+initAuth('crm_clients', function(user, role, profile) {
+  ME = user.email; MY_ROLE = role;
+  CAN_EDIT = EDIT_ROLES_CLIENTS.includes(role);
+  renderSidebar(role, profile, user, 'crm_clients');
+  showAppPage(user, role, profile);
+  updateHealthIndicator();
+  if (CAN_EDIT) document.getElementById('btn-add-client').style.display = 'flex';
+  var now = new Date();
+  var M = ['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
+  document.getElementById('page-subtitle').innerText = now.getDate() + ' ' + M[now.getMonth()] + ' ' + now.getFullYear();
+  loadData();
+});
+
+function loadData() {
+  db.collection('mandats').get().then(function(snap) {
+    allMandats = [];
+    snap.forEach(function(doc) { allMandats.push(Object.assign({id:doc.id},doc.data())); });
+    allMandats.sort(function(a,b){return (b.date_debut||'').localeCompare(a.date_debut||'');});
+    var sel = document.getElementById('f-mandat');
+    allMandats.forEach(function(m) {
+      var o = document.createElement('option');
+      o.value = m.id; o.text = m.label; sel.appendChild(o);
+    });
+  });
+
+  db.collection('etudes').onSnapshot(function(snap) {
+    allEtudes = [];
+    snap.forEach(function(doc) { allEtudes.push(Object.assign({id:doc.id},doc.data())); });
+  });
+
+  db.collection('clients').onSnapshot(function(snap) {
+    allClients = [];
+    snap.forEach(function(doc) { allClients.push(Object.assign({id:doc.id},doc.data())); });
+    render();
+    renderKPIs();
+  });
+}
+
+function renderKPIs() {
+  var total = allClients.length;
+  var actifs = allClients.filter(function(c){return c.status==='Actif';}).length;
+  // CA calculé depuis les études liées (pas saisi manuellement)
+  var caTotal = allEtudes.filter(function(e){return ['Signé','En cours','Livré','Facturé','Clôturé'].includes(e.statut);})
+    .reduce(function(a,e){return a+(parseFloat(e.montant_ht)||0);},0);
+  var etudes = allEtudes.length;
+  document.getElementById('kpi-strip').innerHTML =
+    kpi('Clients total', total) + kpi('Actifs', actifs, 'kc-success') +
+    kpi('CA total', fmtM(caTotal), 'kc-bordeaux') + kpi('Études', etudes);
+}
+
+function kpi(l,v,cls) {
+  return '<div class="kpi-mini '+(cls||'')+'"><div class="kpi-mini-val">'+v+'</div><div class="kpi-mini-lbl">'+l+'</div></div>';
+}
+
+function render() {
+  var srch = (document.getElementById('srch').value||'').toLowerCase();
+  var fst = document.getElementById('f-status').value;
+  var fse = document.getElementById('f-sector').value;
+  var fma = document.getElementById('f-mandat').value;
+  var data = allClients.filter(function(c) {
+    if (srch && !(c.company_name||'').toLowerCase().includes(srch)) return false;
+    if (fst && c.status !== fst) return false;
+    if (fse && c.sector !== fse) return false;
+    if (fma && c.mandat_id !== fma) return false;
+    return true;
+  });
+  document.getElementById('f-note').innerText = data.length < allClients.length ? data.length+' / '+allClients.length : '';
+  if (data.length === 0) {
+    document.getElementById('clients-grid').innerHTML = '<div style="color:var(--text-tertiary);font-size:13px">Aucun client trouvé.</div>';
+    return;
+  }
+  var statCls = {Actif:'actif',Inactif:'inactif','Prospect converti':'prospect'};
+  var statBadge = {Actif:'sb-actif',Inactif:'sb-inactif','Prospect converti':'sb-prospect'};
+  document.getElementById('clients-grid').innerHTML = data.map(function(c) {
+    var nbEtudes = allEtudes.filter(function(e){return e.client_id===c.id;}).length;
+    var sc = statCls[c.status]||'';
+    var sb = statBadge[c.status]||'';
+    return '<div class="client-card '+sc+'" onclick="openClient(\''+c.id+'\')">' +
+      '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">' +
+        '<div class="cc-name">'+(c.company_name||'')+'</div>' +
+        '<span class="status-badge '+sb+'">'+(c.status||'—')+'</span>' +
+      '</div>' +
+      '<div class="cc-sector">'+(c.sector||'—')+(c.ville?' · '+c.ville:'')+'</div>' +
+      '<div class="cc-stats">' +
+        '<div class="cc-stat"><div class="cc-stat-val">'+nbEtudes+'</div><div class="cc-stat-lbl">études</div></div>' +
+        '<div class="cc-stat"><div class="cc-stat-val">'+(c.ca_total?fmtM(c.ca_total):'—')+'</div><div class="cc-stat-lbl">CA total</div></div>' +
+      '</div></div>';
+  }).join('');
+}
+
+function clearFilters() {
+  ['srch','f-status','f-sector','f-mandat'].forEach(function(id){document.getElementById(id).value='';});
+  render();
+}
+
+// ── Panel client ──────────────────────────────────────────────
+function openClient(id) {
+  var c = allClients.find(function(x){return x.id===id;});
+  if (!c) return;
+  curClientId = id;
+  document.getElementById('cp-name').innerText = c.company_name||'';
+  var sb = {Actif:'sb-actif',Inactif:'sb-inactif','Prospect converti':'sb-prospect'}[c.status]||'';
+  document.getElementById('cp-meta').innerHTML =
+    '<span class="status-badge '+sb+'">'+(c.status||'—')+'</span>' +
+    (c.sector?'<span style="font-size:12px;color:var(--text-tertiary)">'+c.sector+'</span>':'') +
+    (c.ville?'<span style="font-size:12px;color:var(--text-tertiary)">📍 '+c.ville+'</span>':'');
+  document.getElementById('cpt-edit').style.display = CAN_EDIT ? '' : 'none';
+  renderCpInfos(c);
+  renderCpEtudes(id);
+  renderCpContacts(c);
+  renderCpEdit(c);
+  switchCpTab('infos');
+  document.getElementById('client-panel').classList.add('open');
+  document.getElementById('overlay').classList.add('open');
+}
+
+function closePanel() {
+  document.getElementById('client-panel').classList.remove('open');
+  document.getElementById('overlay').classList.remove('open');
+  curClientId = null;
+}
+
+function switchCpTab(key) {
+  ['infos','etudes','contacts','perso','edit'].forEach(function(k) {
+    var btn = document.getElementById('cpt-'+k);
+    var pane = document.getElementById('cpp-'+k);
+    if (btn) btn.classList.toggle('active', k===key);
+    if (pane) pane.classList.toggle('active', k===key);
+  });
+}
+
+function renderCpInfos(c) {
+  document.getElementById('cp-infos-content').innerHTML =
+    '<div class="sec">Coordonnées</div>' +
+    field('Email', c.email||'—') + field('Téléphone', c.tel||'—') +
+    field('Site web', c.website ? '<a href="'+c.website+'" target="_blank" style="color:var(--bordeaux)">'+c.website+'</a>' : '—') +
+    field('Ville', c.ville||'—') +
+    '<div class="sec" style="margin-top:16px">Données financières</div>' +
+    field('CA total études', fmtM(allEtudes.filter(function(e){return e.client_id===c.id&&['Signé','En cours','Livré','Facturé','Clôturé'].includes(e.statut);}).reduce(function(a,e){return a+(parseFloat(e.montant_ht)||0);},0))) +
+    field('CA encaissé', fmtM(c.ca_encaisse)) +
+    (c.code_comptable?field('Code comptable', c.code_comptable):'') +
+    field('Mandat', c.mandat_id||'—') +
+    (c.notes ? '<div class="sec" style="margin-top:16px">Notes</div><div style="font-size:13px;color:var(--text-secondary);line-height:1.6">'+c.notes+'</div>' : '') +
+    '<div class="sec" style="margin-top:16px">Métadonnées</div>' +
+    field('Source', c.source||'Manuel') + field('Créé le', fmtD(c.created_at_str||''));
+}
+
+function field(label, val) {
+  return '<div style="display:flex;gap:8px;padding:6px 0;border-bottom:1px solid var(--border)">' +
+    '<div style="font-size:12px;color:var(--text-tertiary);width:140px;flex-shrink:0">'+label+'</div>' +
+    '<div style="font-size:13px;color:var(--text-primary)">'+val+'</div></div>';
+}
+
+function renderCpEtudes(clientId) {
+  var etudes = allEtudes.filter(function(e){return e.client_id===clientId;});
+  var STATUT_COLORS = {Signé:'s-signe',Clôturé:'s-signe','En cours':'s-rdvplanifie',
+    Livré:'s-proposition',Facturé:'s-negociation',Prospection:'s-acontacter'};
+  var html = etudes.length === 0
+    ? '<div style="color:var(--text-tertiary);font-size:13px;text-align:center;padding:20px">Aucune étude.</div>'
+    : etudes.map(function(e) {
+        return '<div class="etude-item">' +
+          '<div style="display:flex;justify-content:space-between;align-items:flex-start">' +
+            '<div class="etude-ref">'+(e.reference||'—')+'</div>' +
+            '<span class="badge '+(STATUT_COLORS[e.statut]||'')+'">'+(e.statut||'—')+'</span>' +
+          '</div>' +
+          '<div class="etude-title">'+(e.title||'Sans titre')+'</div>' +
+          '<div class="etude-meta">' +
+            '<span>'+fmtD(e.date_debut)+' → '+fmtD(e.date_fin)+'</span>' +
+            (e.montant_ht?'<span style="font-weight:600;color:var(--bordeaux)">'+fmtM(e.montant_ht)+'</span>':'') +
+          '</div></div>';
+      }).join('');
+  var caClient = etudes.reduce(function(a,e){return a+(parseFloat(e.montant_ht)||0);},0);
+  document.getElementById('cp-etudes-content').innerHTML =
+    '<div style="font-size:12px;color:var(--text-tertiary);margin-bottom:12px">'+etudes.length+' étude(s) · CA : '+fmtM(caClient)+'</div>' + html;
+}
+
+function renderCpContacts(c) {
+  var contacts = c.contacts || [];
+  document.getElementById('cp-contacts-content').innerHTML = !CAN_EDIT
+    ? (contacts.length===0?'<div style="color:var(--text-tertiary);font-size:13px">Aucun contact renseigné.</div>':
+      '<div class="contact-list">'+contacts.map(function(ct){return '<div class="contact-item"><div class="contact-name">'+(ct.nom||'')+'</div><div class="contact-meta">'+(ct.poste||'')+(ct.email?' · '+ct.email:'')+(ct.tel?' · '+ct.tel:'')+'</div></div>';}).join('')+'</div>')
+    : '<div class="contact-list" id="contact-list-edit">' +
+      contacts.map(function(ct,i){return contactEditRow(ct,i);}).join('') +
+      '</div><button class="btn btn-secondary btn-sm" style="margin-top:10px" onclick="addContactRow()">+ Ajouter un contact</button>' +
+      '<button class="btn btn-primary btn-sm" style="margin-top:8px;margin-left:8px" onclick="saveContacts()">💾 Sauvegarder</button>';
+}
+
+function contactEditRow(ct, i) {
+  return '<div class="contact-item" data-ci="'+i+'">' +
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">' +
+    '<input class="input" placeholder="Nom" value="'+(ct.nom||'')+'" style="font-size:12px" data-field="nom"/>' +
+    '<input class="input" placeholder="Poste" value="'+(ct.poste||'')+'" style="font-size:12px" data-field="poste"/>' +
+    '<input class="input" placeholder="Email" value="'+(ct.email||'')+'" style="font-size:12px" data-field="email"/>' +
+    '<input class="input" placeholder="Tél" value="'+(ct.tel||'')+'" style="font-size:12px" data-field="tel"/>' +
+    '</div>' +
+    '<button onclick="this.closest(\'[data-ci]\').remove()" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:12px;margin-top:4px">✕ Supprimer</button>' +
+    '</div>';
+}
+
+function addContactRow() {
+  var list = document.getElementById('contact-list-edit');
+  var i = list.children.length;
+  var div = document.createElement('div');
+  div.innerHTML = contactEditRow({},i);
+  list.appendChild(div.firstChild);
+}
+
+function saveContacts() {
+  if (!curClientId) return;
+  var rows = document.querySelectorAll('#contact-list-edit [data-ci]');
+  var contacts = [];
+  rows.forEach(function(row) {
+    var ct = {};
+    row.querySelectorAll('[data-field]').forEach(function(inp){ct[inp.dataset.field]=inp.value.trim();});
+    if (ct.nom) contacts.push(ct);
+  });
+  // Validate emails
+  var badEmail = contacts.find(function(ct){ return ct.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(ct.email); });
+  if (badEmail) { alert('Format email invalide : ' + badEmail.email); return; }
+  db.collection('clients').doc(curClientId).update({contacts:contacts}).then(function(){
+    var c2 = allClients.find(function(x){return x.id===curClientId;});
+    if (c2) { c2.contacts = contacts; renderCpContacts(c2); }
+    // Confirmation visuelle
+    var btn = document.querySelector('#cpp-contacts .btn-primary');
+    if (btn) { var orig=btn.innerText; btn.innerText='✅ Sauvegardé'; btn.style.background='var(--success)'; setTimeout(function(){btn.innerText=orig;btn.style.background='';},2000); }
+  });
+}
+
+function renderCpEdit(c) {
+  if (!CAN_EDIT) { document.getElementById('cp-edit-content').innerHTML = ''; return; }
+  var cid = c.id;
+  var statOpts = ['Actif','Inactif','Prospect converti'].map(function(s){
+    return '<option'+(c.status===s?' selected':'')+'>'+s+'</option>';
+  }).join('');
+  var secOpts = ['','Industrie','Services','Commerce','Tech','Santé','Éducation','Autre'].map(function(s){
+    return '<option'+(c.sector===s?' selected':'')+'>'+(s||'—')+'</option>';
+  }).join('');
+  document.getElementById('cp-edit-content').innerHTML =
+    '<div style="display:flex;flex-direction:column;gap:10px">' +
+    editF('Nom', 'text', c.company_name||'', 'company_name', cid) +
+    editF('Secteur', 'select:'+secOpts, c.sector||'', 'sector', cid) +
+    editF('Statut', 'select:'+statOpts, c.status||'', 'status', cid) +
+    editF('Ville', 'text', c.ville||'', 'ville', cid) +
+    editF('Email', 'email', c.email||'', 'email', cid) +
+    editF('Téléphone', 'text', c.tel||'', 'tel', cid) +
+    editF('Site web', 'text', c.website||'', 'website', cid) +
+    editF('CA total (€)', 'number', c.ca_total||'', 'ca_total', cid) +
+    editF('CA encaissé (€)', 'number', c.ca_encaisse||'', 'ca_encaisse', cid) +
+    editF('Code comptable', 'text', c.code_comptable||'', 'code_comptable', cid) +
+    editF('Notes', 'textarea', c.notes||'', 'notes', cid) +
+    '<button class="btn btn-danger btn-sm" onclick="deleteClient(\''+cid+'\')" style="background:#fee2e2;color:#991b1b;border-color:#fca5a5;margin-top:8px">🗑 Supprimer ce client</button>' +
+    '</div>';
+}
+
+function editF(label, type, val, field, cid) {
+  var input;
+  if (type.startsWith('select:')) {
+    input = '<select class="select-field" style="font-size:12px" onchange="saveField(\''+cid+'\',\''+field+'\',this.value)">'+type.slice(7)+'</select>';
+  } else if (type === 'textarea') {
+    input = '<textarea class="input" rows="3" style="font-size:12px;resize:vertical" onblur="saveField(\''+cid+'\',\''+field+'\',this.value)">'+val+'</textarea>';
+  } else {
+    input = '<input class="input" type="'+type+'" value="'+val+'" style="font-size:12px" onblur="saveField(\''+cid+'\',\''+field+'\',this.type===\'number\'?parseFloat(this.value)||0:this.value.trim())"/>';
+  }
+  return '<div><label class="input-label">'+label+'</label>'+input+'</div>';
+}
+
+function saveField(id, field, val) {
+  var u = {}; u[field] = val;
+  db.collection('clients').doc(id).update(u);
+}
+
+function deleteClient(id) {
+  if (!confirm('Supprimer ce client ? Cette action est irréversible.')) return;
+  db.collection('clients').doc(id).delete().then(function(){closePanel();});
+}
+
+// ── Ajout client ──────────────────────────────────────────────
+function openAddClient() { document.getElementById('modal-add').classList.add('open'); }
+function closeAddClient() { document.getElementById('modal-add').classList.remove('open'); }
+function confirmAddClient() {
+  var name = document.getElementById('nc-name').value.trim();
+  var ville = document.getElementById('nc-ville').value.trim();
+  var sector = document.getElementById('nc-sector').value;
+  var status = document.getElementById('nc-status').value;
+  var email = document.getElementById('nc-email').value.trim();
+  var tel = document.getElementById('nc-tel').value.trim();
+  if (!name) { alert('Le nom de l\'entreprise est obligatoire.'); return; }
+  if (!ville) { alert('La ville est obligatoire.'); return; }
+  if (!sector) { alert('Le secteur est obligatoire.'); return; }
+  if (!email && !tel) { alert('Merci de renseigner au moins un email ou un numéro de téléphone.'); return; }
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { alert('Format email invalide.'); return; }
+  db.collection('clients').add({
+    company_name: name,
+    sector: document.getElementById('nc-sector').value,
+    status: document.getElementById('nc-status').value,
+    ville: document.getElementById('nc-ville').value.trim(),
+    email: document.getElementById('nc-email').value.trim(),
+    tel: document.getElementById('nc-tel').value.trim(),
+    website: document.getElementById('nc-web').value.trim(),
+    notes: document.getElementById('nc-notes').value.trim(),
+    code_comptable: document.getElementById('nc-code-compta').value.trim(),
+    source: 'manuel', contacts: [], ca_total: 0, ca_encaisse: 0,
+    created_at_str: localDateStr(new Date()),
+    created_at: firebase.firestore.FieldValue.serverTimestamp()
+  }).then(function(){closeAddClient();});
+}
+
+// ── Export ────────────────────────────────────────────────────
+function exportXLSX() {
+  var rows = [['Entreprise','Secteur','Statut','Ville','Email','Tél','CA Total','CA Encaissé','Nb Études','Source']];
+  allClients.forEach(function(c) {
+    var nb = allEtudes.filter(function(e){return e.client_id===c.id;}).length;
+    rows.push([c.company_name||'',c.sector||'',c.status||'',c.ville||'',c.email||'',c.tel||'',
+      c.ca_total||0, c.ca_encaisse||0, nb, c.source||'']);
+  });
+  var ws = XLSX.utils.aoa_to_sheet(rows);
+  var wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Clients');
+  XLSX.writeFile(wb, 'Clients_ICN_JC.xlsx');
+}
+</script>
+</body>
+</html>function renderCpPerso(client) {
+  var el = document.getElementById('cpp-perso'); if(!el)return;
+  var cid=client.id; var p=client.personnalite||{};
+  var stylesList=['Directif','Collaboratif','Analytique','Creatif','Pragmatique','Exigeant','Flexible','Formel','Informel'];
+  var canauxList=['Email','Telephone','Visio','Presentiel','Slack/Teams','WhatsApp'];
+  var freqList=['Hebdomadaire','Bimensuelle','Mensuelle','A la demande','Jalons uniquement'];
+  el.innerHTML=
+    '<div style="font-size:12px;color:var(--text-tertiary);margin-bottom:16px">Fiche de personnalite client — style de travail, preferences, notes de passation entre mandats.</div>'+
+    '<div style="font-weight:600;font-size:12px;color:var(--navy);margin-bottom:8px">Style de travail</div>'+
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px">'+
+    stylesList.map(function(tag){var s=(p.styles||[]).includes(tag);return'<button data-cid="'+cid+'" data-tag="'+tag+'" data-field="styles" onclick="togglePersoTag(this)" style="padding:5px 12px;border-radius:99px;font-size:12px;cursor:pointer;font-family:Sora,sans-serif;border:1.5px solid '+(s?'var(--bordeaux)':'var(--border)')+';background:'+(s?'rgba(163,33,95,.1)':'var(--bg)')+';color:'+(s?'var(--bordeaux)':'var(--text-secondary)')+'">'+tag+'</button>';}).join('')+
+    '</div>'+
+    '<div style="font-weight:600;font-size:12px;color:var(--navy);margin-bottom:8px">Canaux preferés</div>'+
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px">'+
+    canauxList.map(function(tag){var s=(p.canaux||[]).includes(tag);return'<button data-cid="'+cid+'" data-tag="'+tag+'" data-field="canaux" onclick="togglePersoTag(this)" style="padding:5px 12px;border-radius:99px;font-size:12px;cursor:pointer;font-family:Sora,sans-serif;border:1.5px solid '+(s?'#3b82f6':'var(--border)')+';background:'+(s?'rgba(59,130,246,.1)':'var(--bg)')+';color:'+(s?'#1e3a5f':'var(--text-secondary)')+'">'+tag+'</button>';}).join('')+
+    '</div>'+
+    '<div style="font-weight:600;font-size:12px;color:var(--navy);margin-bottom:8px">Frequence de contact souhaitee</div>'+
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px">'+
+    freqList.map(function(tag){var s=(p.frequence||'')===tag;return'<button data-cid="'+cid+'" data-tag="'+tag+'" data-field="frequence" data-single="1" onclick="togglePersoTag(this)" style="padding:5px 12px;border-radius:99px;font-size:12px;cursor:pointer;font-family:Sora,sans-serif;border:1.5px solid '+(s?'var(--success)':'var(--border)')+';background:'+(s?'rgba(22,163,74,.1)':'var(--bg)')+';color:'+(s?'var(--success)':'var(--text-secondary)')+'">'+tag+'</button>';}).join('')+
+    '</div>'+
+    '<div style="font-weight:600;font-size:12px;color:var(--navy);margin-bottom:8px">Notes de passation</div>'+
+    '<textarea class="input" id="perso-notes-'+cid+'" rows="4" style="resize:vertical;font-size:13px;line-height:1.6;margin-bottom:14px" placeholder="Points cles : attentes, vigilances, historique important…" data-cid="'+cid+'" onblur="savePersoNotes(this.dataset.cid,this.value)">'+((p.notes)||'')+'</textarea>'+
+    '<div style="font-weight:600;font-size:12px;color:var(--navy);margin-bottom:8px">Qualite de la relation</div>'+
+    '<div style="display:flex;gap:6px;align-items:center">'+
+    [1,2,3,4,5].map(function(n){var s=(p.note_relation||0)===n;return'<button data-cid="'+cid+'" data-note="'+n+'" onclick="savePersoNote(this.dataset.cid,parseInt(this.dataset.note))" style="width:32px;height:32px;border-radius:50%;border:2px solid '+(s?'var(--bordeaux)':'var(--border)')+';background:'+(s?'rgba(163,33,95,.1)':'var(--bg)')+';font-size:14px;cursor:pointer;color:'+(s?'var(--bordeaux)':'var(--text-tertiary)')+'">'+n+'</button>';}).join('')+
+    '<span style="font-size:12px;color:var(--text-tertiary);margin-left:6px">'+(p.note_relation?p.note_relation+'/5':'Non note')+'</span>'+
+    '</div>';
+}
+function togglePersoTag(btn){
+  var cid=btn.dataset.cid,tag=btn.dataset.tag,field=btn.dataset.field||'styles',single=btn.dataset.single==='1';
+  var client=allClients?allClients.find(function(x){return x.id===cid;}):null; if(!client)return;
+  var p=JSON.parse(JSON.stringify(client.personnalite||{}));
+  if(single){p[field]=p[field]===tag?'':tag;}
+  else{if(!p[field])p[field]=[];var idx=p[field].indexOf(tag);if(idx>=0)p[field].splice(idx,1);else p[field].push(tag);}
+  db.collection('clients').doc(cid).update({personnalite:p}).then(function(){var c2=allClients.find(function(x){return x.id===cid;});if(c2)renderCpPerso(c2);});
+}
+function savePersoNotes(cid,val){
+  var client=allClients?allClients.find(function(x){return x.id===cid;}):null;
+  var p=client?JSON.parse(JSON.stringify(client.personnalite||{})):{};
+  p.notes=val; db.collection('clients').doc(cid).update({personnalite:p});
+}
+function savePersoNote(cid,note){
+  var client=allClients?allClients.find(function(x){return x.id===cid;}):null;
+  var p=client?JSON.parse(JSON.stringify(client.personnalite||{})):{};
+  p.note_relation=note; db.collection('clients').doc(cid).update({personnalite:p}).then(function(){var c2=allClients.find(function(x){return x.id===cid;});if(c2)renderCpPerso(c2);});
+}
+
+
