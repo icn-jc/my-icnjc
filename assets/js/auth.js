@@ -110,33 +110,52 @@ function initAuth(pageKey, onReady) {
     const email  = user.email || '';
     const domain = email.split('@')[1] || '';
     if (domain !== ALLOWED_DOMAIN) {
-      // Vérifier la whitelist Firestore pour les emails hors domaine
+      // Pour les emails hors domaine : vérifier whitelist_emails OU users collection
       try {
+        // 1. Check whitelist_emails first
         const wlDoc = await db.collection('whitelist_emails').doc(email.toLowerCase()).get();
-        if (!wlDoc.exists) {
-          auth.signOut();
-          showAccessDenied('Accès non autorisé. Contacte l\'administrateur.');
+        if (wlDoc.exists) {
+          const wlData = wlDoc.data();
+          CURRENT_USER = user;
+          CURRENT_PROFILE = {
+            prenom: wlData.prenom || email.split('@')[0],
+            nom: wlData.nom || '',
+            email: email,
+            role: wlData.role || 'tuteur',
+            roles: [wlData.role || 'tuteur'],
+            prospecte: false
+          };
+          CURRENT_ROLE = wlData.role || 'tuteur';
+          const allowed = PAGE_ACCESS[pageKey] || [];
+          if (!allowed.includes(CURRENT_ROLE)) {
+            auth.signOut();
+            showAccessDenied('Tu n\'as pas accès à cette page.');
+            return;
+          }
+          if (onReady) onReady(user, CURRENT_ROLE, CURRENT_PROFILE);
           return;
         }
-        // Email whitelisté — construire un profil depuis la whitelist
-        const wlData = wlDoc.data();
-        CURRENT_USER = user;
-        CURRENT_PROFILE = {
-          prenom: wlData.prenom || email.split('@')[0],
-          nom: wlData.nom || '',
-          email: email,
-          role: wlData.role || 'tuteur',
-          roles: [wlData.role || 'tuteur'],
-          prospecte: false
-        };
-        CURRENT_ROLE = wlData.role || 'tuteur';
-        const allowed = PAGE_ACCESS[pageKey] || [];
-        if (!allowed.includes(CURRENT_ROLE)) {
-          auth.signOut();
-          showAccessDenied('Tu n\'as pas accès à cette page.');
+        // 2. Check users collection (email ajouté manuellement dans Firestore)
+        const userDoc = await COLLECTIONS.users.doc(email).get();
+        if (userDoc.exists) {
+          CURRENT_USER = user;
+          CURRENT_PROFILE = userDoc.data();
+          var profileRoles2 = Array.isArray(CURRENT_PROFILE.roles)
+            ? CURRENT_PROFILE.roles
+            : (CURRENT_PROFILE.role ? [CURRENT_PROFILE.role] : ['intervenant']);
+          CURRENT_ROLE = getHighestRoleAuth(profileRoles2);
+          const allowed2 = PAGE_ACCESS[pageKey] || [];
+          if (!allowed2.includes(CURRENT_ROLE)) {
+            auth.signOut();
+            showAccessDenied('Tu n\'as pas accès à cette page.');
+            return;
+          }
+          if (onReady) onReady(user, CURRENT_ROLE, CURRENT_PROFILE);
           return;
         }
-        if (onReady) onReady(user, CURRENT_ROLE, CURRENT_PROFILE);
+        // Neither found
+        auth.signOut();
+        showAccessDenied('Accès non autorisé. Contacte l\'administrateur pour être ajouté(e).');
         return;
       } catch(e) {
         auth.signOut();
