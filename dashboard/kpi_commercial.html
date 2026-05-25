@@ -358,7 +358,11 @@ function renderComparison() {
         case 'nb_etudes_signees': return signes.length;
         case 'nb_prospects': return contactes.length;
         case 'taux_conversion': return prospects.length>0?Math.round(signes.length/prospects.length*100):0;
-        case 'panier_moyen': return signes.length>0?Math.round(caSigneActif/signes.length):0;
+        case 'panier_moyen': {
+        var esActif = allEtudes.filter(function(e){return e.mandat_id===mandatActif.id&&['Signé','En cours','Livré','Facturé','Clôturé'].includes(e.statut);});
+        var caEt = esActif.reduce(function(a,e){return a+(parseFloat(e.montant_ht)||0);},0);
+        return esActif.length>0?Math.round(caEt/esActif.length):(signes.length>0?Math.round(caSigneActif/signes.length):0);
+      }
         default: return (m.kpi_commercial&&m.kpi_commercial[metric]) || 0;
       }
     } else {
@@ -410,7 +414,11 @@ function renderComparison() {
       kc = {
         ca_signe: ca, nb_etudes_signees: signes.length, nb_prospects: contactes.length,
         taux_conversion: prospects.length>0?Math.round(signes.length/prospects.length*100):0,
-        panier_moyen: signes.length>0?Math.round(ca/signes.length):0,
+        panier_moyen: (function(){
+        var es2=allEtudes.filter(function(e){return(e.mandat_id===m.id)&&['Signé','En cours','Livré','Facturé','Clôturé'].includes(e.statut);});
+        var ca2=es2.reduce(function(a,e){return a+(parseFloat(e.montant_ht)||0);},0);
+        return es2.length>0?Math.round(ca2/es2.length):(signes.length>0?Math.round(ca/signes.length):0);
+      })(),
         taux_prospection: m.kpi_commercial&&m.kpi_commercial.taux_prospection || 0
       };
     }
