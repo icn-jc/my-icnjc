@@ -109,13 +109,40 @@ function initAuth(pageKey, onReady) {
     if (!user) { showLoginPage(); return; }
     const email  = user.email || '';
     const domain = email.split('@')[1] || '';
-    // ⚠️ TEMPORAIRE — accès test stellayathe@gmail.com
-    const TEMP_WHITELIST = ['stellayathe@gmail.com'];
-    const isTemp = TEMP_WHITELIST.includes(email.toLowerCase());
-    if (domain !== ALLOWED_DOMAIN && !isTemp) {
-      auth.signOut();
-      showAccessDenied('Utilise ton adresse @icnjuniorconseil.com');
-      return;
+    if (domain !== ALLOWED_DOMAIN) {
+      // Vérifier la whitelist Firestore pour les emails hors domaine
+      try {
+        const wlDoc = await db.collection('whitelist_emails').doc(email.toLowerCase()).get();
+        if (!wlDoc.exists) {
+          auth.signOut();
+          showAccessDenied('Accès non autorisé. Contacte l\'administrateur.');
+          return;
+        }
+        // Email whitelisté — construire un profil depuis la whitelist
+        const wlData = wlDoc.data();
+        CURRENT_USER = user;
+        CURRENT_PROFILE = {
+          prenom: wlData.prenom || email.split('@')[0],
+          nom: wlData.nom || '',
+          email: email,
+          role: wlData.role || 'tuteur',
+          roles: [wlData.role || 'tuteur'],
+          prospecte: false
+        };
+        CURRENT_ROLE = wlData.role || 'tuteur';
+        const allowed = PAGE_ACCESS[pageKey] || [];
+        if (!allowed.includes(CURRENT_ROLE)) {
+          auth.signOut();
+          showAccessDenied('Tu n\'as pas accès à cette page.');
+          return;
+        }
+        if (onReady) onReady(user, CURRENT_ROLE, CURRENT_PROFILE);
+        return;
+      } catch(e) {
+        auth.signOut();
+        showAccessDenied('Erreur de vérification d\'accès.');
+        return;
+      }
     }
     try {
       const doc = await COLLECTIONS.users.doc(email).get();
