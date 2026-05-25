@@ -39,7 +39,7 @@ const CA_ROLES = [
 const PAGE_ACCESS = {
   'index': ['super_admin','president','vice_president','tresorier','secretaire',
             'responsable_commercial','responsable_qualite','responsable_marketing',
-            'tresorerie','auditeur','marketing','commercial','membre_cos'],
+            'tresorerie','auditeur','marketing','commercial','membre_cos','intervenant','tuteur'],
 
   'tracker_treso': ['super_admin','vice_president','tresorier','tresorerie','responsable_qualite'],
   'tracker_orga':  ['super_admin','president','vice_president','tresorier','responsable_qualite','auditeur'],
@@ -51,7 +51,7 @@ const PAGE_ACCESS = {
 
   'crm_prospection': ['super_admin','president','vice_president','tresorier','secretaire',
                       'responsable_commercial','responsable_qualite','responsable_marketing',
-                      'tresorerie','auditeur','marketing','commercial','membre_cos'],
+                      'tresorerie','auditeur','marketing','commercial','membre_cos','tuteur'],
   'crm_clients':     ['super_admin','president','vice_president','tresorier','responsable_commercial',
                       'responsable_marketing','responsable_qualite','secretaire','tresorerie','commercial','membre_cos'],
   'crm_intervenants':['super_admin','president','vice_president','tresorier','responsable_commercial',
