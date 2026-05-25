@@ -530,21 +530,23 @@ function autoCreateClientFromEtude(etudeId) {
 }
 
 function updateMandatKpiFromEtudes() {
-  // Find active mandat and update its commercial KPIs from Firestore data
   var actifMandat = allMandats.find(function(m){return m.statut==='actif';});
   if (!actifMandat) return;
   var mandatId = actifMandat.id;
   var mandatEtudes = allEtudes.filter(function(e){return e.mandat_id===mandatId;});
   var signees = mandatEtudes.filter(function(e){return ['Signé','En cours','Livré','Facturé','Clôturé'].includes(e.statut);});
   var caSign = signees.reduce(function(a,e){return a+(parseFloat(e.montant_ht)||0);},0);
+  var caEnc = signees.reduce(function(a,e){return a+(parseFloat(e.montant_encaisse)||0);},0);
   var nbEtudes = signees.length;
   var panierMoy = nbEtudes > 0 ? Math.round(caSign/nbEtudes) : 0;
   db.collection('mandats').doc(mandatId).update({
     'kpi_commercial.ca_signe': caSign,
+    'kpi_commercial.ca_encaisse': caEnc,
     'kpi_commercial.nb_etudes_signees': nbEtudes,
     'kpi_commercial.panier_moyen': panierMoy,
     'kpi_treso.nb_etudes': nbEtudes,
     'kpi_treso.ca_signe': caSign,
+    'kpi_treso.ca_encaisse': caEnc,
     'kpi_treso.panier_moyen': panierMoy
   });
 }
