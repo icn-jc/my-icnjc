@@ -163,11 +163,12 @@ function loadData() {
     renderActif();
   });
 
-  // Charger études (pour CA réel signé + encaissé)
+  // Charger études (pour CA réel signé + encaissé) - charge en premier
   db.collection('etudes').onSnapshot(function(snap) {
     allEtudes = [];
     snap.forEach(function(doc){allEtudes.push(Object.assign({id:doc.id},doc.data()));});
     renderActif();
+    renderComparison();
   });
 
   db.collection('users').get().then(function(snap) {
@@ -186,6 +187,7 @@ function switchTab(key) {
 // ═══ MANDAT ACTUEL ════════════════════════════════════════════
 function renderActif() {
   if (!mandatActif) return;
+  if (!allEtudes) allEtudes = [];
   var mid = mandatActif.id;
   var prospects = allProspects.filter(function(p){return p.mandat_id===mid||!p.mandat_id;});
   var signes = prospects.filter(function(p){return p.status==='Signé';});
@@ -331,6 +333,7 @@ function toggleMandatCompare(el) {
 }
 
 function renderComparison() {
+  if (!allEtudes) allEtudes = [];
   var metric = document.getElementById('cmp-metric') ? document.getElementById('cmp-metric').value : 'ca_signe';
   var metricLabels = {
     ca_signe:'CA signé (€)', nb_etudes_signees:'Nb études signées',
