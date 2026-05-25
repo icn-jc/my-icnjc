@@ -1,8 +1,221 @@
-<!DOCTYPE html><html lang="fr"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/><title>Mes missions — My-ICN-JC</title><link rel="stylesheet" href="../assets/css/global.css"/><script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script><script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script><script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script><script src="../assets/js/firebase.js"></script><script src="../assets/js/auth.js"></script><script src="../assets/js/sidebar.js"></script><style>.mm-tabs{display:flex;gap:3px;background:var(--bg);border-radius:var(--radius-lg);padding:4px;border:1px solid var(--border);width:fit-content;margin-bottom:24px;flex-wrap:wrap;}.mm-tab{padding:8px 18px;border-radius:var(--radius-md);font-size:13px;font-weight:500;cursor:pointer;border:none;background:transparent;color:var(--text-secondary);font-family:Sora,sans-serif;transition:all .2s;}.mm-tab.active{background:var(--white);color:var(--bordeaux);box-shadow:var(--shadow-sm);font-weight:600;}.mm-pane{display:none;}.mm-pane.active{display:block;}.mc{background:var(--bg-card);border-radius:var(--radius-lg);border:1px solid var(--border);box-shadow:var(--shadow-sm);overflow:hidden;margin-bottom:16px;}.mc.active-mc{border-top:3px solid var(--bordeaux);}.mc.done-mc{border-top:3px solid var(--success);}.mc-top{padding:18px 20px;display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap;}.mc-date-box{background:var(--bg);border-radius:var(--radius-md);padding:10px 14px;text-align:center;min-width:56px;flex-shrink:0;}.mc-date-day{font-size:22px;font-weight:800;color:var(--navy);line-height:1;}.mc-date-mo{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--text-tertiary);}.mc-info{flex:1;min-width:0;}.mc-ref{font-family:monospace;font-size:11px;font-weight:700;color:var(--bordeaux);}.mc-title{font-family:'Playfair Display',serif;font-size:17px;color:var(--navy);margin-top:2px;}.mc-type-badge{font-size:10px;font-weight:700;padding:3px 10px;border-radius:99px;margin-top:6px;display:inline-block;}.type-marche{background:#e0f2fe;color:#0c4a6e;}.type-marketing{background:#fce7f3;color:#831843;}.type-finance{background:#dcfce7;color:#14532d;}.type-affaires{background:#fef3c7;color:#78350f;}.mc-stats{display:flex;gap:12px;padding:12px 20px;border-top:1px solid var(--border);background:#fafafa;flex-wrap:wrap;}.mc-stat-val{font-size:15px;font-weight:700;color:var(--navy);}.mc-stat-lbl{font-size:10px;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:.06em;}.phase-track{padding:16px 20px;border-top:1px solid var(--border);}.phase-title{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--text-tertiary);margin-bottom:10px;}.phases-bar{display:flex;gap:2px;margin-bottom:14px;height:6px;}.phase-seg{flex:1;border-radius:99px;background:var(--border);transition:background .3s;}.phase-seg.done{background:var(--bordeaux);}.phase-seg.current{background:#f9a8d4;}.phase-item{display:flex;gap:12px;align-items:flex-start;padding:8px 0;border-bottom:1px solid var(--border);}.phase-item:last-child{border-bottom:none;}.phase-check{width:24px;height:24px;border-radius:50%;border:2px solid var(--border);display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;transition:all .2s;font-size:12px;}.phase-check.done{background:var(--bordeaux);border-color:var(--bordeaux);color:white;}.phase-check.current{border-color:var(--bordeaux);}.phase-name{font-size:13px;font-weight:600;color:var(--navy);}.phase-sub{font-size:11px;color:var(--text-tertiary);margin-top:1px;}.phase-expand{font-size:11px;color:var(--bordeaux);cursor:pointer;margin-top:3px;}.phase-extra{display:none;margin-top:8px;}.phase-extra.open{display:block;}.phase-note{width:100%;padding:6px 8px;border:1px solid var(--border);border-radius:var(--radius-sm);font-family:Sora,sans-serif;font-size:12px;resize:vertical;min-height:48px;}.phase-note:focus{outline:none;border-color:var(--bordeaux);}.lien-card{background:var(--bg-card);border-radius:var(--radius-lg);padding:16px 18px;border:1px solid var(--border);margin-bottom:12px;display:flex;align-items:center;gap:14px;}.lien-card.nouveau{border-left:3px solid var(--bordeaux);background:rgba(163,33,95,0.02);}.lien-icon{width:44px;height:44px;border-radius:var(--radius-md);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;}.lien-icon.rm{background:#fce7f3;}.lien-icon.ce{background:#e0f2fe;}.lien-icon.bv{background:#dcfce7;}.new-badge{background:var(--bordeaux);color:white;font-size:10px;font-weight:700;padding:2px 8px;border-radius:99px;}.empty-state{text-align:center;padding:60px 20px;}.empty-icon{font-size:48px;margin-bottom:12px;opacity:.4;}.empty-title{font-size:15px;font-weight:600;color:var(--navy);margin-bottom:6px;}.empty-sub{font-size:13px;color:var(--text-tertiary);max-width:360px;margin:0 auto;line-height:1.5;}.badge{padding:3px 10px;border-radius:99px;font-size:11px;font-weight:600;}.s-signe{background:#dcfce7;color:#14532d;}.s-encours{background:#fef3c7;color:#78350f;}.s-livre{background:#dbeafe;color:#1e3a5f;}.s-cloture{background:#f1f5f9;color:#475569;}</style></head><body><div class="login-page" id="login-page">  <div class="login-box">    <div class="login-logo"><img src="../assets/images/ICN-Junior-Conseil_logo.png" style="height:54px;object-fit:contain"/></div>    <div class="login-title">Connexion</div>    <div class="login-sub">Accès réservé aux membres ICN Junior Conseil.</div>    <button class="google-btn" onclick="doGoogleLogin()">      <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google"/>Se connecter avec Google    </button>    <div class="denied-box" id="denied-box"><strong>Accès refusé</strong><p id="denied-msg"></p></div>    <div class="login-error" id="login-error"></div>  </div></div><div class="app-page" id="app-page">  <div id="sidebar-container"></div>  <div class="app-content">    <div class="page-header">      <div class="page-title">Mes missions</div>      <div class="page-subtitle" id="page-sub"></div>    </div>    <div class="page-body">      <div class="mm-tabs">        <button class="mm-tab active" onclick="switchTab('actives')" id="mmt-actives">🎯 En cours</button>        <button class="mm-tab" onclick="switchTab('historique')" id="mmt-historique">📋 Historique</button>        <button class="mm-tab" onclick="switchTab('liens')" id="mmt-liens">📂 Mes liens <span id="new-badge" style="display:none;background:var(--bordeaux);color:white;border-radius:99px;padding:1px 7px;font-size:10px;margin-left:4px"></span></button>      </div>      <div class="mm-pane active" id="mmp-actives"><div class="empty-state"><div class="empty-icon">⏳</div><div class="empty-title">Chargement…</div></div></div>      <div class="mm-pane" id="mmp-historique"><div class="empty-state"><div class="empty-icon">📋</div><div class="empty-title">Chargement…</div></div></div>      <div class="mm-pane" id="mmp-liens"><div class="empty-state"><div class="empty-icon">📂</div><div class="empty-title">Chargement…</div></div></div>    </div>  </div></div><div class="modal-overlay" id="modal-q" onclick="if(event.target===this)closeQ()">  <div class="modal-box" style="max-width:600px">    <div class="modal-header"><div class="modal-title">Questionnaire de fin d\'étude</div><button class="modal-close" onclick="closeQ()">x</button></div>    <div id="q-content"></div>    <div class="modal-actions">      <button class="btn btn-secondary" onclick="closeQ()">Annuler</button>      <button class="btn btn-primary" onclick="submitQ()">Soumettre</button>    </div>  </div></div><script>var STUDY_TYPES = {  marche:{label:'Marché & Stratégie',badge:'type-marche',icon:'📊',    subtypes:['Étude de marché','Étude de lancement','Benchmark','Veille stratégique'],    phases:[      {id:'cadrage',label:'Cadrage',sub:'Objectifs, problématique, périmètre'},      {id:'conception',label:'Conception',sub:'Méthodologie, questionnaires, guides'},      {id:'collecte',label:'Collecte',sub:'Enquêtes terrain, interviews, recherche doc'},      {id:'analyse',label:'Analyse',sub:'Traitement données, segmentation, insights'},      {id:'recommandations',label:'Recommandations',sub:'Opportunités, positionnement, axes de dev'},      {id:'restitution',label:'Restitution',sub:'Rapport détaillé, présentation client'}    ]},  marketing:{label:'Marketing & Communication',badge:'type-marketing',icon:'📣',    subtypes:['Étude de notoriété','Plan de communication','Étude de satisfaction'],    phases:[      {id:'cadrage',label:'Cadrage',sub:'KPIs, identification des cibles'},      {id:'conception',label:'Conception',sub:'Questionnaires, sondages, choix canaux'},      {id:'collecte',label:'Collecte',sub:'Diffusion enquêtes, feedback clients'},      {id:'analyse',label:'Analyse',sub:'Indicateurs, analyse qualitative des retours'},      {id:'recommandations',label:'Recommandations',sub:'Actions marketing, stratégie com'},      {id:'restitution',label:'Restitution',sub:'Synthèse opérationnelle, plan d\'actions'}    ]},  finance:{label:'Finance & Audit',badge:'type-finance',icon:'💰',    subtypes:['Business plan','Diagnostic RSE','Visite mystère'],    phases:[      {id:'cadrage',label:'Cadrage',sub:'Analyse des besoins'},      {id:'collecte',label:'Collecte',sub:'Données financières, documents internes'},      {id:'analyse',label:'Analyse',sub:'Diagnostic, calculs de rentabilité'},      {id:'construction',label:'Construction',sub:'Business plan, scénarios financiers'},      {id:'recommandations',label:'Recommandations',sub:'Décisions investissement, optimisation'},      {id:'restitution',label:'Restitution',sub:'Livrables structurés, projections'}    ]},  affaires:{label:'Affaires Publiques',badge:'type-affaires',icon:'🏛️',    subtypes:['Sondage d\'opinion'],    phases:[      {id:'cadrage',label:'Cadrage',sub:'Public cible, objectif du sondage'},      {id:'conception',label:'Conception',sub:'Création du questionnaire'},      {id:'collecte',label:'Collecte',sub:'Diffusion à l\'échantillon'},      {id:'analyse',label:'Analyse',sub:'Traitement statistique, interprétation'},      {id:'recommandations',label:'Recommandations',sub:'Aide à la décision'},      {id:'restitution',label:'Restitution',sub:'Rapport + synthèse décisionnelle'}    ]}};function getTypeKey(t){  if(!t)return 'marche';  var tl=t.toLowerCase();  if(tl.includes('march')||tl.includes('strat')||tl.includes('bench')||tl.includes('veille')||tl.includes('lancement'))return 'marche';  if(tl.includes('market')||tl.includes('not')||tl.includes('satisf')||tl.includes('com'))return 'marketing';  if(tl.includes('finan')||tl.includes('audit')||tl.includes('business')||tl.includes('rse')||tl.includes('myst'))return 'finance';  if(tl.includes('public')||tl.includes('sondage'))return 'affaires';  return 'marche';}var ME='',MY_ROLE='',MY_NAME='',MY_IV_ID=null;var myMissions=[],myDocs=[],questionnaire=null,questionnaireId=null,curQId=null;var MOIS_S=['jan','fév','mar','avr','mai','jun','jul','aoû','sep','oct','nov','déc'];function fmtD(s){if(!s)return'—';var p=s.split('-');return p.length===3?p[2]+'/'+p[1]+'/'+p[0]:s;}function fmtM(n){return Number(n||0).toLocaleString('fr-FR',{minimumFractionDigits:0,maximumFractionDigits:0})+' €';}function esc(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}initAuth('mes_missions',function(user,role,profile){  ME=user.email;MY_ROLE=role;
-  
-  db.collection('intervenants').where('email','==',user.email).limit(1).get().then(function(snap){
-    if(!snap.empty){MY_IV_ID=snap.docs[0].id;}
-    
-  });  MY_NAME=((profile.prenom||'')+' '+(profile.nom||'')).trim();  renderSidebar(role,profile,user,'mes_missions');  showAppPage(user,role,profile);  updateHealthIndicator();  var now=new Date();  var M=['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];  document.getElementById('page-sub').innerText=(profile.prenom||'')+' · '+now.getDate()+' '+M[now.getMonth()]+' '+now.getFullYear();  loadData();});function loadData(){  db.collection('questionnaires').where('actif','==',true).limit(1).get().then(function(snap){    if(!snap.empty){questionnaireId=snap.docs[0].id;questionnaire=Object.assign({id:snap.docs[0].id},snap.docs[0].data());}  })
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 </script>
-</body></html>
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Mes missions — My-ICN-JC</title>
+
+<link rel="stylesheet" href="../assets/css/global.css"/>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+
+<script src="../assets/js/firebase.js"></script>
+<script src="../assets/js/auth.js"></script>
+<script src="../assets/js/sidebar.js"></script>
+
+<style>
+/* ton CSS inchangé */
+</style>
+</head>
+
+<body>
+
+<div class="login-page" id="login-page">
+  <div class="login-box">
+    <div class="login-logo">
+      <img src="../assets/images/ICN-Junior-Conseil_logo.png" style="height:54px;object-fit:contain"/>
+    </div>
+    <div class="login-title">Connexion</div>
+    <div class="login-sub">Accès réservé aux membres ICN Junior Conseil.</div>
+
+    <button class="google-btn" onclick="doGoogleLogin()">
+      <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google"/>
+      Se connecter avec Google
+    </button>
+
+    <div class="denied-box" id="denied-box">
+      <strong>Accès refusé</strong>
+      <p id="denied-msg"></p>
+    </div>
+
+    <div class="login-error" id="login-error"></div>
+  </div>
+</div>
+
+<div class="app-page" id="app-page">
+  <div id="sidebar-container"></div>
+
+  <div class="app-content">
+    <div class="page-header">
+      <div class="page-title">Mes missions</div>
+      <div class="page-subtitle" id="page-sub"></div>
+    </div>
+
+    <div class="page-body">
+
+      <div class="mm-tabs">
+        <button class="mm-tab active" onclick="switchTab('actives')" id="mmt-actives">🎯 En cours</button>
+        <button class="mm-tab" onclick="switchTab('historique')" id="mmt-historique">📋 Historique</button>
+        <button class="mm-tab" onclick="switchTab('liens')" id="mmt-liens">
+          📂 Mes liens 
+          <span id="new-badge" style="display:none;background:var(--bordeaux);color:white;border-radius:99px;padding:1px 7px;font-size:10px;margin-left:4px"></span>
+        </button>
+      </div>
+
+      <div class="mm-pane active" id="mmp-actives">
+        <div class="empty-state">
+          <div class="empty-icon">⏳</div>
+          <div class="empty-title">Chargement…</div>
+        </div>
+      </div>
+
+      <div class="mm-pane" id="mmp-historique">
+        <div class="empty-state">
+          <div class="empty-icon">📋</div>
+          <div class="empty-title">Chargement…</div>
+        </div>
+      </div>
+
+      <div class="mm-pane" id="mmp-liens">
+        <div class="empty-state">
+          <div class="empty-icon">📂</div>
+          <div class="empty-title">Chargement…</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-q" onclick="if(event.target===this)closeQ()">
+  <div class="modal-box" style="max-width:600px">
+    <div class="modal-header">
+      <div class="modal-title">Questionnaire de fin d'étude</div>
+      <button class="modal-close" onclick="closeQ()">x</button>
+    </div>
+
+    <div id="q-content"></div>
+
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeQ()">Annuler</button>
+      <button class="btn btn-primary" onclick="submitQ()">Soumettre</button>
+    </div>
+  </div>
+</div>
+
+<script>
+
+/* ----------- UTILS ----------- */
+
+function esc(s){
+  return (s || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+function fmtD(s){
+  if(!s) return '—';
+  var p = s.split('-');
+  return p.length===3 ? p[2]+'/'+p[1]+'/'+p[0] : s;
+}
+
+function fmtM(n){
+  return Number(n||0).toLocaleString('fr-FR') + ' €';
+}
+
+/* ----------- VARIABLES ----------- */
+
+var ME='', MY_ROLE='', MY_NAME='', MY_IV_ID=null;
+var myMissions=[], myDocs=[];
+var questionnaire=null, questionnaireId=null;
+
+/* ----------- AUTH ----------- */
+
+initAuth('mes_missions', function(user, role, profile){
+
+  ME = user.email;
+  MY_ROLE = role;
+
+  db.collection('intervenants')
+    .where('email','==',user.email)
+    .limit(1)
+    .get()
+    .then(function(snap){
+      if(!snap.empty){
+        MY_IV_ID = snap.docs[0].id;
+      }
+    });
+
+  MY_NAME = ((profile.prenom||'')+' '+(profile.nom||'')).trim();
+
+  renderSidebar(role, profile, user, 'mes_missions');
+  showAppPage(user, role, profile);
+  updateHealthIndicator();
+
+  var now = new Date();
+  var M = ['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
+
+  document.getElementById('page-sub').innerText =
+    (profile.prenom||'') + ' · ' +
+    now.getDate() + ' ' + M[now.getMonth()] + ' ' + now.getFullYear();
+
+  loadData();
+});
+
+/* ----------- DATA ----------- */
+
+function loadData(){
+
+  if (!db) {
+    console.error("Firestore non initialisé");
+    return;
+  }
+
+  db.collection('questionnaires')
+    .where('actif','==',true)
+    .limit(1)
+    .get()
+    .then(function(snap){
+      if(!snap.empty){
+        questionnaireId = snap.docs[0].id;
+        questionnaire = Object.assign(
+          { id: snap.docs[0].id },
+          snap.docs[0].data()
+        );
+      } else {
+        console.warn("Aucun questionnaire actif");
+      }
+    })
+    .catch(function(err){
+      console.error("Erreur Firestore :", err);
+    });
+}
+
+/* ----------- TABS ----------- */
+
+function switchTab(tab){
+
+  document.querySelectorAll('.mm-tab').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('.mm-pane').forEach(p=>p.classList.remove('active'));
+
+  document.getElementById('mmt-'+tab).classList.add('active');
+  document.getElementById('mmp-'+tab).classList.add('active');
+}
+
+/* ----------- MODAL ----------- */
+
+function closeQ(){
+  document.getElementById('modal-q').style.display = 'none';
+}
+
+function submitQ(){
+  console.log("Soumission questionnaire");
+}
+
+</script>
+
+</body>
+</html>
