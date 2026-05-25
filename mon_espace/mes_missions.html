@@ -1,771 +1,293 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-  <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-
-  <title>Mes missions — My-ICN-JC</title>
-
-  <link rel="stylesheet" href="../assets/css/global.css"/>
-
-  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
-
-  <script src="../assets/js/firebase.js"></script>
-  <script src="../assets/js/auth.js"></script>
-  <script src="../assets/js/sidebar.js"></script>
-
-  <style>
-    .mm-tabs{
-      display:flex;
-      gap:3px;
-      background:var(--bg);
-      border-radius:var(--radius-lg);
-      padding:4px;
-      border:1px solid var(--border);
-      width:fit-content;
-      margin-bottom:24px;
-      flex-wrap:wrap;
-    }
-
-    .mm-tab{
-      padding:8px 18px;
-      border-radius:var(--radius-md);
-      font-size:13px;
-      font-weight:500;
-      cursor:pointer;
-      border:none;
-      background:transparent;
-      color:var(--text-secondary);
-      font-family:Sora,sans-serif;
-      transition:all .2s;
-    }
-
-    .mm-tab.active{
-      background:var(--white);
-      color:var(--bordeaux);
-      box-shadow:var(--shadow-sm);
-      font-weight:600;
-    }
-
-    .mm-pane{
-      display:none;
-    }
-
-    .mm-pane.active{
-      display:block;
-    }
-
-    .mc{
-      background:var(--bg-card);
-      border-radius:var(--radius-lg);
-      border:1px solid var(--border);
-      box-shadow:var(--shadow-sm);
-      overflow:hidden;
-      margin-bottom:16px;
-    }
-
-    .mc.active-mc{
-      border-top:3px solid var(--bordeaux);
-    }
-
-    .mc.done-mc{
-      border-top:3px solid var(--success);
-    }
-
-    .mc-top{
-      padding:18px 20px;
-      display:flex;
-      gap:16px;
-      align-items:flex-start;
-      flex-wrap:wrap;
-    }
-
-    .mc-date-box{
-      background:var(--bg);
-      border-radius:var(--radius-md);
-      padding:10px 14px;
-      text-align:center;
-      min-width:56px;
-      flex-shrink:0;
-    }
-
-    .mc-date-day{
-      font-size:22px;
-      font-weight:800;
-      color:var(--navy);
-      line-height:1;
-    }
-
-    .mc-date-mo{
-      font-size:10px;
-      text-transform:uppercase;
-      letter-spacing:.08em;
-      color:var(--text-tertiary);
-    }
-
-    .mc-info{
-      flex:1;
-      min-width:0;
-    }
-
-    .mc-ref{
-      font-family:monospace;
-      font-size:11px;
-      font-weight:700;
-      color:var(--bordeaux);
-    }
-
-    .mc-title{
-      font-family:'Playfair Display', serif;
-      font-size:17px;
-      color:var(--navy);
-      margin-top:2px;
-    }
-
-    .mc-type-badge{
-      font-size:10px;
-      font-weight:700;
-      padding:3px 10px;
-      border-radius:99px;
-      margin-top:6px;
-      display:inline-block;
-    }
-
-    .type-marche{
-      background:#e0f2fe;
-      color:#0c4a6e;
-    }
-
-    .type-marketing{
-      background:#fce7f3;
-      color:#831843;
-    }
-
-    .type-finance{
-      background:#dcfce7;
-      color:#14532d;
-    }
-
-    .type-affaires{
-      background:#fef3c7;
-      color:#78350f;
-    }
-
-    .mc-stats{
-      display:flex;
-      gap:12px;
-      padding:12px 20px;
-      border-top:1px solid var(--border);
-      background:#fafafa;
-      flex-wrap:wrap;
-    }
-
-    .mc-stat-val{
-      font-size:15px;
-      font-weight:700;
-      color:var(--navy);
-    }
-
-    .mc-stat-lbl{
-      font-size:10px;
-      color:var(--text-tertiary);
-      text-transform:uppercase;
-      letter-spacing:.06em;
-    }
-
-    .phase-track{
-      padding:16px 20px;
-      border-top:1px solid var(--border);
-    }
-
-    .phase-title{
-      font-size:10px;
-      font-weight:700;
-      text-transform:uppercase;
-      letter-spacing:.1em;
-      color:var(--text-tertiary);
-      margin-bottom:10px;
-    }
-
-    .phases-bar{
-      display:flex;
-      gap:2px;
-      margin-bottom:14px;
-      height:6px;
-    }
-
-    .phase-seg{
-      flex:1;
-      border-radius:99px;
-      background:var(--border);
-      transition:background .3s;
-    }
-
-    .phase-seg.done{
-      background:var(--bordeaux);
-    }
-
-    .phase-seg.current{
-      background:#f9a8d4;
-    }
-
-    .phase-item{
-      display:flex;
-      gap:12px;
-      align-items:flex-start;
-      padding:8px 0;
-      border-bottom:1px solid var(--border);
-    }
-
-    .phase-item:last-child{
-      border-bottom:none;
-    }
-
-    .phase-check{
-      width:24px;
-      height:24px;
-      border-radius:50%;
-      border:2px solid var(--border);
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      cursor:pointer;
-      flex-shrink:0;
-      transition:all .2s;
-      font-size:12px;
-    }
-
-    .phase-check.done{
-      background:var(--bordeaux);
-      border-color:var(--bordeaux);
-      color:white;
-    }
-
-    .phase-check.current{
-      border-color:var(--bordeaux);
-    }
-
-    .phase-name{
-      font-size:13px;
-      font-weight:600;
-      color:var(--navy);
-    }
-
-    .phase-sub{
-      font-size:11px;
-      color:var(--text-tertiary);
-      margin-top:1px;
-    }
-
-    .phase-expand{
-      font-size:11px;
-      color:var(--bordeaux);
-      cursor:pointer;
-      margin-top:3px;
-    }
-
-    .phase-extra{
-      display:none;
-      margin-top:8px;
-    }
-
-    .phase-extra.open{
-      display:block;
-    }
-
-    .phase-note{
-      width:100%;
-      padding:6px 8px;
-      border:1px solid var(--border);
-      border-radius:var(--radius-sm);
-      font-family:Sora,sans-serif;
-      font-size:12px;
-      resize:vertical;
-      min-height:48px;
-    }
-
-    .phase-note:focus{
-      outline:none;
-      border-color:var(--bordeaux);
-    }
-
-    .empty-state{
-      text-align:center;
-      padding:60px 20px;
-    }
-
-    .empty-icon{
-      font-size:48px;
-      margin-bottom:12px;
-      opacity:.4;
-    }
-
-    .empty-title{
-      font-size:15px;
-      font-weight:600;
-      color:var(--navy);
-      margin-bottom:6px;
-    }
-
-    .empty-sub{
-      font-size:13px;
-      color:var(--text-tertiary);
-      max-width:360px;
-      margin:0 auto;
-      line-height:1.5;
-    }
-  </style>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Mes missions — My-ICN-JC</title>
+<link rel="stylesheet" href="../assets/css/global.css"/>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script src="../assets/js/firebase.js"></script>
+<script src="../assets/js/auth.js"></script>
+<script src="../assets/js/sidebar.js"></script>
+<style>
+.missions-grid{display:flex;flex-direction:column;gap:16px;}
+.mc{background:var(--bg-card);border-radius:var(--radius-lg);border:1px solid var(--border);box-shadow:var(--shadow-sm);overflow:hidden;}
+.mc.done-mc{opacity:.85;}
+.mc-header{display:flex;align-items:center;gap:14px;padding:16px 20px;border-bottom:1px solid var(--border);background:linear-gradient(135deg,rgba(27,42,74,.03),rgba(163,33,95,.03));}
+.mc-ref{font-family:monospace;font-size:13px;font-weight:700;color:var(--bordeaux);background:rgba(163,33,95,.08);padding:3px 8px;border-radius:4px;}
+.mc-title{font-size:15px;font-weight:700;color:var(--navy);margin-top:2px;}
+.mc-client{font-size:12px;color:var(--text-tertiary);margin-top:2px;}
+.mc-body{padding:16px 20px;}
+.mc-stats{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:10px;margin-bottom:14px;}
+.mc-stat{background:var(--bg);border-radius:var(--radius-md);padding:10px 12px;text-align:center;border:1px solid var(--border);}
+.mc-stat-val{font-size:16px;font-weight:700;color:var(--navy);}
+.mc-stat-lbl{font-size:10px;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:.06em;margin-top:3px;}
+.phase-list{display:flex;flex-direction:column;gap:4px;margin-bottom:14px;}
+.phase-row{display:flex;align-items:center;gap:10px;background:var(--bg);border-radius:var(--radius-md);padding:8px 12px;border:1px solid var(--border);font-size:13px;}
+.phase-name{flex:1;color:var(--text-secondary);font-weight:500;}
+.phase-jeh{color:var(--bordeaux);font-weight:700;font-size:12px;}
+.phase-brut{color:var(--success);font-weight:700;font-size:12px;}
+.docs-section{margin-bottom:14px;}
+.doc-row{display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px;}
+.doc-type{background:rgba(163,33,95,.1);color:var(--bordeaux);padding:2px 6px;border-radius:4px;font-weight:700;font-size:10px;flex-shrink:0;}
+.doc-label{flex:1;color:var(--text-secondary);}
+.doc-link{color:var(--bordeaux);font-weight:600;text-decoration:none;font-size:11px;white-space:nowrap;}
+.mc-footer{padding:12px 20px;border-top:1px solid var(--border);display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:rgba(248,247,245,.5);}
+.badge{padding:2px 8px;border-radius:99px;font-size:11px;font-weight:600;display:inline-block;}
+.s-signe{background:#dcfce7;color:#14532d;}
+.s-encours{background:#dbeafe;color:#1e3a5f;}
+.s-livre{background:#ede9fe;color:#4c1d95;}
+.s-cloture{background:#f1f5f9;color:#475569;}
+.empty-state{text-align:center;padding:60px 20px;color:var(--text-tertiary);}
+.empty-icon{font-size:40px;margin-bottom:12px;}
+.empty-title{font-size:16px;font-weight:600;color:var(--navy);margin-bottom:8px;}
+.empty-sub{font-size:13px;line-height:1.5;}
+.tabs{display:flex;gap:3px;background:var(--bg);border-radius:var(--radius-lg);padding:4px;border:1px solid var(--border);width:fit-content;margin-bottom:24px;}
+.tab-btn{padding:8px 18px;border-radius:var(--radius-md);font-size:13px;font-weight:500;cursor:pointer;border:none;background:transparent;color:var(--text-secondary);font-family:'Sora',sans-serif;transition:all .2s;}
+.tab-btn.active{background:var(--white);color:var(--bordeaux);box-shadow:var(--shadow-sm);font-weight:600;}
+</style>
 </head>
-
 <body>
-
 <div class="login-page" id="login-page">
   <div class="login-box">
-
-    <div class="login-logo">
-      <img
-        src="../assets/images/ICN-Junior-Conseil_logo.png"
-        style="height:54px;object-fit:contain"
-      />
-    </div>
-
+    <div class="login-logo"><img src="../assets/images/ICN-Junior-Conseil_logo.png" style="height:54px;object-fit:contain"/></div>
     <div class="login-title">Connexion</div>
-
-    <div class="login-sub">
-      Accès réservé aux membres ICN Junior Conseil.
-    </div>
-
+    <div class="login-sub">Accès réservé aux membres ICN Junior Conseil.</div>
     <button class="google-btn" onclick="doGoogleLogin()">
-      <img
-        src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg"
-        alt="Google"
-      />
-      Se connecter avec Google
+      <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google"/>Se connecter avec Google
     </button>
-
-    <div class="denied-box" id="denied-box">
-      <strong>Accès refusé</strong>
-      <p id="denied-msg"></p>
-    </div>
-
+    <div class="denied-box" id="denied-box"><strong>Accès refusé</strong><p id="denied-msg"></p></div>
     <div class="login-error" id="login-error"></div>
-
   </div>
 </div>
-
 <div class="app-page" id="app-page">
-
   <div id="sidebar-container"></div>
-
   <div class="app-content">
-
     <div class="page-header">
       <div class="page-title">Mes missions</div>
       <div class="page-subtitle" id="page-sub"></div>
     </div>
-
     <div class="page-body">
-
-      <div class="mm-tabs">
-
-        <button
-          class="mm-tab active"
-          onclick="switchTab('actives')"
-          id="mmt-actives"
-        >
-          🎯 En cours
-        </button>
-
-        <button
-          class="mm-tab"
-          onclick="switchTab('historique')"
-          id="mmt-historique"
-        >
-          📋 Historique
-        </button>
-
-        <button
-          class="mm-tab"
-          onclick="switchTab('liens')"
-          id="mmt-liens"
-        >
-          📂 Mes liens
-
-          <span
-            id="new-badge"
-            style="
-              display:none;
-              background:var(--bordeaux);
-              color:white;
-              border-radius:99px;
-              padding:1px 7px;
-              font-size:10px;
-              margin-left:4px;
-            "
-          ></span>
-
-        </button>
-
+      <div class="tabs">
+        <button class="tab-btn active" onclick="switchTab('active')" id="tab-active">En cours</button>
+        <button class="tab-btn" onclick="switchTab('history')" id="tab-history">Historique</button>
+        <button class="tab-btn" onclick="switchTab('docs')" id="tab-docs">Mes liens</button>
       </div>
-
-      <div class="mm-pane active" id="mmp-actives">
-        <div class="empty-state">
-          <div class="empty-icon">⏳</div>
-          <div class="empty-title">Chargement…</div>
-        </div>
-      </div>
-
-      <div class="mm-pane" id="mmp-historique">
-        <div class="empty-state">
-          <div class="empty-icon">📋</div>
-          <div class="empty-title">Chargement…</div>
-        </div>
-      </div>
-
-      <div class="mm-pane" id="mmp-liens">
-        <div class="empty-state">
-          <div class="empty-icon">📂</div>
-          <div class="empty-title">Chargement…</div>
-        </div>
-      </div>
-
+      <div id="pane-active"></div>
+      <div id="pane-history" style="display:none"></div>
+      <div id="pane-docs" style="display:none"></div>
     </div>
   </div>
 </div>
-
-<div
-  class="modal-overlay"
-  id="modal-q"
-  onclick="if(event.target===this)closeQ()"
->
-
-  <div class="modal-box" style="max-width:600px">
-
-    <div class="modal-header">
-
-      <div class="modal-title">
-        Questionnaire de fin d'étude
-      </div>
-
-      <button class="modal-close" onclick="closeQ()">x</button>
-
-    </div>
-
-    <div id="q-content"></div>
-
-    <div class="modal-actions">
-      <button class="btn btn-secondary" onclick="closeQ()">
-        Annuler
-      </button>
-
-      <button class="btn btn-primary" onclick="submitQ()">
-        Soumettre
-      </button>
-    </div>
-
-  </div>
-</div>
-
 <script>
-
+var ME = '', MY_ROLE = '', MY_IV_ID = '', MY_NAME = '';
+var myMissions = [], myDocs = [], sphinxUrl = '';
+var MOIS_S = ['Jan','Fev','Mar','Avr','Mai','Jun','Jul','Aou','Sep','Oct','Nov','Dec'];
 var STUDY_TYPES = {
-
-  marche:{
-    label:'Marché & Stratégie',
-    badge:'type-marche',
-    icon:'📊',
-
-    subtypes:[
-      'Étude de marché',
-      'Étude de lancement',
-      'Benchmark',
-      'Veille stratégique'
-    ],
-
-    phases:[
-      {
-        id:'cadrage',
-        label:'Cadrage',
-        sub:'Objectifs, problématique, périmètre'
-      },
-      {
-        id:'conception',
-        label:'Conception',
-        sub:'Méthodologie, questionnaires, guides'
-      },
-      {
-        id:'collecte',
-        label:'Collecte',
-        sub:'Enquêtes terrain, interviews, recherche doc'
-      },
-      {
-        id:'analyse',
-        label:'Analyse',
-        sub:'Traitement données, segmentation, insights'
-      },
-      {
-        id:'recommandations',
-        label:'Recommandations',
-        sub:'Opportunités, positionnement, axes de dev'
-      },
-      {
-        id:'restitution',
-        label:'Restitution',
-        sub:'Rapport détaillé, présentation client'
-      }
-    ]
-  },
-
-  marketing:{
-    label:'Marketing & Communication',
-    badge:'type-marketing',
-    icon:'📣',
-
-    subtypes:[
-      'Étude de notoriété',
-      'Plan de communication',
-      'Étude de satisfaction'
-    ],
-
-    phases:[
-      {
-        id:'cadrage',
-        label:'Cadrage',
-        sub:'KPIs, identification des cibles'
-      },
-      {
-        id:'conception',
-        label:'Conception',
-        sub:'Questionnaires, sondages, choix canaux'
-      },
-      {
-        id:'collecte',
-        label:'Collecte',
-        sub:'Diffusion enquêtes, feedback clients'
-      },
-      {
-        id:'analyse',
-        label:'Analyse',
-        sub:'Indicateurs, analyse qualitative des retours'
-      },
-      {
-        id:'recommandations',
-        label:'Recommandations',
-        sub:'Actions marketing, stratégie communication'
-      },
-      {
-        id:'restitution',
-        label:'Restitution',
-        sub:"Synthèse opérationnelle, plan d'actions"
-      }
-    ]
-  }
-
+  marche:{label:'Marche & Strategie',icon:'📊'},
+  marketing:{label:'Marketing & Com',icon:'📣'},
+  finance:{label:'Finance & Gestion',icon:'💰'},
+  affaires:{label:'Affaires publiques',icon:'🏛️'}
 };
 
 function getTypeKey(t){
-
-  if(!t) return 'marche';
-
-  var tl = t.toLowerCase();
-
-  if(
-    tl.includes('march') ||
-    tl.includes('strat') ||
-    tl.includes('bench')
-  ){
-    return 'marche';
-  }
-
-  if(
-    tl.includes('market') ||
-    tl.includes('not') ||
-    tl.includes('satisf')
-  ){
-    return 'marketing';
-  }
-
+  if(!t)return 'marche';
+  var tl=(t||'').toLowerCase();
+  if(tl.includes('market')||tl.includes('notori')||tl.includes('satisf')||tl.includes('com')||tl.includes('plan'))return 'marketing';
+  if(tl.includes('finan')||tl.includes('audit')||tl.includes('business')||tl.includes('rse')||tl.includes('myst'))return 'finance';
+  if(tl.includes('public')||tl.includes('sondage')||tl.includes('opinion'))return 'affaires';
   return 'marche';
 }
+function encId(id){return(id||'').replace(/['"<>&]/g,'');}
+function fmtD(s){if(!s)return'—';var p=s.split('-');return p.length===3?p[2]+'/'+p[1]+'/'+p[0]:s;}
+function fmtM(n){return Number(n||0).toLocaleString('fr-FR',{minimumFractionDigits:0,maximumFractionDigits:0})+' €';}
+function esc(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 
-var ME = '';
-var MY_ROLE = '';
-var MY_NAME = '';
-var MY_IV_ID = null;
-
-var myMissions = [];
-var myDocs = [];
-
-var questionnaire = null;
-var questionnaireId = null;
-
-function esc(s){
-  return (s || '')
-    .replace(/&/g,'&amp;')
-    .replace(/</g,'&lt;')
-    .replace(/>/g,'&gt;');
-}
-
-function switchTab(tab){
-
-  document.querySelectorAll('.mm-tab').forEach(function(el){
-    el.classList.remove('active');
+initAuth('mes_missions',function(user,role,profile){
+  ME=user.email; MY_ROLE=role;
+  MY_NAME=((profile.prenom||'')+' '+(profile.nom||'')).trim();
+  renderSidebar(role,profile,user,'mes_missions');
+  showAppPage(user,role,profile);
+  updateHealthIndicator();
+  var now=new Date();
+  var M=['janvier','fevrier','mars','avril','mai','juin','juillet','aout','septembre','octobre','novembre','decembre'];
+  document.getElementById('page-sub').innerText=now.getDate()+' '+M[now.getMonth()]+' '+now.getFullYear();
+  db.collection('intervenants').where('email','==',ME).limit(1).get().then(function(snap){
+    if(!snap.empty){MY_IV_ID=snap.docs[0].id;}
+    loadData();
+  }).catch(function(){loadData();});
+  db.collection('crm_config').doc('parametres').get().then(function(doc){
+    if(doc.exists&&doc.data().sphinx_url){sphinxUrl=doc.data().sphinx_url;}
   });
-
-  document.querySelectorAll('.mm-pane').forEach(function(el){
-    el.classList.remove('active');
-  });
-
-  document.getElementById('mmt-' + tab).classList.add('active');
-  document.getElementById('mmp-' + tab).classList.add('active');
-}
-
-function closeQ(){
-  document.getElementById('modal-q').style.display = 'none';
-}
-
-function submitQ(){
-  alert('Questionnaire soumis.');
-  closeQ();
-}
-
-initAuth('mes_missions', function(user, role, profile){
-
-  ME = user.email;
-  MY_ROLE = role;
-
-  db.collection('intervenants')
-    .where('email', '==', user.email)
-    .limit(1)
-    .get()
-    .then(function(snap){
-
-      if(!snap.empty){
-        MY_IV_ID = snap.docs[0].id;
-      }
-
-    });
-
-  MY_NAME = (
-    (profile.prenom || '') +
-    ' ' +
-    (profile.nom || '')
-  ).trim();
-
-  renderSidebar(
-    role,
-    profile,
-    user,
-    'mes_missions'
-  );
-
-  showAppPage(user, role, profile);
-
-  if(typeof updateHealthIndicator === 'function'){
-    updateHealthIndicator();
-  }
-
-  var now = new Date();
-
-  var M = [
-    'janvier',
-    'février',
-    'mars',
-    'avril',
-    'mai',
-    'juin',
-    'juillet',
-    'août',
-    'septembre',
-    'octobre',
-    'novembre',
-    'décembre'
-  ];
-
-  document.getElementById('page-sub').innerText =
-    (profile.prenom || '') +
-    ' · ' +
-    now.getDate() +
-    ' ' +
-    M[now.getMonth()] +
-    ' ' +
-    now.getFullYear();
-
-  loadData();
-
 });
 
 function loadData(){
-
-  db.collection('questionnaires')
-    .where('actif', '==', true)
-    .limit(1)
-    .get()
-
-    .then(function(snap){
-
-      if(!snap.empty){
-
-        questionnaireId = snap.docs[0].id;
-
-        questionnaire = Object.assign(
-          { id:snap.docs[0].id },
-          snap.docs[0].data()
-        );
+  db.collection('etudes').onSnapshot(function(snap){
+    myMissions=[];
+    snap.forEach(function(doc){
+      var e=Object.assign({id:doc.id},doc.data());
+      var isMe=(e.intervenants||[]).some(function(i){
+        return i.intervenant_id===MY_IV_ID||(i.email||'').toLowerCase()===ME.toLowerCase();
+      });
+      if(!isMe){
+        isMe=(e.phases||[]).some(function(ph){
+          return(ph.intervenants||[]).some(function(iv){
+            return iv.intervenant_id===MY_IV_ID||(iv.email||'').toLowerCase()===ME.toLowerCase();
+          });
+        });
       }
-
-      renderEmptyStates();
-
-    })
-
-    .catch(function(err){
-
-      console.error(
-        'Erreur chargement questionnaire :',
-        err
-      );
-
+      if(isMe)myMissions.push(e);
     });
-
+    renderMissions();
+  });
+  db.collection('documents').onSnapshot(function(snap){
+    myDocs=[];
+    snap.forEach(function(doc){
+      var d=Object.assign({id:doc.id},doc.data());
+      var firstName=(MY_NAME||'').split(' ')[0].toLowerCase();
+      var mine=d.intervenant_id===MY_IV_ID||(d.intervenant_email||'').toLowerCase()===ME.toLowerCase()||(firstName&&(d.intervenant_nom||'').toLowerCase().includes(firstName));
+      if(mine)myDocs.push(d);
+    });
+    renderDocs();
+  });
 }
 
-function renderEmptyStates(){
-
-  document.getElementById('mmp-actives').innerHTML = `
-    <div class="empty-state">
-      <div class="empty-icon">🎯</div>
-      <div class="empty-title">Aucune mission active</div>
-      <div class="empty-sub">
-        Vous n'avez actuellement aucune mission assignée.
-      </div>
-    </div>
-  `;
-
-  document.getElementById('mmp-historique').innerHTML = `
-    <div class="empty-state">
-      <div class="empty-icon">📋</div>
-      <div class="empty-title">Aucun historique</div>
-      <div class="empty-sub">
-        Les missions terminées apparaîtront ici.
-      </div>
-    </div>
-  `;
-
-  document.getElementById('mmp-liens').innerHTML = `
-    <div class="empty-state">
-      <div class="empty-icon">📂</div>
-      <div class="empty-title">Aucun document</div>
-      <div class="empty-sub">
-        Les liens et documents partagés apparaîtront ici.
-      </div>
-    </div>
-  `;
-
+function renderMissions(){
+  var active=myMissions.filter(function(e){return['Signé','En cours'].includes(e.statut);});
+  var hist=myMissions.filter(function(e){return['Livré','Facturé','Clôturé'].includes(e.statut);});
+  renderList(active,'pane-active',true);
+  renderList(hist,'pane-history',false);
 }
 
+function switchTab(k){
+  ['active','history','docs'].forEach(function(t){
+    document.getElementById('tab-'+t).classList.toggle('active',t===k);
+    document.getElementById('pane-'+t).style.display=t===k?'block':'none';
+  });
+}
+
+function getMyPhasesInEtude(e){
+  var r=[];
+  (e.phases||[]).forEach(function(ph){
+    (ph.intervenants||[]).forEach(function(iv){
+      if(iv.intervenant_id===MY_IV_ID||(iv.email||'').toLowerCase()===ME.toLowerCase()){
+        r.push({phase:ph,assignment:iv});
+      }
+    });
+  });
+  return r;
+}
+
+function renderList(list,cid,isActive){
+  var el=document.getElementById(cid); if(!el)return;
+  if(!list.length){
+    el.innerHTML='<div class="empty-state">'+'<div class="empty-icon">'+(isActive?'🎯':'✅')+'</div>'+'<div class="empty-title">'+(isActive?'Aucune mission en cours':'Aucune mission terminee')+'</div>'+'<div class="empty-sub">'+(isActive?'Tu seras notifie des qu\'une mission t\'est assignee.':'Tes missions terminees apparaitront ici.')+'</div>'+'</div>';
+    return;
+  }
+  var SC={Signé:'s-signe','En cours':'s-encours',Livré:'s-livre',Clôturé:'s-cloture',Facturé:'s-livre'};
+  el.innerHTML='<div class="missions-grid">'+list.map(function(e){
+    var eid=encId(e.id);
+    var tk=getTypeKey(e.type_etude||'');
+    var td=STUDY_TYPES[tk];
+    var myPhases=getMyPhasesInEtude(e);
+    var totalJeh=myPhases.reduce(function(a,mp){return a+(parseFloat(mp.assignment.jeh)||0);},0);
+    var totalBrut=myPhases.reduce(function(a,mp){return a+(parseFloat(mp.assignment.montant_brut)||0);},0);
+
+    var phaseRows=myPhases.length>0
+      ?myPhases.map(function(mp){
+        return '<div class="phase-row"><span class="phase-name">'+esc(mp.phase.label)+'</span><span class="phase-jeh">'+mp.assignment.jeh+' JEH</span><span class="phase-brut">'+fmtM(mp.assignment.montant_brut)+'</span></div>';
+      }).join('')
+      :'<div style="font-size:12px;color:var(--text-tertiary);font-style:italic;padding:6px">Phases en cours de definition.</div>';
+
+    var etudeDocs=myDocs.filter(function(d){return d.etude_id===e.id;});
+    var docRows=etudeDocs.length>0
+      ?'<div class="docs-section"><div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text-tertiary);margin-bottom:6px">Mes documents</div>'+etudeDocs.map(function(d){return'<div class="doc-row"><span class="doc-type">'+esc(d.type||'DOC')+'</span><span class="doc-label">'+esc(d.phase_label||d.nom_affiche||'Document')+'</span>'+(d.lien_gdrive?'<a class="doc-link" href="'+d.lien_gdrive+'" target="_blank">Ouvrir &rarr;</a>':'<span style="font-size:10px;color:var(--text-tertiary);font-style:italic">Lien en attente</span>')+'</div>';}).join('')+'</div>'
+      :'';
+
+    var sphinxBlock='';
+    if(!isActive&&sphinxUrl){
+      sphinxBlock='<a href="'+sphinxUrl+'" target="_blank" style="display:inline-flex;align-items:center;gap:6px;background:#f0fdf4;border:1px solid #86efac;color:#14532d;padding:6px 12px;border-radius:var(--radius-md);font-size:12px;font-weight:600;text-decoration:none;margin-bottom:10px">📋 Questionnaire de fin d\'etude &rarr;</a>';
+    }
+
+    return '<div class="mc'+(isActive?'':' done-mc')+'">'+
+      '<div class="mc-header">'+
+        '<div style="flex:1;min-width:0">'+
+          '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px">'+
+            '<span class="mc-ref">'+esc(e.reference||'—')+'</span>'+
+            '<span class="badge '+(SC[e.statut]||'')+'">'+esc(e.statut)+'</span>'+
+            '<span style="font-size:11px;font-weight:600;color:var(--text-tertiary)">'+td.icon+' '+td.label+'</span>'+
+          '</div>'+
+          '<div class="mc-title">'+esc(e.title||'Mission sans titre')+'</div>'+
+          '<div class="mc-client">'+esc(e.client_name||'—')+'</div>'+
+        '</div>'+
+        (totalBrut>0?'<div style="text-align:right;flex-shrink:0"><div style="font-size:18px;font-weight:800;color:var(--success)">'+fmtM(totalBrut)+'</div><div style="font-size:10px;color:var(--text-tertiary)">brut total</div></div>':'')+
+      '</div>'+
+      '<div class="mc-body">'+
+        '<div class="mc-stats">'+
+          '<div class="mc-stat"><div class="mc-stat-val">'+fmtD(e.date_debut)+'</div><div class="mc-stat-lbl">Debut</div></div>'+
+          '<div class="mc-stat"><div class="mc-stat-val">'+fmtD(e.date_fin)+'</div><div class="mc-stat-lbl">Fin prevue</div></div>'+
+          '<div class="mc-stat"><div class="mc-stat-val">'+totalJeh+'</div><div class="mc-stat-lbl">Mes JEH</div></div>'+
+          '<div class="mc-stat"><div class="mc-stat-val">'+myPhases.length+'</div><div class="mc-stat-lbl">Phase(s)</div></div>'+
+        '</div>'+
+        (e.description?'<div style="font-size:13px;color:var(--text-secondary);line-height:1.6;margin-bottom:14px;background:var(--bg);padding:10px 12px;border-radius:var(--radius-md)">'+esc(e.description)+'</div>':'')+
+        '<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text-tertiary);margin-bottom:6px">Mes phases assignees</div>'+
+        '<div class="phase-list">'+phaseRows+'</div>'+
+        docRows+
+        sphinxBlock+
+      '</div>'+
+      '<div class="mc-footer">'+
+        (isActive
+          ?'<button style="background:#dcfce7;color:#14532d;border:1px solid #86efac;cursor:pointer;font-family:\'Sora\',sans-serif;font-size:12px;font-weight:600;padding:6px 14px;border-radius:var(--radius-md)" data-eid="'+eid+'" onclick="marquerTerminee(this)">&#x2705; Marquer terminee</button><span style="font-size:11px;color:var(--text-tertiary)">Elle passera dans l\'historique</span>'
+          :'<span style="font-size:12px;color:var(--text-tertiary)">Mission terminee</span>'+(sphinxUrl?'<a href="'+sphinxUrl+'" target="_blank" style="font-size:12px;color:var(--bordeaux);font-weight:600;text-decoration:none">📋 Questionnaire</a>':'')
+        )+
+      '</div>'+
+    '</div>';
+  }).join('')+'</div>';
+}
+
+function renderDocs(){
+  var el=document.getElementById('pane-docs'); if(!el)return;
+  if(!myDocs.length){
+    el.innerHTML='<div class="empty-state"><div class="empty-icon">📂</div><div class="empty-title">Aucun document</div><div class="empty-sub">Tes RMs et documents de mission apparaitront ici.</div></div>';
+    return;
+  }
+  var withLink=myDocs.filter(function(d){return d.lien_gdrive;});
+  var withoutLink=myDocs.filter(function(d){return!d.lien_gdrive;});
+  var html='';
+  if(withLink.length){
+    html+='<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text-tertiary);margin-bottom:10px">Liens disponibles ('+withLink.length+')</div>';
+    html+='<div style="display:flex;flex-direction:column;gap:8px;margin-bottom:24px">';
+    withLink.forEach(function(d){
+      html+='<div style="background:var(--bg-card);border-radius:var(--radius-lg);padding:14px 16px;border:1px solid var(--border);display:flex;align-items:center;gap:12px">'+
+        '<span style="background:rgba(163,33,95,.1);color:var(--bordeaux);padding:4px 8px;border-radius:6px;font-weight:700;font-size:11px;flex-shrink:0">'+esc(d.type||'DOC')+'</span>'+
+        '<div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:600;color:var(--navy)">'+esc(d.nom_affiche||d.phase_label||'Document')+'</div><div style="font-size:11px;color:var(--text-tertiary);margin-top:2px">'+esc(d.etude_ref||'')+(d.phase_label?' · '+esc(d.phase_label):'')+'</div></div>'+
+        '<a href="'+d.lien_gdrive+'" target="_blank" style="font-size:12px;background:var(--bordeaux);color:white;padding:6px 12px;border-radius:var(--radius-md);text-decoration:none;font-weight:600;flex-shrink:0">Ouvrir &rarr;</a>'+
+      '</div>';
+    });
+    html+='</div>';
+  }
+  if(withoutLink.length){
+    html+='<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text-tertiary);margin-bottom:10px">En attente du lien ('+withoutLink.length+')</div>';
+    html+='<div style="display:flex;flex-direction:column;gap:6px">';
+    withoutLink.forEach(function(d){
+      html+='<div style="background:var(--bg);border-radius:var(--radius-md);padding:10px 14px;border:1px solid var(--border);display:flex;align-items:center;gap:10px;opacity:.7">'+
+        '<span style="background:#f1f5f9;color:#475569;padding:3px 7px;border-radius:4px;font-weight:700;font-size:10px;flex-shrink:0">'+esc(d.type||'DOC')+'</span>'+
+        '<div style="flex:1"><div style="font-size:12px;color:var(--text-secondary)">'+esc(d.nom_affiche||d.phase_label||'Document')+'</div><div style="font-size:10px;color:var(--text-tertiary);margin-top:1px">'+esc(d.etude_ref||'')+'</div></div>'+
+        '<span style="font-size:10px;color:var(--text-tertiary);font-style:italic">Lien en attente</span>'+
+      '</div>';
+    });
+    html+='</div>';
+  }
+  el.innerHTML=html;
+}
+
+function marquerTerminee(btn){
+  var eid=btn.dataset.eid;
+  if(!confirm('Marquer cette mission comme terminee ? Elle passera dans l\'historique.'))return;
+  db.collection('etudes').doc(eid).update({statut:'Livré'});
+}
 </script>
-
 </body>
 </html>
