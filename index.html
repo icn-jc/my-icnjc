@@ -103,7 +103,7 @@
       </div>
 
       <!-- MES ACTIONS -->
-      <div class="hub-section-title">Mes actions</div>
+      
       <div class="actions-grid" id="actions-grid">
         <div class="action-card"><div class="empty-state">Chargement…</div></div>
       </div>
@@ -137,7 +137,6 @@ initAuth('index', function(user, role, profile) {
 function loadHub(role, profile, user) {
   loadAlerts(role);
   loadKpiSnap(role);
-  loadMyActions(role, profile, user);
   loadModules(role);
 }
 
@@ -152,7 +151,7 @@ function loadAlerts(role) {
   };
 
   // 1. Études à compléter (CA + commercial)
-  if (['super_admin','president','vice_president','responsable_commercial'].includes(role)) {
+  if (['super_admin','president','vice_president','responsable_commercial','responsable_qualite'].includes(role)) {
     pending++;
     db.collection('etudes').where('a_completer','==',true).get().then(function(snap) {
       if (!snap.empty) alerts.push({type:'warning',icon:'📋',
