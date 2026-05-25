@@ -1,45 +1,26 @@
-// ── My-ICN-JC — Auth & Rôles ──────────────────────────────────
+// ═══════════════════════════════════════════════════════════════
+// auth.js — ICN Junior Conseil
+// ═══════════════════════════════════════════════════════════════
 
 const ALLOWED_DOMAIN = 'icnjuniorconseil.com';
 
-// ── Hiérarchie complète ───────────────────────────────────────
+// ── Hiérarchie des rôles ──────────────────────────────────────
 var ROLE_HIERARCHY_AUTH = [
-  'super_admin',
-  'president',
-  'vice_president',
-  'tresorier',
-  'secretaire',
-  'responsable_commercial',
-  'responsable_qualite',
-  'responsable_marketing',
-  'tresorerie',
-  'auditeur',
-  'marketing',
-  'commercial',
-  'intervenant',
-  'membre_cos', // Anciens membres — lecture seule CA
+  'super_admin', 'president', 'vice_president', 'tresorier', 'secretaire',
+  'responsable_commercial', 'responsable_qualite', 'responsable_marketing',
+  'tresorerie', 'auditeur', 'marketing', 'commercial', 'intervenant',
+  'membre_cos', 'tuteur'
 ];
 
-function getHighestRoleAuth(roles) {
-  for (var i = 0; i < ROLE_HIERARCHY_AUTH.length; i++) {
-    if (roles.indexOf(ROLE_HIERARCHY_AUTH[i]) !== -1) return ROLE_HIERARCHY_AUTH[i];
-  }
-  return 'commercial';
-}
-
-// ── Rôles CA (accès données financières / tréso) ──────────────
-const CA_ROLES = [
-  'super_admin','president','vice_president','tresorier',
-  'secretaire','responsable_commercial','responsable_qualite',
-  'responsable_marketing','tresorerie','auditeur','marketing',
-  'membre_cos' // lecture seule
-];
-
-// ── Permissions par page ──────────────────────────────────────
+// ── Accès par page ────────────────────────────────────────────
+// tuteur     → index + crm_prospection uniquement (lecture seule)
+// intervenant → mes_missions + index
+// Tous les autres rôles = accès normal selon liste
 const PAGE_ACCESS = {
   'index': ['super_admin','president','vice_president','tresorier','secretaire',
             'responsable_commercial','responsable_qualite','responsable_marketing',
-            'tresorerie','auditeur','marketing','commercial','membre_cos','intervenant','tuteur'],
+            'tresorerie','auditeur','marketing','commercial','membre_cos',
+            'intervenant','tuteur'],
 
   'tracker_treso': ['super_admin','vice_president','tresorier','tresorerie','responsable_qualite'],
   'tracker_orga':  ['super_admin','president','vice_president','tresorier','responsable_qualite','auditeur'],
@@ -58,23 +39,18 @@ const PAGE_ACCESS = {
                       'responsable_marketing','responsable_qualite','secretaire','tresorerie','membre_cos'],
   'crm_partenariats':['super_admin','president','vice_president','tresorier','responsable_commercial',
                       'responsable_marketing','responsable_qualite','secretaire','tresorerie','commercial'],
+  'crm_compta':      ['super_admin','president','vice_president','tresorier','tresorerie','responsable_qualite'],
+  'crm_partenariats':ROLE_HIERARCHY_AUTH,
+
   'etudes':          ['super_admin','president','vice_president','tresorier','responsable_commercial',
                       'responsable_qualite','secretaire','tresorerie','responsable_marketing','membre_cos'],
-  'mes_missions':    ['super_admin','president','vice_president','tresorier','secretaire',
-                      'responsable_commercial','responsable_qualite','responsable_marketing',
-                      'tresorerie','auditeur','marketing','commercial','intervenant','membre_cos'],
+  'mes_missions':    ROLE_HIERARCHY_AUTH,
   'gestion_docs':    ['super_admin','responsable_qualite'],
-  'crm_compta':      ['super_admin','president','vice_president','tresorier','tresorerie','responsable_qualite'],
-
-  'etudes': ['super_admin','president','vice_president','tresorier','responsable_commercial',
-             'responsable_qualite','secretaire','tresorerie','responsable_marketing','membre_cos'],
-  'evenements': ['super_admin','president','vice_president','tresorier','secretaire',
-                 'responsable_commercial','responsable_qualite','responsable_marketing',
-                 'tresorerie','auditeur','marketing','commercial','membre_cos'],
-  'mes_missions': ROLE_HIERARCHY_AUTH,
-  'mandats': ['super_admin','president','vice_president'], // Lecture tous, modif super_admin + président du mandat
-
-  'admin': ['super_admin','president'],
+  'evenements':      ['super_admin','president','vice_president','tresorier','secretaire',
+                      'responsable_commercial','responsable_qualite','responsable_marketing',
+                      'tresorerie','auditeur','marketing','commercial','membre_cos'],
+  'mandats':         ['super_admin','president','vice_president'],
+  'admin':           ['super_admin','president'],
 };
 
 // ── Droits de modification ────────────────────────────────────
@@ -87,9 +63,8 @@ const EDIT_ROLES = {
   'etudes':            ['super_admin','president','vice_president','responsable_commercial','responsable_qualite'],
   'mes_missions':      ['super_admin','responsable_commercial','responsable_qualite'],
   'gestion_docs':      ['super_admin','responsable_qualite'],
-  'crm_partenariats':  ['super_admin','president','vice_president','responsable_commercial'],
+  'crm_partenariats':  ['super_admin','vice_president'],
   'crm_prospection':   ROLE_HIERARCHY_AUTH,
-  'etudes':            ['super_admin','president','vice_president','responsable_commercial','responsable_qualite'],
   'evenements':        ['super_admin','president','vice_president','secretaire'],
   'kpi_commercial':    ['super_admin','president','vice_president','responsable_commercial'],
   'mandats':           ['super_admin'],
@@ -103,170 +78,164 @@ let CURRENT_USER    = null;
 let CURRENT_ROLE    = null;
 let CURRENT_PROFILE = null;
 
-// ── Init Auth ─────────────────────────────────────────────────
+// ── Utilitaire rôle le plus élevé ────────────────────────────
+function getHighestRoleAuth(roles) {
+  if (!roles || !roles.length) return 'commercial';
+  for (var i = 0; i < ROLE_HIERARCHY_AUTH.length; i++) {
+    if (roles.includes(ROLE_HIERARCHY_AUTH[i])) return ROLE_HIERARCHY_AUTH[i];
+  }
+  return roles[0];
+}
+
+// ═══════════════════════════════════════════════════════════════
+// INIT AUTH — point d'entrée unique
+// ═══════════════════════════════════════════════════════════════
 function initAuth(pageKey, onReady) {
   auth.onAuthStateChanged(async function(user) {
-    if (!user) { showLoginPage(); return; }
-    const email  = user.email || '';
+    if (!user) {
+      showLoginPage();
+      return;
+    }
+
+    const email  = (user.email || '').toLowerCase().trim();
     const domain = email.split('@')[1] || '';
-    if (domain !== ALLOWED_DOMAIN) {
-      // Pour les emails hors domaine : vérifier whitelist_emails OU users collection
+
+    // ── CAS 1 : email @icnjuniorconseil.com ──────────────────
+    if (domain === ALLOWED_DOMAIN) {
       try {
-        // 1. Check whitelist_emails first
-        const wlDoc = await db.collection('whitelist_emails').doc(email.toLowerCase()).get();
-        if (wlDoc.exists) {
-          const wlData = wlDoc.data();
-          CURRENT_USER = user;
-          CURRENT_PROFILE = {
-            prenom: wlData.prenom || email.split('@')[0],
-            nom: wlData.nom || '',
-            email: email,
-            role: wlData.role || 'tuteur',
-            roles: [wlData.role || 'tuteur'],
-            prospecte: false
-          };
-          CURRENT_ROLE = wlData.role || 'tuteur';
-          const allowed = PAGE_ACCESS[pageKey] || [];
-          if (!allowed.includes(CURRENT_ROLE)) {
-            auth.signOut();
-            showAccessDenied('Tu n\'as pas accès à cette page.');
-            return;
-          }
-          if (onReady) onReady(user, CURRENT_ROLE, CURRENT_PROFILE);
+        const doc = await db.collection('users').doc(email).get();
+        if (!doc.exists) {
+          auth.signOut();
+          showAccessDenied('Ton compte n\'a pas encore été configuré. Contacte Stella.');
           return;
         }
-        // 2. Check users collection (email ajouté manuellement dans Firestore)
-        const userDoc = await COLLECTIONS.users.doc(email).get();
-        if (userDoc.exists) {
-          CURRENT_USER = user;
-          CURRENT_PROFILE = userDoc.data();
-          var profileRoles2 = Array.isArray(CURRENT_PROFILE.roles)
-            ? CURRENT_PROFILE.roles
-            : (CURRENT_PROFILE.role ? [CURRENT_PROFILE.role] : ['intervenant']);
-          CURRENT_ROLE = getHighestRoleAuth(profileRoles2);
-          const allowed2 = PAGE_ACCESS[pageKey] || [];
-          if (!allowed2.includes(CURRENT_ROLE)) {
-            auth.signOut();
-            showAccessDenied('Tu n\'as pas accès à cette page.');
-            return;
-          }
-          if (onReady) onReady(user, CURRENT_ROLE, CURRENT_PROFILE);
+        const data = doc.data();
+        const roles = Array.isArray(data.roles) ? data.roles
+                    : data.role ? [data.role]
+                    : ['commercial'];
+        CURRENT_USER    = user;
+        CURRENT_PROFILE = data;
+        CURRENT_ROLE    = getHighestRoleAuth(roles);
+        const allowed = PAGE_ACCESS[pageKey] || [];
+        if (!allowed.includes(CURRENT_ROLE)) {
+          auth.signOut();
+          showAccessDenied('Tu n\'as pas accès à cette page.');
           return;
         }
-        // Neither found
-        auth.signOut();
-        showAccessDenied('Accès non autorisé. Contacte l\'administrateur pour être ajouté(e).');
-        return;
+        if (onReady) onReady(user, CURRENT_ROLE, CURRENT_PROFILE);
       } catch(e) {
-        // Firestore permission denied for whitelist — try users collection directly
-        try {
-          const userDoc2 = await COLLECTIONS.users.doc(email).get();
-          if (userDoc2.exists) {
-            CURRENT_USER = user;
-            CURRENT_PROFILE = userDoc2.data();
-            var profileRoles3 = Array.isArray(CURRENT_PROFILE.roles)
-              ? CURRENT_PROFILE.roles
-              : (CURRENT_PROFILE.role ? [CURRENT_PROFILE.role] : ['intervenant']);
-            CURRENT_ROLE = getHighestRoleAuth(profileRoles3);
-            const allowed3 = PAGE_ACCESS[pageKey] || [];
-            if (!allowed3.includes(CURRENT_ROLE)) {
-              auth.signOut();
-              showAccessDenied('Tu n\'as pas accès à cette page.');
-              return;
-            }
-            if (onReady) onReady(user, CURRENT_ROLE, CURRENT_PROFILE);
-            return;
-          }
-        } catch(e2) {}
         auth.signOut();
-        showAccessDenied('Accès non autorisé. Vérifie avec l\'administrateur que ton adresse est bien enregistrée.');
-        return;
+        showAccessDenied('Erreur de connexion : ' + e.message);
       }
+      return;
     }
+
+    // ── CAS 2 : email hors domaine → cherche dans whitelist_emails ──
     try {
-      const doc = await COLLECTIONS.users.doc(email).get();
-      if (!doc.exists) {
-        auth.signOut();
-        showAccessDenied('Ton compte n\'a pas encore été configuré. Contacte Stella.');
+      const wlDoc = await db.collection('whitelist_emails').doc(email).get();
+      if (wlDoc.exists) {
+        const wl = wlDoc.data();
+        const role = wl.role || 'tuteur';
+        CURRENT_USER    = user;
+        CURRENT_ROLE    = role;
+        CURRENT_PROFILE = {
+          prenom:    wl.prenom || email.split('@')[0],
+          nom:       wl.nom    || '',
+          email:     email,
+          role:      role,
+          roles:     [role],
+          prospecte: false
+        };
+        const allowed = PAGE_ACCESS[pageKey] || [];
+        if (!allowed.includes(role)) {
+          auth.signOut();
+          showAccessDenied('Tu n\'as pas accès à cette page. Rôle : ' + role);
+          return;
+        }
+        if (onReady) onReady(user, role, CURRENT_PROFILE);
         return;
       }
-      CURRENT_USER    = user;
-      CURRENT_PROFILE = doc.data();
-      var profileRoles = Array.isArray(CURRENT_PROFILE.roles)
-        ? CURRENT_PROFILE.roles
-        : (CURRENT_PROFILE.role ? [CURRENT_PROFILE.role] : ['commercial']);
-      CURRENT_ROLE = getHighestRoleAuth(profileRoles);
-      const allowed = PAGE_ACCESS[pageKey] || [];
-      if (!allowed.includes(CURRENT_ROLE)) {
-        showAccessDenied('Tu n\'as pas accès à cette page.');
-        return;
-      }
-      if (onReady) onReady(CURRENT_USER, CURRENT_ROLE, CURRENT_PROFILE);
-    } catch (err) {
-      showAccessDenied('Erreur de connexion : ' + err.message);
+
+      // Pas dans whitelist_emails → accès refusé
+      auth.signOut();
+      showAccessDenied('Ton adresse email (' + email + ') n\'est pas autorisée. Contacte l\'administrateur.');
+
+    } catch(e) {
+      auth.signOut();
+      showAccessDenied('Erreur de connexion : ' + e.message);
     }
   });
 }
 
-function isAdmin()        { return ['super_admin','president'].includes(CURRENT_ROLE); }
-function isCA()           { return CA_ROLES.includes(CURRENT_ROLE); }
-function canEdit(page)    { return (EDIT_ROLES[page] || []).includes(CURRENT_ROLE); }
-function canArchiveOrga() { return ARCHIVE_ORGA_ROLES.includes(CURRENT_ROLE); }
-function isSuperAdmin()   { return CURRENT_ROLE === 'super_admin'; }
-function isMembre_cos()   { return CURRENT_ROLE === 'membre_cos'; }
-
-function doGoogleLogin() {
-  const errEl = document.getElementById('login-error');
-  if (errEl) errEl.style.display = 'none';
-  auth.signInWithPopup(googleProvider).catch(function(e) {
-    if (e.code !== 'auth/popup-closed-by-user') {
-      if (errEl) { errEl.innerText = 'Erreur : ' + e.message; errEl.style.display = 'block'; }
-    }
-  });
-}
-
-function doLogout() {
-  auth.signOut().then(function() {
-    window.location.href = getBasePath() + 'index.html';
-  });
-}
-
+// ═══════════════════════════════════════════════════════════════
+// UI helpers
+// ═══════════════════════════════════════════════════════════════
 function showLoginPage() {
-  const lp = document.getElementById('login-page');
-  const ap = document.getElementById('app-page');
+  var lp = document.getElementById('login-page');
+  var ap = document.getElementById('app-page');
   if (lp) lp.style.display = 'flex';
   if (ap) ap.style.display = 'none';
-}
-
-function showAccessDenied(msg) {
-  const lp = document.getElementById('login-page');
-  const ap = document.getElementById('app-page');
-  const db = document.getElementById('denied-box');
-  const dm = document.getElementById('denied-msg');
-  if (lp) lp.style.display = 'flex';
-  if (ap) ap.style.display = 'none';
-  if (db) db.style.display = 'block';
-  if (dm) dm.innerText = msg;
 }
 
 function showAppPage(user, role, profile) {
-  const lp = document.getElementById('login-page');
-  const ap = document.getElementById('app-page');
+  var lp = document.getElementById('login-page');
+  var ap = document.getElementById('app-page');
   if (lp) lp.style.display = 'none';
-  if (ap) ap.style.display = 'block';
-  const nameEl = document.getElementById('user-name');
-  if (nameEl) nameEl.innerText = profile.prenom || user.displayName || user.email;
-  const avatarEl = document.getElementById('user-avatar');
-  if (avatarEl && user.photoURL) { avatarEl.src = user.photoURL; avatarEl.style.display = 'block'; }
+  if (ap) ap.style.display = 'flex';
+  updateHealthIndicator();
 }
 
-function getBasePath() {
-  const parts = window.location.pathname.split('/').filter(Boolean);
-  const repoIdx = parts.indexOf('my-icnjc');
-  if (repoIdx === -1) return './';
-  const afterRepo = parts.slice(repoIdx + 1);
-  const levels = afterRepo.length > 0
-    ? afterRepo.length - (afterRepo[afterRepo.length-1].includes('.') ? 1 : 0)
-    : 0;
-  return levels > 0 ? '../'.repeat(levels) : './';
+function showAccessDenied(msg) {
+  var lp = document.getElementById('login-page');
+  var ap = document.getElementById('app-page');
+  if (lp) lp.style.display = 'flex';
+  if (ap) ap.style.display = 'none';
+  var db2 = document.getElementById('denied-box');
+  var dm  = document.getElementById('denied-msg');
+  if (db2) db2.style.display = 'block';
+  if (dm)  dm.innerText = msg;
+  var le  = document.getElementById('login-error');
+  if (le)  le.innerText = msg;
+}
+
+function doGoogleLogin() {
+  var provider = new firebase.auth.GoogleAuthProvider();
+  auth.signInWithPopup(provider).catch(function(e) {
+    // Ignore cancelled-popup (double-click)
+    if (e.code === 'auth/cancelled-popup-request') return;
+    if (e.code === 'auth/popup-closed-by-user') return;
+    var le = document.getElementById('login-error');
+    if (le) le.innerText = 'Erreur : ' + e.message;
+  });
+}
+
+function doGoogleLogout() {
+  auth.signOut().then(function() {
+    window.location.reload();
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Fonctions utilitaires exportées
+// ═══════════════════════════════════════════════════════════════
+function getCurrentRole()    { return CURRENT_ROLE; }
+function getCurrentUser()    { return CURRENT_USER; }
+function getCurrentProfile() { return CURRENT_PROFILE; }
+
+function canEdit(pageKey) {
+  var roles = EDIT_ROLES[pageKey] || [];
+  return roles.includes(CURRENT_ROLE);
+}
+
+function hasRole(role) {
+  return CURRENT_ROLE === role;
+}
+
+function isInRole(roles) {
+  return roles.includes(CURRENT_ROLE);
+}
+
+function updateHealthIndicator() {
+  var el = document.getElementById('health-indicator');
+  if (el) el.style.background = 'var(--success)';
 }
