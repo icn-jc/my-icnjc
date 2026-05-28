@@ -26,9 +26,9 @@ var PAGE_ACCESS = {
   'tracker_orga':  ['super_admin','president','vice_president','tresorier','responsable_qualite','auditeur'],
 
   'kpi_treso':     ['super_admin','president','vice_president','tresorier','tresorerie',
-                    'secretaire','responsable_marketing','responsable_commercial','responsable_qualite','membre_cos'],
+                    'secretaire','responsable_marketing','responsable_commercial','responsable_qualite','membre_cos','tuteur'],
   'kpi_commercial':['super_admin','president','vice_president','tresorier','responsable_commercial',
-                    'secretaire','marketing','responsable_marketing','auditeur','commercial','membre_cos'],
+                    'secretaire','marketing','responsable_marketing','auditeur','commercial','membre_cos','tuteur'],
 
   'crm_prospection': ['super_admin','president','vice_president','tresorier','secretaire',
                       'responsable_commercial','responsable_qualite','responsable_marketing',
@@ -43,7 +43,7 @@ var PAGE_ACCESS = {
   'crm_partenariats':ROLE_HIERARCHY_AUTH,
 
   'etudes':          ['super_admin','president','vice_president','tresorier','responsable_commercial',
-                      'responsable_qualite','secretaire','tresorerie','responsable_marketing','membre_cos'],
+                      'responsable_qualite','secretaire','tresorerie','responsable_marketing','membre_cos','tuteur'],
   'mes_missions':    ['super_admin','president','vice_president','tresorier','secretaire',
                       'responsable_commercial','responsable_qualite','responsable_marketing',
                       'tresorerie','auditeur','marketing','commercial','intervenant','membre_cos'],
