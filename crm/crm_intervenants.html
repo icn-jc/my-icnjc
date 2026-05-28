@@ -736,8 +736,7 @@ function renderIvEdit(iv) {
     '<input class="input" placeholder="Commentaire…" value="'+esc(iv.note_commentaire||'')+'" data-ivid="'+id+'" onblur="saveIvField(this.dataset.ivid,\'note_commentaire\',this.value)" style="margin-top:6px;font-size:12px"/>'+
     '</div>'+
     '</div>';
-  document.getElementById('ivp-edit').innerHTML = html;
-  setTimeout(function(){
+    setTimeout(function(){
     var ms=document.getElementById('ev-mandats-'+id);
     if(ms&&allMandatsIV&&allMandatsIV.length){
       ms.innerHTML='<option value="externe">Externe</option>'+
