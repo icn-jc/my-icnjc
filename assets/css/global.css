@@ -442,7 +442,7 @@ body {
 .sidebar.collapsed .sidebar-logout{justify-content:center;padding:6px 0;}
 
   /* ── Content margin ── */
-.app-content{margin-left:220px;min-height:100vh;width:calc(100%-220px);}
+.app-content{margin-left:220px;min-height:100vh;width:calc(100% - 220px);}
 .app-content.sidebar-collapsed{margin-left:54px;width: calc(100% - 54px)}
 
   /* ── Mobile ── */
