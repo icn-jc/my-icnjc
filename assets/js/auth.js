@@ -44,7 +44,9 @@ var PAGE_ACCESS = {
 
   'etudes':          ['super_admin','president','vice_president','tresorier','responsable_commercial',
                       'responsable_qualite','secretaire','tresorerie','responsable_marketing','membre_cos'],
-  'mes_missions':    ROLE_HIERARCHY_AUTH,
+  'mes_missions':    ['super_admin','president','vice_president','tresorier','secretaire',
+                      'responsable_commercial','responsable_qualite','responsable_marketing',
+                      'tresorerie','auditeur','marketing','commercial','intervenant','membre_cos'],
   'gestion_docs':    ['super_admin','responsable_qualite'],
   'evenements':      ['super_admin','president','vice_president','tresorier','secretaire',
                       'responsable_commercial','responsable_qualite','responsable_marketing',
@@ -144,7 +146,8 @@ function initAuth(pageKey, onReady) {
           email:     email,
           role:      role,
           roles:     [role],
-          prospecte: false
+          prospecte: false,
+          externe:   true
         };
         var allowed = PAGE_ACCESS[pageKey] || [];
         if (!allowed.includes(role)) {
