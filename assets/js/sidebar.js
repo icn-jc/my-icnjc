@@ -4,10 +4,10 @@
 
 // Structure de navigation par rôle
 function buildNavItems(role, basePath) {
-  const ALL = ['super_admin','president','vice_president','tresorier','secretaire',
+  var ALL = ['super_admin','president','vice_president','tresorier','secretaire',
                'responsable_commercial','responsable_qualite','responsable_marketing',
                'tresorerie','auditeur','marketing','commercial','membre_cos','intervenant'];
-  const all = [
+  var all = [
     // ── Accueil ──────────────────────────────────────────────
     { section:null, key:'home', label:'Accueil', icon:'home',
       href: basePath+'index.html', roles:ALL },
@@ -81,7 +81,7 @@ function buildNavItems(role, basePath) {
 
 
 function getIcon(name) {
-  const icons = {
+  var icons = {
     home: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9,22 9,12 15,12 15,22"/></svg>',
     clipboard: '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/></svg>',
     'check-square': '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9,11 12,14 22,4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>',
@@ -116,8 +116,8 @@ function getBasePath() {
 }
 
 function renderSidebar(role, profile, user, activeKey) {
-  const basePath = getBasePath();
-  const items = buildNavItems(role, basePath);
+  var basePath = getBasePath();
+  var items = buildNavItems(role, basePath);
 
   // Construire le HTML nav
   let navHTML = '';
@@ -127,17 +127,17 @@ function renderSidebar(role, profile, user, activeKey) {
       navHTML += `<div class="sidebar-section">${item.section}</div>`;
       lastSection = item.section;
     }
-    const isActive = item.key === activeKey ? ' active' : '';
+    var isActive = item.key === activeKey ? ' active' : '';
     navHTML += `<a class="sidebar-item${isActive}" href="${item.href}" data-label="${item.label}">${getIcon(item.icon)}<span class="nav-label">${item.label}</span></a>`;
   });
 
-  const initials = (profile.prenom || '?')[0].toUpperCase();
-  const photoURL  = user.photoURL || '';
+  var initials = (profile.prenom || '?')[0].toUpperCase();
+  var photoURL  = user.photoURL || '';
 
   // Lire la préférence sauvegardée
-  const isCollapsed = localStorage.getItem('sidebar-collapsed') === 'true';
+  var isCollapsed = localStorage.getItem('sidebar-collapsed') === 'true';
 
-  const sidebarHTML = `
+  var sidebarHTML = `
     <nav class="sidebar${isCollapsed ? ' collapsed' : ''}" id="sidebar">
       <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()" title="Réduire/Agrandir">
         <span id="sidebar-toggle-icon">${isCollapsed ? '›' : '‹'}</span>
@@ -167,7 +167,7 @@ function renderSidebar(role, profile, user, activeKey) {
   `;
 
   // Injecter dans le DOM
-  const container = document.getElementById('sidebar-container');
+  var container = document.getElementById('sidebar-container');
   if (container) container.innerHTML = sidebarHTML +
     // Overlay mobile
     '<div class="sidebar-overlay" id="sidebar-overlay" onclick="closeMobileSidebar()"></div>' +
@@ -175,8 +175,14 @@ function renderSidebar(role, profile, user, activeKey) {
     '<button class="mobile-menu-btn" id="mobile-menu-btn" onclick="openMobileSidebar()">☰</button>';
 
   // Appliquer l'état au contenu principal
-  const appContent = document.querySelector('.app-content');
-  if (appContent && isCollapsed) appContent.classList.add('sidebar-collapsed');
+  var appContent = document.querySelector('.app-content');
+  if (appContent) {
+    if (isCollapsed) {
+      appContent.classList.add('sidebar-collapsed');
+    } else {
+      appContent.classList.remove('sidebar-collapsed');
+    }
+  }
 }
 
 function openMobileSidebar() {
@@ -193,12 +199,21 @@ function closeMobileSidebar() {
   if (overlay) overlay.classList.remove('active');
 }
 
+function doLogout() {
+  if (typeof auth !== 'undefined') {
+    auth.signOut().then(function() { window.location.reload(); });
+  } else {
+    window.location.reload();
+  }
+}
+
 function toggleSidebar() {
-  const sidebar    = document.getElementById('sidebar');
-  const appContent = document.querySelector('.app-content');
-  const icon       = document.getElementById('sidebar-toggle-icon');
+  var sidebar    = document.getElementById('sidebar');
+  var appContent = document.querySelector('.app-content');
+  var icon       = document.getElementById('sidebar-toggle-icon');
   if (!sidebar) return;
-  const collapsed = sidebar.classList.toggle('collapsed');
+  var collapsed = sidebar.classList.toggle('collapsed');
+  localStorage.setItem('sidebar-collapsed', collapsed ? 'true' : 'false');
   if (appContent) appContent.classList.toggle('sidebar-collapsed', collapsed);
   if (icon) icon.textContent = collapsed ? '›' : '‹';
   localStorage.setItem('sidebar-collapsed', collapsed);
@@ -208,13 +223,13 @@ function toggleSidebar() {
 async function updateHealthIndicator() {
   try {
     // Critères : tâches en retard, études actives, KPI
-    const today = new Date().toISOString().split('T')[0];
-    const lateTasks = await COLLECTIONS.tasks
+    var today = new Date().toISOString().split('T')[0];
+    var lateTasks = await COLLECTIONS.tasks
       .where('status','!=','Terminé')
       .where('date','<', today)
       .get();
 
-    const activeEtudes = await COLLECTIONS.etudes
+    var activeEtudes = await COLLECTIONS.etudes
       .where('statut','in',['En cours','Bloquée'])
       .get();
 
@@ -224,8 +239,8 @@ async function updateHealthIndicator() {
       if (doc.data().statut === 'Bloquée') score -= 15;
     });
 
-    const dot   = document.getElementById('health-dot');
-    const label = document.getElementById('health-label');
+    var dot   = document.getElementById('health-dot');
+    var label = document.getElementById('health-label');
     if (!dot || !label) return;
 
     if (score >= 75) {
