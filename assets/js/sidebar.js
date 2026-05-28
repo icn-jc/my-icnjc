@@ -24,18 +24,18 @@ function buildNavItems(role, basePath) {
     { section:'KPI', key:'kpi_treso', label:'KPI Trésorerie', icon:'trending-up',
       href: basePath+'dashboard/kpi_treso.html',
       roles:['super_admin','president','vice_president','tresorier','tresorerie',
-             'secretaire','responsable_marketing','responsable_commercial','responsable_qualite','membre_cos'] },
+             'secretaire','responsable_marketing','responsable_commercial','responsable_qualite','membre_cos','tuteur'] },
     { section:null, key:'kpi_commercial', label:'KPI Commercial', icon:'bar-chart',
       href: basePath+'dashboard/kpi_commercial.html',
       roles:['super_admin','president','vice_president','tresorier','responsable_commercial',
-             'secretaire','marketing','responsable_marketing','auditeur','commercial','membre_cos'] },
+             'secretaire','marketing','responsable_marketing','auditeur','commercial','membre_cos','tuteur'] },
 
     // ── CRM ──────────────────────────────────────────────────
     { section:'CRM', key:'crm_prospection', label:'Prospection', icon:'target',
       href: basePath+'crm/crm_prospection.html',
       roles:['super_admin','president','vice_president','tresorier','secretaire',
              'responsable_commercial','responsable_qualite','responsable_marketing',
-             'tresorerie','auditeur','marketing','commercial','membre_cos'] },
+             'tresorerie','auditeur','marketing','commercial','membre_cos','tuteur'] },
     { section:null, key:'crm_clients', label:'Clients', icon:'briefcase',
       href: basePath+'crm/crm_clients.html',
       roles:['super_admin','president','vice_president','tresorier','responsable_commercial',
@@ -47,7 +47,7 @@ function buildNavItems(role, basePath) {
     { section:null, key:'etudes', label:'Études', icon:'folder',
       href: basePath+'etudes/etudes_index.html',
       roles:['super_admin','president','vice_president','tresorier','responsable_commercial',
-             'responsable_qualite','secretaire','tresorerie','responsable_marketing','commercial','membre_cos'] },
+             'responsable_qualite','secretaire','tresorerie','responsable_marketing','commercial','membre_cos','tuteur'] },
     { section:null, key:'crm_partenariats', label:'Partenariats', icon:'link',
       href: basePath+'crm/crm_partenariats.html',
       roles:['super_admin','president','vice_president','responsable_commercial',
@@ -135,7 +135,9 @@ function renderSidebar(role, profile, user, activeKey) {
   var photoURL  = user.photoURL || '';
 
   // Lire la préférence sauvegardée
-  var isCollapsed = localStorage.getItem('sidebar-collapsed') === 'true';
+  // Default: sidebar open (never start collapsed)
+  var isCollapsed = false;
+  try { isCollapsed = localStorage.getItem('sidebar-collapsed') === 'true'; } catch(e) {}
 
   var sidebarHTML = `
     <nav class="sidebar${isCollapsed ? ' collapsed' : ''}" id="sidebar">
