@@ -104,6 +104,17 @@ function getIcon(name) {
   return icons[name] || '';
 }
 
+function getBasePath() {
+  var path = window.location.pathname;
+  if (path.includes('/audit/') || path.includes('/crm/') ||
+      path.includes('/dashboard/') || path.includes('/etudes/') ||
+      path.includes('/evenements/') || path.includes('/mon_espace/') ||
+      path.includes('/qualite/') || path.includes('/admin/')) {
+    return '../';
+  }
+  return './';
+}
+
 function renderSidebar(role, profile, user, activeKey) {
   const basePath = getBasePath();
   const items = buildNavItems(role, basePath);
