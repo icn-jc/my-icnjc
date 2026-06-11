@@ -174,6 +174,14 @@ tr:hover td{background:rgba(27,42,74,0.02);cursor:pointer;}
         <label class="input-label">Description de la mission *</label>
         <textarea class="input" id="ne-desc" rows="2" style="resize:vertical" placeholder="Contexte, objectifs, périmètre de la mission…"></textarea>
       </div>
+      <div class="form-field">
+        <label class="input-label">Frais de structure (€) <span style="font-size:10px;color:var(--text-tertiary);font-weight:400">— facturés en plus des JEH</span></label>
+        <input class="input" type="number" id="ne-frais-structure" value="100" min="0" step="10" oninput="updateNeTotals()"/>
+      </div>
+      <div class="form-field">
+        <label class="input-label">Taux rémunération intervenants (%) <span style="font-size:10px;color:var(--text-tertiary);font-weight:400">— défaut 50%</span></label>
+        <input class="input" type="number" id="ne-taux" value="50" min="0" max="100" step="5" oninput="updateNeTotals()"/>
+      </div>
       <div class="form-field full">
         <label class="input-label">Phases & JEH <span style="font-size:10px;color:var(--text-tertiary);font-weight:400">— générées depuis le type d'étude, ajustables</span></label>
         <div id="ne-phases-list" style="display:flex;flex-direction:column;gap:6px;margin-top:4px"></div>
@@ -184,15 +192,23 @@ tr:hover td{background:rgba(27,42,74,0.02);cursor:pointer;}
             <span style="font-weight:700;color:var(--navy)" id="ne-total-jeh">0 JEH</span>
           </div>
           <div style="display:flex;justify-content:space-between;margin-bottom:3px">
-            <span style="color:var(--text-tertiary)">Montant HT (facturé client)</span>
+            <span style="color:var(--text-tertiary)">JEH facturés</span>
+            <span style="font-weight:600;color:var(--text-secondary)" id="ne-total-jeh-ht">0 €</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;margin-bottom:3px">
+            <span style="color:var(--text-tertiary)">Frais de structure</span>
+            <span style="font-weight:600;color:var(--text-secondary)" id="ne-total-fs">100 €</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;margin-bottom:3px;border-top:1px solid var(--border);padding-top:4px">
+            <span style="color:var(--text-tertiary)">Total facturé client (HT)</span>
             <span style="font-weight:700;color:var(--bordeaux)" id="ne-total-ht">0 €</span>
           </div>
           <div style="display:flex;justify-content:space-between;margin-bottom:3px">
-            <span style="color:var(--text-tertiary)">Rémunération brute intervenants (50%)</span>
+            <span style="color:var(--text-tertiary)">Brut intervenants (<span id="ne-lbl-taux">50</span>%)</span>
             <span style="font-weight:600;color:var(--success)" id="ne-total-brut">0 €</span>
           </div>
           <div style="display:flex;justify-content:space-between">
-            <span style="color:var(--text-tertiary)">Part JE (50%)</span>
+            <span style="color:var(--text-tertiary)">Part JE (<span id="ne-lbl-taux-je">50</span>%)</span>
             <span style="font-weight:600;color:var(--navy)" id="ne-total-je">0 €</span>
           </div>
         </div>
@@ -418,6 +434,8 @@ function openEtude(id) {
       '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">' +
         '<div><label class="input-label">Statut</label><select class="select-field" style="font-size:12px" onchange="updEtude(\''+id+'\',\'statut\',this.value)">'+statOpts+'</select></div>' +
         '<div><label class="input-label">Montant HT (€)</label><input class="input" type="number" value="'+(e.montant_ht||'')+'" style="font-size:12px" onblur="updEtude(\''+id+'\',\'montant_ht\',parseFloat(this.value)||0)"/></div>' +
+        '<div><label class="input-label">Frais de structure (€)</label><input class="input" type="number" value="'+(e.frais_structure!=null?e.frais_structure:100)+'" style="font-size:12px" onblur="updFraisStructure(\''+id+'\',this.value)"/></div>' +
+        '<div><label class="input-label">% brut intervenants</label><input class="input" type="number" min="0" max="100" value="'+(e.taux_intervenants!=null?e.taux_intervenants:50)+'" style="font-size:12px" onblur="updTauxIntervenants(\''+id+'\',this.value)"/></div>' +
       '</div>' +
       '<div><label class="input-label">Notes</label><textarea class="input" rows="2" style="font-size:12px;resize:vertical;width:100%;margin-bottom:12px" onblur="updEtude(\''+id+'\',\'notes\',this.value)">'+(e.notes||'')+'</textarea></div>'
     : '') +
@@ -466,6 +484,18 @@ function epField(label, val) {
   return '<div style="display:flex;gap:8px;padding:6px 0;border-bottom:1px solid var(--border)">' +
     '<div style="font-size:12px;color:var(--text-tertiary);width:130px;flex-shrink:0">'+label+'</div>' +
     '<div style="font-size:13px;color:var(--text-primary)">'+val+'</div></div>';
+}
+
+function updFraisStructure(id, val) {
+  var fs = parseFloat(val)||0;
+  var e = allEtudes.find(function(x){return x.id===id;});
+  var calc = calcEtude(e ? e.phases : [], fs, e ? e.taux_intervenants : 50);
+  db.collection('etudes').doc(id).update({frais_structure: fs, montant_ht: calc.montant_ht});
+}
+
+function updTauxIntervenants(id, val) {
+  var taux = Math.max(0, Math.min(100, parseFloat(val)||50));
+  db.collection('etudes').doc(id).update({taux_intervenants: taux});
 }
 
 function updEtude(id, field, val) {
@@ -583,7 +613,7 @@ function renderPhasesEditor(e) {
   }
   html += '<div style="display:flex;flex-direction:column;gap:6px;margin-bottom:8px">';
   phases.forEach(function(ph, idx) {
-    var phCalc = calcPhase(ph);
+    var phCalc = calcPhase(ph, taux);
     var isActif = ph.actif !== false;
     html += '<div style="background:var(--bg);border-radius:var(--radius-md);padding:10px 12px;border:1px solid var(--border);opacity:'+(isActif?1:0.5)+'">' +
       '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px">' +
@@ -682,7 +712,9 @@ function renderPhasesPanel(e, isSA, canEdit) {
       '<div style="font-size:12px;color:var(--text-tertiary);font-style:italic">Aucune phase définie. ' +
       (isSA ? 'Modifie l\'étude pour ajouter des phases.' : '') + '</div>';
   }
-  var calc = calcEtude(phases);
+  var taux = (typeof e.taux_intervenants === 'number') ? e.taux_intervenants : 50;
+  var fs = (typeof e.frais_structure === 'number') ? e.frais_structure : 100;
+  var calc = calcEtude(phases, fs, taux);
   var html = '<div class="ep-section" style="margin-top:16px">Phases & JEH — ' +
     fmtJEH(calc.jeh_total) + ' · ' + fmtM(calc.montant_ht) + ' HT</div>';
 
@@ -691,20 +723,21 @@ function renderPhasesPanel(e, isSA, canEdit) {
     '<div style="background:rgba(163,33,95,0.06);border-radius:var(--radius-md);padding:10px;text-align:center">' +
       '<div style="font-size:18px;font-weight:800;color:var(--bordeaux)">' + fmtM(calc.montant_ht) + '</div>' +
       '<div style="font-size:10px;color:var(--text-tertiary);text-transform:uppercase">Facturé client</div>' +
+      '<div style="font-size:9px;color:var(--text-tertiary);margin-top:2px">dont ' + fmtM(fs) + ' frais structure</div>' +
     '</div>' +
     '<div style="background:rgba(34,197,94,0.08);border-radius:var(--radius-md);padding:10px;text-align:center">' +
       '<div style="font-size:18px;font-weight:800;color:#15803d">' + fmtM(calc.montant_brut_iv) + '</div>' +
-      '<div style="font-size:10px;color:var(--text-tertiary);text-transform:uppercase">Brut intervenants (50%)</div>' +
+      '<div style="font-size:10px;color:var(--text-tertiary);text-transform:uppercase">Brut intervenants (' + taux + '%)</div>' +
     '</div>' +
     '<div style="background:rgba(27,42,74,0.06);border-radius:var(--radius-md);padding:10px;text-align:center">' +
       '<div style="font-size:18px;font-weight:800;color:var(--navy)">' + fmtM(calc.part_je) + '</div>' +
-      '<div style="font-size:10px;color:var(--text-tertiary);text-transform:uppercase">Part JE (50%)</div>' +
+      '<div style="font-size:10px;color:var(--text-tertiary);text-transform:uppercase">Part JE (' + (100-taux) + '%)</div>' +
     '</div>' +
   '</div>';
 
   // Phases list
   phases.forEach(function(ph) {
-    var phCalc = calcPhase(ph);
+    var phCalc = calcPhase(ph, taux);
     var ivList = (ph.intervenants||[]);
     var jehAssigned = ivList.reduce(function(a,i){return a+(parseFloat(i.jeh)||0);},0);
     var jehRestant = (ph.jeh_total||0) - jehAssigned;
@@ -727,7 +760,7 @@ function renderPhasesPanel(e, isSA, canEdit) {
     if (ivList.length > 0) {
       html += '<div style="display:flex;flex-direction:column;gap:4px;margin-bottom:8px">';
       ivList.forEach(function(iv) {
-        var ivBrut = (iv.jeh||0) * (ph.montant_jeh||0) * 0.5;
+        var ivBrut = (iv.jeh||0) * (ph.montant_jeh||0) * (taux/100);
         html += '<div style="display:flex;align-items:center;gap:8px;background:var(--bg);border-radius:var(--radius-sm);padding:6px 10px;font-size:12px">' +
           '<div style="width:26px;height:26px;border-radius:50%;background:var(--bordeaux);color:white;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0">' +
             ((iv.nom||'?')[0]) +
@@ -763,6 +796,23 @@ function renderPhasesPanel(e, isSA, canEdit) {
 
 // ── Assigner intervenant à une phase ─────────────────────────
 var curAssignEtudeId = null, curAssignPhaseId = null, curAssignMaxJeh = 0, curAssignMontantJeh = 0;
+
+function handleDeletePhase(btn) {
+  var eid = btn.dataset.eid;
+  var pidx = parseInt(btn.dataset.pidx);
+  var e = allEtudes.find(function(x){return x.id===eid;});
+  if (!e) return;
+  var phases = JSON.parse(JSON.stringify(e.phases||[]));
+  var phaseName = phases[pidx] ? phases[pidx].label : 'cette phase';
+  if (!confirm('Supprimer "'+phaseName+'" ?')) return;
+  phases.splice(pidx, 1);
+  var calc = calcEtude(phases, e.frais_structure, e.taux_intervenants);
+  db.collection('etudes').doc(eid).update({
+    phases: phases,
+    jeh_total_etude: calc.jeh_total,
+    montant_ht: calc.montant_ht
+  }).then(function(){ openEtude(eid); });
+}
 
 function handleEtudeBtn(btn) {
   var eid = btn.dataset.eid;
@@ -877,7 +927,7 @@ function confirmAssignPhase() {
     nom: (iv.prenom||'')+' '+(iv.nom||''),
     email: iv.email||'',
     jeh: jeh,
-    montant_brut: jeh * (phases[phIdx].montant_jeh||0) * 0.5,
+    montant_brut: jeh * (phases[phIdx].montant_jeh||0) * ((e.taux_intervenants||50)/100),
     statut: 'Assigné'
   };
   if (alreadyIdx >= 0) {
@@ -1012,6 +1062,8 @@ function confirmAdd() {
   var client = allClients.find(function(c){return c.id===clientId;});
   var actifMandat = allMandats.find(function(m){return m.statut==='actif';});
 
+  var fsVal = parseFloat(document.getElementById('ne-frais-structure').value)||100;
+  var tauxVal = parseFloat(document.getElementById('ne-taux').value)||50;
   db.collection('etudes').add({
     reference: ref,
     title: title,
@@ -1020,6 +1072,8 @@ function confirmAdd() {
     statut: document.getElementById('ne-statut').value,
     montant_ht: parseFloat(document.getElementById('ne-montant').value)||0,
     montant_encaisse: 0,
+    frais_structure: fsVal,
+    taux_intervenants: tauxVal,
     date_signature: document.getElementById('ne-sign').value||null,
     date_debut: document.getElementById('ne-debut').value||null,
     date_fin: document.getElementById('ne-fin').value||null,
@@ -1091,22 +1145,28 @@ function buildDefaultPhases(typeKey) {
 }
 
 // ── Calculs financiers ────────────────────────────────────────
-function calcPhase(ph) {
+function calcPhase(ph, taux) {
+  // taux = % pour les intervenants (défaut 50)
+  var t = (typeof taux === 'number') ? taux/100 : 0.5;
   var total = (ph.jeh_total||0) * (ph.montant_jeh||0);
-  var brut_iv = total * 0.5;
-  var part_je = total * 0.5;
+  var brut_iv = total * t;
+  var part_je = total * (1-t);
   return {montant_total: total, montant_brut_iv: brut_iv, part_je: part_je};
 }
 
-function calcEtude(phases) {
+function calcEtude(phases, fraisStruct, taux) {
   var jeh = 0, montant = 0, brut = 0, je = 0;
+  var fs = parseFloat(fraisStruct)||0;
   (phases||[]).filter(function(p){return p.actif;}).forEach(function(p) {
     jeh += (p.jeh_total||0);
-    var c = calcPhase(p);
-    montant += c.montant_total;
-    brut += c.montant_brut_iv;
-    je += c.part_je;
+    var cp = calcPhase(p, taux);
+    montant += cp.montant_total;
+    brut += cp.montant_brut_iv;
+    je += cp.part_je;
   });
+  // Frais de structure s'ajoutent au montant facturé client (côté JE uniquement)
+  montant += fs;
+  je += fs;
   return {jeh_total: jeh, montant_ht: montant, montant_brut_iv: brut, part_je: je};
 }
 
@@ -1137,7 +1197,7 @@ function renderNePhasesUI() {
           '<input type="number" min="0" value="'+(ph.montant_jeh||'')+'" placeholder="€/JEH" style="width:80px;padding:4px 6px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:12px;font-family:Sora,sans-serif" oninput="updatePhaseMontant('+i+',this.value)"/>' +
           '<span style="font-size:12px;font-weight:600;color:var(--bordeaux);min-width:70px;text-align:right" id="neph-total-'+i+'">'+fmtM(calcPhase(ph).montant_total)+'</span>' +
         '</div>' +
-        (i > 5 ? '<button onclick="removeCustomPhase('+i+')" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:14px;padding:0 2px">×</button>' : '') +
+        '<button onclick="removeCustomPhase('+i+')" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:16px;padding:0 4px" title="Supprimer cette phase">×</button>' +
       '</div>' +
       '<div style="font-size:10px;color:var(--text-tertiary);margin-top:3px;padding-left:22px">'+ph.sub+'</div>' +
     '</div>';
@@ -1171,15 +1231,28 @@ function removeCustomPhase(i) {
   renderNePhasesUI();
 }
 function updateNeTotals() {
-  var calc = calcEtude(nePhases);
-  var jEl = document.getElementById('ne-total-jeh');
-  var hEl = document.getElementById('ne-total-ht');
-  var bEl = document.getElementById('ne-total-brut');
-  var jeEl = document.getElementById('ne-total-je');
-  if (jEl) jEl.innerText = calc.jeh_total + ' JEH';
-  if (hEl) hEl.innerText = fmtM(calc.montant_ht);
-  if (bEl) bEl.innerText = fmtM(calc.montant_brut_iv);
-  if (jeEl) jeEl.innerText = fmtM(calc.part_je);
+  var fsEl = document.getElementById('ne-frais-structure');
+  var fs = fsEl ? parseFloat(fsEl.value)||0 : 100;
+  var tauxEl = document.getElementById('ne-taux');
+  var taux = tauxEl ? parseFloat(tauxEl.value)||50 : 50;
+  var calc = calcEtude(nePhases, fs, taux);
+  var jEl   = document.getElementById('ne-total-jeh');
+  var hEl   = document.getElementById('ne-total-ht');
+  var bEl   = document.getElementById('ne-total-brut');
+  var jeEl  = document.getElementById('ne-total-je');
+  var fsLbl = document.getElementById('ne-total-fs');
+  var jehHtLbl = document.getElementById('ne-total-jeh-ht');
+  var tauxLbl  = document.getElementById('ne-lbl-taux');
+  var tauxJeLbl = document.getElementById('ne-lbl-taux-je');
+  var jehOnlyMontant = calc.montant_ht - fs;
+  if (jEl)       jEl.innerText = calc.jeh_total + ' JEH';
+  if (jehHtLbl)  jehHtLbl.innerText = fmtM(jehOnlyMontant);
+  if (fsLbl)     fsLbl.innerText = fmtM(fs);
+  if (hEl)       hEl.innerText = fmtM(calc.montant_ht);
+  if (bEl)       bEl.innerText = fmtM(calc.montant_brut_iv);
+  if (jeEl)      jeEl.innerText = fmtM(calc.part_je);
+  if (tauxLbl)   tauxLbl.innerText = taux;
+  if (tauxJeLbl) tauxJeLbl.innerText = (100-taux);
   // Sync montant HT field
   var mhtEl = document.getElementById('ne-montant');
   if (mhtEl && calc.montant_ht > 0) mhtEl.value = calc.montant_ht;
