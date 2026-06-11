@@ -584,6 +584,8 @@ function updateMandatKpiFromEtudes() {
 function renderPhasesEditor(e) {
   var phases = e.phases || [];
   var isClos = e.statut === 'Clôturé' && !e.defige;
+  var taux = (typeof e.taux_intervenants === 'number') ? e.taux_intervenants : 50;
+  var fs = (typeof e.frais_structure === 'number') ? e.frais_structure : 100;
   var TYPE_OPTS = [
     {val:'',lbl:'— Choisir le type —'},
     {val:'Étude de marché',lbl:'Étude de marché'},
