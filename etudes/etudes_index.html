@@ -523,6 +523,10 @@ function updEtude(id, field, val) {
     }
     // Si statut change → toujours recalculer les KPI mandat
     if (field === 'statut') updateMandatKpiFromEtudes();
+    // Si statut passe à Clôturé → rafraîchir le panneau pour appliquer le figeage
+    if (field === 'statut' && val === 'Clôturé') {
+      setTimeout(function(){ openEtude(id); }, 300);
+    }
   });
 }
 
