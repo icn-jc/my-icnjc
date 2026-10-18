@@ -473,9 +473,13 @@ function renderRdv() {
 }
 
 /* ───────── Panneau prospect ───────── */
-function openProspect(id) { S.current = id; renderPanel(); openPanel('panel'); loadActions(id); }
+function openProspect(id) { S.formFor = null; S.current = id; renderPanel(); openPanel('panel'); loadActions(id); }
 function renderPanel() {
   const p = S.prospects.find(x => x.id === S.current); if (!p) return;
+  // Ce que le commercial est en train de saisir ne doit pas être effacé quand une donnée change ailleurs.
+  const af = document.getElementById('action-form'), typed = {};
+  if (af && S.formFor === p.id) af.querySelectorAll('[data-f]').forEach(el => { typed[el.dataset.f] = el.value; });
+  const keep = Object.assign({}, typed); delete keep.new_amount; // le montant, lui, reflète toujours la valeur actuelle de la fiche
   document.getElementById('p-title').textContent = p.company_name;
   document.getElementById('p-meta').innerHTML = statusBadge(p.status) + '<span class="muted">' + esc(userName(p.owner_email)) + '</span>' +
     (p.estimated_amount ? '<b style="color:var(--bordeaux)">' + eur(p.estimated_amount) + '</b>' : '');
@@ -502,12 +506,16 @@ function renderPanel() {
       '<div class="field" data-rdv hidden><label>Date du RDV *</label><input type="date" data-f="rdv_date"></div>' +
       '<div class="field" data-rdv hidden><label>Heure</label><input type="time" data-f="rdv_heure"></div>' +
       '<div class="field"><label>Prochaine action le</label><input type="date" data-f="next_action_at"></div>' +
-      '<div class="field"><label>Montant estimé (€)</label><input type="number" min="0" data-f="new_amount" placeholder="' + esc(p.estimated_amount || '') + '"></div>' +
+      '<div class="field"><label>Montant estimé (€)</label><input type="number" min="0" data-f="new_amount" value="' + esc(p.estimated_amount || '') + '"></div>' +
       '<div class="field full"><label>Note</label><textarea data-f="note" placeholder="Ce qui s’est dit, la suite…"></textarea></div>' +
       '<div class="full"><button class="btn primary" data-action="save-action">Enregistrer l’action</button></div></div>';
   }
   h += '<div class="sub-title">Historique</div><div class="timeline" id="timeline"><div class="muted">Chargement…</div></div>';
   document.getElementById('p-body').innerHTML = h;
+  const nf = document.getElementById('action-form');
+  if (nf) { nf.querySelectorAll('[data-f]').forEach(el => { if (keep[el.dataset.f] !== undefined && el.dataset.f !== 'new_amount') el.value = keep[el.dataset.f]; });
+    if (keep.new_status) nf.querySelector('[data-f=new_status]').dispatchEvent(new Event('change', { bubbles: true })); }
+  S.formFor = p.id;
   const st = document.getElementById('af-status');
   if (st) st.addEventListener('change', () => document.querySelectorAll('#action-form [data-rdv]').forEach(el => { el.hidden = st.value !== 'RDV planifié'; }));
   if (S.actions && S.actions.id === p.id) renderTimeline();
@@ -704,6 +712,7 @@ onActions({
     if (!a.date) return toast('La date est obligatoire', true);
     if (a.new_status === 'RDV planifié' && !a.rdv_date) return toast('La date du RDV est obligatoire', true);
     if (!a.new_status && !a.note) return toast('Ajoute une note ou un nouveau statut', true);
+    a.new_amount = num(a.new_amount) > 0 && num(a.new_amount) !== num(p.estimated_amount) ? num(a.new_amount) : null;
     saveAction(p, a).then(() => { toast('Action enregistrée'); loadActions(p.id); }).catch(fail);
   },
   rdv: el => openRdv(el.dataset.id, el.dataset.pid, el.dataset.date),
