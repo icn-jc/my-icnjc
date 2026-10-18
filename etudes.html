@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta charset="UTF-8"><meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"><meta http-equiv="Pragma" content="no-cache"><meta http-equiv="Expires" content="0"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Études — My-ICN-JC</title>
 <link rel="icon" href="assets/logo-mark.png"><link rel="stylesheet" href="assets/app.css">
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
@@ -112,7 +112,7 @@ App.start('etudes', () => {
 
 const userName = e => { const u = S.users.find(x => (x.email || x.id) === e); return u ? fullName(u) : (e || '—').split('@')[0]; };
 const respList = () => S.users.filter(u => (u.roles || [u.role]).some(r => CA.includes(r))).map(u => ({ value: u.email || u.id, label: fullName(u) }));
-const encaisse = e => { const f = S.factures.filter(x => x.etude_id === e.id && x.statut === 'Encaissée').reduce((a, x) => a + num(x.montant_ht), 0); return Math.max(f, num(e.montant_encaisse)); };
+const encaisse = e => encaisseHT(e, S.factures);
 const isFrozen = e => e.statut === 'Clôturé' && !e.defige;
 const editable = e => CAN_EDIT && !isFrozen(e);
 
@@ -150,7 +150,7 @@ function render() {
       '<td><b>' + esc(e.title || '—') + '</b><div class="muted">' + esc(e.type_etude || '') + '</div></td><td>' + esc(e.client_name || '—') + '</td>' +
       '<td><span class="badge ' + (ETUDE_BADGE[e.statut] || '') + '">' + esc(e.statut || '—') + '</span></td>' +
       '<td class="num"><b>' + (e.montant_ht ? eur(e.montant_ht) : '—') + '</b></td>' +
-      '<td>' + (ETUDE_SIGNEE.includes(e.statut) ? '<div class="row" style="flex-wrap:nowrap"><div class="bar ' + (p >= 100 ? 'ok' : '') + '"><i style="width:' + Math.min(100, p) + '%"></i></div><span class="muted">' + p + '%</span></div>' : '') + '</td>' +
+      '<td>' + (ETUDE_SIGNEE.includes(e.statut) ? (enc > num(e.montant_ht) + 0.5 ? '<span class="badge b-bad">trop-perçu</span>' : '<div class="row" style="flex-wrap:nowrap"><div class="bar ' + (p >= 100 ? 'ok' : '') + '"><i style="width:' + Math.min(100, p) + '%"></i></div><span class="muted">' + Math.min(100, p) + '%</span></div>') : '') + '</td>' +
       '<td>' + esc(userName(e.responsable_email)) + '</td><td>' + fmtDate(e.date_debut) + '</td><td>' + fmtDate(e.date_fin) + '</td></tr>';
   }).join('') : '<tr><td colspan="9" class="empty">Aucune étude.</td></tr>';
 }
@@ -171,7 +171,7 @@ function renderPanel(resetDraft) {
     '<div class="kpi accent"><div class="v">' + eur(e.montant_ht) + '</div><div class="l">Facturé client HT</div><div class="s">dont ' + eur(c.frais) + ' frais de structure</div></div>' +
     '<div class="kpi"><div class="v" style="color:var(--ok)">' + eur(c.brutIv) + '</div><div class="l">Brut intervenants (' + c.taux + ' %)</div></div>' +
     '<div class="kpi"><div class="v">' + eur(c.partJe) + '</div><div class="l">Part JE</div><div class="s">' + (100 - c.taux) + ' % des JEH + frais</div></div></div>' +
-    '<div class="muted">Encaissé : <b>' + eur(enc) + '</b> (' + pct(enc, num(e.montant_ht)) + ' %) — mis à jour par les factures dans Comptabilité</div>';
+    '<div class="muted">TTC : <b>' + eur(etudeTTC(e)) + '</b> · Encaissé HT : <b>' + eur(enc) + '</b> (' + Math.min(100, pct(enc, num(e.montant_ht))) + ' %)' + (enc > num(e.montant_ht) + 0.5 ? ' <span class="badge b-bad">trop-perçu à corriger dans Comptabilité</span>' : '') + ' — mis à jour par les factures</div>';
 
   // Informations
   h += '<div class="sub-title">Informations</div>';
@@ -187,6 +187,7 @@ function renderPanel(resetDraft) {
       '<div class="field"><label>Montant HT (€)</label><input type="number" data-f="montant_ht" value="' + num(e.montant_ht) + '"' + (c.montantJeh > 0 ? ' disabled' : '') + '><div class="hint">' + (c.montantJeh > 0 ? 'Calculé depuis les phases' : 'Saisie libre tant qu’aucune phase n’est chiffrée') + '</div></div>' +
       '<div class="field"><label>Frais de structure (€)</label><input type="number" min="0" data-f="frais_structure" value="' + c.frais + '"></div>' +
       '<div class="field"><label>% brut intervenants</label><input type="number" min="0" max="100" data-f="taux_intervenants" value="' + c.taux + '"></div>' +
+      '<div class="field"><label>TVA (%)</label><select data-f="taux_tva">' + options(TVA_TAUX.map(t => ({ value: t, label: String(t).replace('.', ',') + ' %' })), num(e.taux_tva, 20)) + '</select><div class="hint">TTC : ' + eur(etudeTTC(e)) + '</div></div>' +
       '<div class="field full"><label>Description</label><textarea data-f="description">' + esc(e.description || '') + '</textarea></div>' +
       '<div class="field full"><label>Notes</label><textarea data-f="notes">' + esc(e.notes || '') + '</textarea></div>' +
       (App.isSA() ? '<div class="field"><label>Référence (SA)</label><input data-f="reference" value="' + esc(e.reference || '') + '"></div><div class="field"><label>Titre (SA)</label><input data-f="title" value="' + esc(e.title || '') + '"></div>' : '') +
@@ -278,7 +279,7 @@ async function saveInfo() {
   if (f.date_debut && f.date_fin && f.date_debut > f.date_fin) return toast('La date de début doit précéder la date de fin', true);
   const c = calcEtude(Object.assign({}, e, f, { phases: e.phases || [] }));
   if (c.montantJeh > 0) f.montant_ht = c.ht; else f.montant_ht = num(f.montant_ht);
-  f.frais_structure = num(f.frais_structure, 100); f.taux_intervenants = Math.min(100, Math.max(0, num(f.taux_intervenants, 50)));
+  f.frais_structure = num(f.frais_structure, 100); f.taux_tva = num(f.taux_tva, 20); f.taux_intervenants = Math.min(100, Math.max(0, num(f.taux_intervenants, 50)));
   f.updated_at = FV.serverTimestamp();
   // Recalcule la rémunération des intervenants si le taux change
   if (f.taux_intervenants !== num(e.taux_intervenants, 50)) {

@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>My ICN JC</title>
+<script>
+/* Anciennes adresses de l'intranet → nouvelles pages */
+(function () {
+  var base = '/my-icnjc/', p = location.pathname.replace(/^\/my-icnjc\//, '').toLowerCase();
+  var map = [
+    [/audit|evenement|partenariat|accueil/, 'index.html'], [/prospection|crm_index|pipeline|rdv/, 'prospection.html'], [/compta|factur|tresor/, 'compta.html'],
+    [/client/, 'clients.html'], [/intervenant/, 'intervenants.html'], [/etude/, 'etudes.html'],
+    [/dashboard|kpi/, 'kpi.html'], [/mon_espace|mission/, 'missions.html'], [/qualite|doc/, 'documents.html'], [/admin/, 'admin.html']
+  ];
+  var to = 'index.html';
+  for (var i = 0; i < map.length; i++) if (map[i][0].test(p)) { to = map[i][1]; break; }
+  location.replace(base + to);
+})();
+</script></head><body></body></html>

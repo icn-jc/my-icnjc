@@ -1,13 +1,14 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta charset="UTF-8"><meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"><meta http-equiv="Pragma" content="no-cache"><meta http-equiv="Expires" content="0"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Administration — My-ICN-JC</title>
 <link rel="icon" href="assets/logo-mark.png"><link rel="stylesheet" href="assets/app.css">
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script src="assets/core.js"></script>
+<script src="assets/demo.js"></script>
 </head>
 <body>
 <main hidden>
@@ -39,8 +40,18 @@
       <div class="field full"><label>Lien Sphinx par défaut</label><input data-f="sphinx_url" placeholder="https://…"><div class="hint">Proposé quand on envoie le questionnaire de fin de mission</div></div>
       <div class="full"><button class="btn primary" data-action="save-settings">Enregistrer</button></div>
     </div></div>
+    <div class="card" style="max-width:640px;margin-top:16px" id="demo-card" hidden>
+      <h3 style="margin:0 0 6px">Données de démonstration</h3>
+      <p class="muted" style="margin:0 0 12px">Ajoute des prospects, RDV, clients, intervenants, études et factures fictifs (préfixés « [Démo] ») pour essayer chaque module. Ils comptent dans les indicateurs du mandat actif tant qu'ils existent : supprime-les avant la vraie clôture.</p>
+      <div class="row"><button class="btn primary" data-action="demo-add">Ajouter les données de démo</button><button class="btn" data-action="demo-del">Supprimer les données de démo</button><span class="muted" id="demo-n"></span></div>
+    </div>
   </section>
 </main>
+
+<aside class="panel" id="cl-panel" style="width:680px">
+  <div class="panel-head"><div class="grow"><h2 id="cl-title"></h2><div class="muted" id="cl-sub" style="margin-top:4px"></div></div><button class="x" data-close="cl-panel">×</button></div>
+  <div class="panel-body" id="cl-body"></div>
+</aside>
 
 <div class="modal" id="m-user"><div class="modal-box">
   <div class="modal-head"><h2 id="u-title">Nouveau membre</h2><button class="x" data-close="m-user">×</button></div>
@@ -91,14 +102,17 @@
 
 <script>
 const INTERNAL_ROLES = ROLE_ORDER.filter(r => !['intervenant', 'tuteur', 'commercial_ext'].includes(r));
-const S = { users: [], ext: [], mandats: [], tab: 'members', editUser: null, editMandat: null, roles: [] };
+const S = { users: [], ext: [], mandats: [], etudes: [], factures: [], prospects: [], clos: null, tab: 'members', editUser: null, editMandat: null, roles: [] };
 let IS_SA;
 
 App.start('admin', () => {
   IS_SA = App.isSA();
   watch(db.collection('users'), l => { S.users = l; render(); });
   watch(db.collection('whitelist_emails'), l => { S.ext = l; render(); });
-  watch(db.collection('mandats'), l => { S.mandats = l.sort((a, b) => (b.date_debut || '').localeCompare(a.date_debut || '')); render(); });
+  watch(db.collection('mandats'), l => { S.mandats = l.sort((a, b) => (b.date_debut || '').localeCompare(a.date_debut || '')); render(); if (S.clos) renderCloture(); });
+  watch(db.collection('etudes'), l => { S.etudes = l; if (S.clos) renderCloture(); });
+  watch(db.collection('factures'), l => { S.factures = l; if (S.clos) renderCloture(); });
+  watch(db.collection('prospects'), l => { S.prospects = l; if (S.clos) renderCloture(); });
   Promise.all([db.collection('crm_config').doc('objectifs').get(), db.collection('crm_config').doc('parametres').get()]).then(([o, p]) => {
     fillForm(document.getElementById('settings-form'), { objectif_semaine: o.exists ? o.data().objectif_semaine : 10, sphinx_url: p.exists ? p.data().sphinx_url : '' });
   });
@@ -122,6 +136,7 @@ function render() {
     (S.mandats.length ? '<div class="list">' + S.mandats.map(m => '<div class="item row"><b style="font-size:16px">' + esc(m.label || m.id) + '</b>' +
       (m.statut === 'actif' ? '<span class="badge b-ok">en cours</span>' : '<span class="badge">clos</span>') + '<span class="grow muted">' + fmtDate(m.date_debut) + ' → ' + fmtDate(m.date_fin) +
       (m.president_email ? ' · ' + esc(fullName(S.users.find(u => u.id === m.president_email)) || m.president_email) : '') + '</span>' +
+      '<button class="btn sm' + (m.statut === 'actif' ? ' dark' : '') + '" data-action="cloture" data-id="' + esc(m.id) + '">Contrôle de clôture</button>' +
       (IS_SA ? '<button class="btn sm" data-action="edit-mandat" data-id="' + esc(m.id) + '">Modifier</button>' : '') + '</div>').join('') + '</div>' : '<div class="card empty">Aucun mandat.</div>');
   document.getElementById('btn-add').hidden = S.tab === 'settings' || (S.tab === 'mandats' && !IS_SA);
   document.getElementById('btn-add').textContent = { members: '+ Membre', external: '+ Accès externe', mandats: '+ Mandat' }[S.tab] || '';
@@ -173,8 +188,83 @@ async function saveMandat() {
   closeModal('m-mandat'); toast('Mandat enregistré');
 }
 
+
+function demoRefresh() {
+  if (!IS_SA) return;
+  document.getElementById('demo-card').hidden = false;
+  demoCount().then(n => { document.getElementById('demo-n').textContent = n ? n + ' élément(s) de démo en base' : 'Aucune donnée de démo'; }).catch(() => {});
+}
+/* ═════════ Contrôle de clôture d'un mandat ═════════
+   Liste tout ce qui doit être propre avant de clôturer : rattachement des études, montants, encaissements, factures, statuts. */
+function etudesOfMandat(m) {
+  const ids = S.mandats.map(x => x.id), a = m.date_debut || '', b = m.date_fin || '9999-12-31';
+  return S.etudes.filter(e => e.mandat_id === m.id || (!ids.includes(e.mandat_id) && inRange(e.date_signature || e.created_at_str, a, b)));
+}
+function clotureChecks(m) {
+  const E = etudesOfMandat(m), signed = E.filter(e => ETUDE_SIGNEE.includes(e.statut)), ids = E.map(e => e.id);
+  const enc = e => encaisseHT(e, S.factures), ht = e => num(e.montant_ht);
+  const fact = S.factures.filter(f => ids.includes(f.etude_id));
+  const active = S.users.filter(u => u.prospecte).map(u => u.id);
+  const ref = e => '<span class="ref">' + esc(e.reference || '—') + '</span> ' + esc(e.client_name || '');
+  return [
+    { k: 'unlinked', level: 'warn', title: 'Études non rattachées au mandat', help: 'Signées pendant la période mais sans mandat : rattache-les pour qu’elles comptent dans les indicateurs.',
+      items: E.filter(e => e.mandat_id !== m.id).map(e => ({ id: e.id, html: ref(e) + ' <span class="muted">signée le ' + fmtDate(e.date_signature) + '</span>' })), fix: 'Rattacher toutes au mandat' },
+    { k: 'todo', level: 'warn', title: 'Études à compléter', help: 'Créées depuis la prospection, phases ou montant manquants.', link: 'etudes.html',
+      items: E.filter(e => e.a_completer).map(e => ({ html: ref(e) })) },
+    { k: 'noamount', level: 'bad', title: 'Études signées sans montant HT', link: 'etudes.html', items: signed.filter(e => !ht(e)).map(e => ({ html: ref(e) })) },
+    { k: 'over', level: 'bad', title: 'Encaissé supérieur au montant HT', help: 'Souvent une facture saisie en TTC dans la case HT. Corrige la facture dans Comptabilité.', link: 'compta.html',
+      items: signed.filter(e => ht(e) && enc(e) > ht(e) + 0.5).map(e => ({ html: ref(e) + ' — encaissé ' + eurc(enc(e)) + ' pour ' + eurc(ht(e)) + ' HT (' + pct(enc(e), ht(e)) + ' %)' })) },
+    { k: 'unpaid', level: 'warn', title: 'Études pas entièrement encaissées', link: 'compta.html',
+      items: signed.filter(e => ht(e) && enc(e) < ht(e) - 0.5).map(e => ({ html: ref(e) + ' — reste ' + eurc(ht(e) - enc(e)) + ' HT' })) },
+    { k: 'factures', level: 'warn', title: 'Factures en attente ou impayées', link: 'compta.html',
+      items: fact.filter(f => f.statut !== 'Encaissée').map(f => ({ html: '<b>' + esc(f.numero) + '</b> ' + esc(f.client_name || '') + ' — ' + eurc(factureTTC(f)) + ' TTC · ' + esc(f.statut) })) },
+    { k: 'orphanf', level: 'bad', title: 'Factures rattachées à aucune étude', link: 'compta.html',
+      items: S.factures.filter(f => !S.etudes.some(e => e.id === f.etude_id)).map(f => ({ html: '<b>' + esc(f.numero) + '</b> ' + esc(f.client_name || '') + ' — ' + eurc(f.montant_ht) + ' HT' })) },
+    { k: 'running', level: 'warn', title: 'Études encore « Signé » ou « En cours »', help: 'À livrer, ou à repasser en « Prospection » si elles ne se feront pas.', link: 'etudes.html',
+      items: E.filter(e => ['Signé', 'En cours'].includes(e.statut)).map(e => ({ html: ref(e) + ' <span class="badge ' + ETUDE_BADGE[e.statut] + '">' + esc(e.statut) + '</span>' })) },
+    { k: 'toclose', level: 'info', title: 'Études soldées à passer en « Clôturé »', help: 'Livrées ou facturées et entièrement encaissées.',
+      items: signed.filter(e => ['Livré', 'Facturé'].includes(e.statut) && ht(e) && Math.abs(enc(e) - ht(e)) <= 0.5).map(e => ({ id: e.id, html: ref(e) })), fix: 'Tout passer en « Clôturé »' },
+    { k: 'orphans', level: 'info', title: 'Prospects en cours de membres qui ne prospectent plus', help: 'À réaffecter ou passer en « Perdu » avant le nouveau mandat.', link: 'prospection.html',
+      items: S.prospects.filter(p => STATUTS_OUVERTS.includes(p.status) && !active.includes(p.owner_email)).map(p => ({ html: '<b>' + esc(p.company_name) + '</b> <span class="muted">' + esc(p.owner_email || '') + '</span>' })) }
+  ];
+}
+function renderCloture() {
+  const m = S.mandats.find(x => x.id === S.clos); if (!m) return;
+  const checks = clotureChecks(m), blocking = checks.filter(c => c.level === 'bad' && c.items.length).length, open = checks.filter(c => c.items.length).length;
+  document.getElementById('cl-title').textContent = 'Clôture du mandat ' + (m.label || m.id);
+  document.getElementById('cl-sub').textContent = fmtDate(m.date_debut) + ' → ' + fmtDate(m.date_fin) + ' · ' + etudesOfMandat(m).length + ' études · ' + (m.statut === 'actif' ? 'en cours' : 'clos');
+  let h = open ? '<div class="alert ' + (blocking ? 'bad' : 'warn') + '"><span>' + open + ' point(s) à vérifier' + (blocking ? ', dont ' + blocking + ' erreur(s) à corriger' : '') + '.</span></div>'
+    : '<div class="alert info"><span>Tout est propre : le mandat peut être clôturé.</span></div>';
+  checks.forEach(c => {
+    const n = c.items.length;
+    h += '<div class="sub-title row"><span class="grow">' + (n ? '' : '✓ ') + esc(c.title) + '</span><span class="badge ' + (!n ? 'b-ok' : c.level === 'bad' ? 'b-bad' : c.level === 'warn' ? 'b-warn' : 'b-info') + '">' + n + '</span></div>';
+    if (!n) return;
+    if (c.help) h += '<p class="muted" style="margin:0 0 8px">' + c.help + '</p>';
+    h += '<div class="list">' + c.items.slice(0, 15).map(i => '<div class="item soft">' + i.html + '</div>').join('') + (n > 15 ? '<div class="muted">… et ' + (n - 15) + ' autres</div>' : '') + '</div>';
+    h += '<div class="row" style="margin-top:8px">' + (c.fix && IS_SA ? '<button class="btn sm primary" data-action="cl-fix" data-k="' + c.k + '">' + c.fix + '</button>' : '') + (c.link ? '<a class="btn sm" href="' + c.link + '">Corriger</a>' : '') + '</div>';
+  });
+  if (IS_SA) {
+    h += '<div class="sub-title">Clôturer</div>';
+    h += m.statut === 'actif' ? '<p class="muted" style="margin-top:0">Le mandat passe en « clos ». Ses chiffres restent consultables dans Indicateurs.</p><button class="btn dark" data-action="cl-close">Clôturer le mandat ' + esc(m.label || m.id) + '</button>'
+      : '<p class="muted" style="margin-top:0">Ce mandat est clos' + (m.cloture_le ? ' depuis le ' + fmtDate(m.cloture_le) : '') + '.</p>';
+    if (!S.mandats.some(x => x.statut === 'actif')) h += '<div style="margin-top:12px"><button class="btn primary" data-action="cl-next">Ouvrir le mandat suivant</button></div>';
+  }
+  document.getElementById('cl-body').innerHTML = h;
+}
+async function clotureFix(k) {
+  const m = S.mandats.find(x => x.id === S.clos), c = clotureChecks(m).find(x => x.k === k);
+  const batch = db.batch();
+  c.items.forEach(i => batch.update(db.collection('etudes').doc(i.id), k === 'unlinked' ? { mandat_id: m.id } : { statut: 'Clôturé' }));
+  await batch.commit(); toast(c.items.length + ' étude(s) mise(s) à jour');
+}
+function nextMandat(m) {
+  const y = parseInt((m.label || m.id).slice(0, 4), 10);
+  const start = m.date_fin ? addDays(m.date_fin, 1) : today();
+  return { label: y ? (y + 1) + '-' + (y + 2) : '', statut: 'actif', date_debut: start, date_fin: addDays(dateStr(new Date(parseDate(start).getFullYear() + 1, parseDate(start).getMonth(), parseDate(start).getDate())), -1) };
+}
+
 onActions({
-  tab: el => { S.tab = el.dataset.t; document.querySelectorAll('#tabs .tab').forEach(b => b.classList.toggle('on', b === el)); ['members', 'external', 'mandats', 'settings'].forEach(t => { document.getElementById('t-' + t).hidden = t !== S.tab; }); render(); },
+  tab: el => { S.tab = el.dataset.t; document.querySelectorAll('#tabs .tab').forEach(b => b.classList.toggle('on', b === el)); ['members', 'external', 'mandats', 'settings'].forEach(t => { document.getElementById('t-' + t).hidden = t !== S.tab; }); render(); if (S.tab === 'settings') demoRefresh(); },
   add: () => S.tab === 'members' ? openUser(null) : S.tab === 'external' ? (fillForm(document.getElementById('x-form'), { role: 'tuteur' }), openModal('m-ext')) : openMandat(null),
   'edit-user': el => openUser(S.users.find(u => u.id === el.dataset.id)),
   'del-user': el => { if (confirm('Retirer l’accès de ' + el.dataset.id + ' ?')) db.collection('users').doc(el.dataset.id).delete().then(() => toast('Membre retiré')).catch(fail); },
@@ -190,6 +280,26 @@ onActions({
   'del-ext': el => { if (confirm('Retirer l’accès de ' + el.dataset.id + ' ?')) db.collection('whitelist_emails').doc(el.dataset.id).delete().then(() => toast('Accès retiré')).catch(fail); },
   'edit-mandat': el => openMandat(S.mandats.find(m => m.id === el.dataset.id)),
   'save-mandat': () => saveMandat().catch(fail),
+  cloture: el => { S.clos = el.dataset.id; renderCloture(); openPanel('cl-panel'); },
+  'cl-fix': el => { if (confirm('Appliquer cette correction ?')) clotureFix(el.dataset.k).catch(fail); },
+  'cl-close': () => {
+    const m = S.mandats.find(x => x.id === S.clos), left = clotureChecks(m).filter(c => c.items.length && c.level !== 'info').length;
+    if (!confirm((left ? 'Il reste ' + left + ' point(s) non résolus. ' : '') + 'Clôturer définitivement le mandat ' + (m.label || m.id) + ' ?')) return;
+    db.collection('mandats').doc(m.id).update({ statut: 'clos', cloture_le: today(), cloture_par: App.user.email }).then(() => toast('Mandat clôturé')).catch(fail);
+  },
+  'cl-next': () => { const m = S.mandats.find(x => x.id === S.clos); closePanel('cl-panel'); openMandat(null); fillForm(document.getElementById('md-form'), nextMandat(m)); },
+  'demo-add': async el => {
+    if (!confirm('Ajouter les données de démonstration ?')) return;
+    el.disabled = true; toast('Création en cours…');
+    try { await demoCreate(S.users, S.mandats); toast('Données de démo ajoutées'); } catch (e) { fail(e); }
+    el.disabled = false; demoRefresh();
+  },
+  'demo-del': async el => {
+    if (!confirm('Supprimer toutes les données marquées « démo » ? Tes vraies données ne sont pas touchées.')) return;
+    el.disabled = true;
+    try { toast(await demoDelete() + ' élément(s) supprimé(s)'); } catch (e) { fail(e); }
+    el.disabled = false; demoRefresh();
+  },
   'save-settings': () => {
     const f = readForm(document.getElementById('settings-form'));
     Promise.all([db.collection('crm_config').doc('objectifs').set({ objectif_semaine: num(f.objectif_semaine, 10) }, { merge: true }),

@@ -34,3 +34,12 @@ Les clics passent par `data-action="nom"` + `onActions({ nom: el => ... })` : pa
 - Un intervenant dont l'email figure dans `intervenants` accède automatiquement à « Mes missions ».
 
 Règles Firestore attendues : lecture/écriture pour tout utilisateur connecté (`request.auth != null`).
+
+## Fin de mandat
+Administration → Mandats → **Contrôle de clôture** : liste les études non rattachées, à compléter, sans montant, trop-perçues, non soldées, les factures en attente ou orphelines et les prospects de membres inactifs, avec corrections groupées. Puis « Clôturer le mandat » et « Ouvrir le mandat suivant ».
+
+## Données de démonstration
+Administration → Paramètres (Super Admin) : ajoute/supprime des données fictives (`demo: true`, préfixe « [Démo] »). À supprimer avant la clôture réelle.
+
+## HT / TVA / TTC
+Les factures stockent `montant_ht`, `taux_tva`, `montant_tva`, `montant_ttc`. Les études sont en HT ; l'encaissé est calculé en HT depuis les factures encaissées. Une facture dont le HT dépasse le reste à facturer est refusée.

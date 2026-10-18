@@ -91,6 +91,18 @@ function calcEtude(e) {
 }
 function montantBrutAssignation(jeh, montantJeh, taux) { return num(jeh) * num(montantJeh) * num(taux, 50) / 100; }
 
+/* TVA : chaque facture porte son HT, son taux et son TTC. Les comparaisons avec l'étude se font toujours HT contre HT. */
+const TVA_TAUX = [20, 10, 5.5, 0];
+function round2(n) { return Math.round(num(n) * 100) / 100; }
+function tvaTaux(f) { return num(f.taux_tva, 20); }
+function factureTTC(f) { return f.montant_ttc != null && f.montant_ttc !== '' ? num(f.montant_ttc) : round2(num(f.montant_ht) * (1 + tvaTaux(f) / 100)); }
+function etudeTTC(e) { return round2(num(e.montant_ht) * (1 + num(e.taux_tva, 20) / 100)); }
+/* Encaissé HT d'une étude = somme HT de ses factures encaissées (ou ancienne saisie s'il n'y a aucune facture). */
+function encaisseHT(e, factures) {
+  const fs = (factures || []).filter(f => f.etude_id === e.id);
+  return fs.length ? round2(fs.filter(f => f.statut === 'Encaissée').reduce((a, f) => a + num(f.montant_ht), 0)) : num(e.montant_encaisse);
+}
+
 /* Indicateurs d'un mandat, calculés à partir des données du site sur la période du mandat.
    Une étude compte pour le mandat si elle y est rattachée, ou (sans rattachement valide) si sa date de signature tombe dans la période.
    Quand le site n'a pas de données (anciens mandats), on reprend la valeur saisie à la main dans Administration → Mandats. */
@@ -129,6 +141,7 @@ function mandatStats(m, D) {
 function num(v, def) { const n = parseFloat(v); return isNaN(n) ? (def === undefined ? 0 : def) : n; }
 function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
 function eur(n) { return Math.round(num(n)).toLocaleString('fr-FR') + ' €'; }
+function eurc(n) { return num(n).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €'; }
 function pct(a, b) { return b ? Math.round(a / b * 100) : 0; }
 function pad(n) { return String(n).padStart(2, '0'); }
 function dateStr(d) { d = d || new Date(); return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }
@@ -312,9 +325,7 @@ const App = {
     document.querySelector('main').hidden = true;
     let el = document.getElementById('login');
     if (!el) { el = document.createElement('div'); el.id = 'login'; el.className = 'login'; document.body.prepend(el); }
-    el.innerHTML = '<div class="login-art"><svg viewBox="0 0 400 360" aria-hidden="true">' +
-        '<polygon points="0,0 400,0 200,360" fill="#A3215F"/><polygon points="210,92 262,92 214,178" fill="#d0558f"/>' +
-        '<polygon points="272,92 324,92 276,178" fill="#3A3A9C"/></svg>' +
+    el.innerHTML = '<div class="login-art"><img src="assets/logo-mark.png" alt="">' +
         '<p><b>L\u2019intranet d\u2019ICN Junior Conseil</b>Prospection, études, intervenants et pilotage du mandat, au même endroit.</p></div>' +
       '<div class="login-form"><img src="assets/logo.png" alt="ICN Junior Conseil">' +
         '<h1>Connexion</h1><p>Utilise ton compte Google ICN Junior Conseil ou l\u2019adresse qui t\u2019a été autorisée.</p>' +
