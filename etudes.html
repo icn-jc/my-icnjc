@@ -85,11 +85,13 @@ const newPhase = (label, sub) => ({ id: 'ph_' + Math.random().toString(36).slice
 const tplPhases = type => PHASES_TPL[typeFamily(type)].map(p => newPhase(p[0], p[1]));
 const typeOptions = cur => '<option value="">— Choisir —</option>' + Object.keys(TYPES).map(g => '<optgroup label="' + esc(g) + '">' + options(TYPES[g], cur) + '</optgroup>').join('');
 
+let SEE_COMPTA = false, SEE_IV = false; // commerciaux : ni encaissements ni intervenants
 const S = { journal: [], unJournal: null, etudes: [], clients: [], users: [], mandats: [], ivs: [], factures: [], current: null, draft: null, addDraft: [], assign: null };
 let CAN_EDIT;
 
 App.start('etudes', () => {
   CAN_EDIT = App.canEdit('etudes');
+  SEE_COMPTA = App.can('compta'); SEE_IV = App.can('intervenants');
   document.getElementById('sub').textContent = longDate();
   document.getElementById('btn-add').hidden = !CAN_EDIT;
   document.getElementById('readonly').hidden = CAN_EDIT;
@@ -144,7 +146,7 @@ function render() {
     '<div class="kpi accent"><div class="v">' + signed.length + '</div><div class="l">Études signées</div><div class="s">Signé → Clôturé</div></div>' +
     '<div class="kpi"><div class="v">' + E.filter(e => e.statut === 'En cours').length + '</div><div class="l">En cours</div></div>' +
     '<div class="kpi"><div class="v">' + eur(signed.reduce((a, e) => a + num(e.montant_ht), 0)) + '</div><div class="l">CA signé (total)</div></div>' +
-    '<div class="kpi"><div class="v">' + eur(signed.reduce((a, e) => a + encaisse(e), 0)) + '</div><div class="l">CA encaissé</div></div>' +
+    (SEE_COMPTA ? '<div class="kpi"><div class="v">' + eur(signed.reduce((a, e) => a + encaisse(e), 0)) + '</div><div class="l">CA encaissé</div></div>' : '') +
     (todo ? '<div class="kpi warn"><div class="v">' + todo + '</div><div class="l">À compléter</div></div>' : '');
   const q = document.getElementById('f-q').value.toLowerCase(), st = document.getElementById('f-statut').value,
     ma = document.getElementById('f-mandat').value, re = document.getElementById('f-resp').value, td = document.getElementById('f-todo').checked;
@@ -158,7 +160,7 @@ function render() {
       '<td><b>' + esc(e.title || '—') + '</b><div class="muted">' + esc(e.type_etude || '') + '</div></td><td>' + esc(e.client_name || '—') + '</td>' +
       '<td><span class="badge ' + (ETUDE_BADGE[e.statut] || '') + '">' + esc(e.statut || '—') + '</span></td>' +
       '<td class="num"><b>' + (e.montant_ht ? eur(e.montant_ht) : '—') + '</b></td>' +
-      '<td>' + (ETUDE_SIGNEE.includes(e.statut) ? (['frais', 'trop'].includes(situationEtude(e, S.factures).etat) ? '<span class="badge ' + SITUATION_LABEL[situationEtude(e, S.factures).etat][1] + '">' + SITUATION_LABEL[situationEtude(e, S.factures).etat][0] + '</span>' : '<div class="row" style="flex-wrap:nowrap"><div class="bar ' + (p >= 100 ? 'ok' : '') + '"><i style="width:' + Math.min(100, p) + '%"></i></div><span class="muted">' + Math.min(100, p) + '%</span></div>') : '') + '</td>' +
+      '<td>' + (SEE_COMPTA && ETUDE_SIGNEE.includes(e.statut) ? (['frais', 'trop'].includes(situationEtude(e, S.factures).etat) ? '<span class="badge ' + SITUATION_LABEL[situationEtude(e, S.factures).etat][1] + '">' + SITUATION_LABEL[situationEtude(e, S.factures).etat][0] + '</span>' : '<div class="row" style="flex-wrap:nowrap"><div class="bar ' + (p >= 100 ? 'ok' : '') + '"><i style="width:' + Math.min(100, p) + '%"></i></div><span class="muted">' + Math.min(100, p) + '%</span></div>') : '') + '</td>' +
       '<td>' + esc(userName(e.responsable_email)) + '</td><td>' + fmtDate(e.date_debut) + '</td><td>' + fmtDate(e.date_fin) + '</td></tr>';
   }).join('') : '<tr><td colspan="9" class="empty">Aucune étude.</td></tr>';
 }
@@ -184,9 +186,9 @@ function renderPanel(resetDraft) {
   if (isFrozen(e)) h += '<div class="alert warn"><span>🔒 Étude clôturée — lecture seule.</span>' + (App.isSA() ? '<a href="#" data-action="defreeze">Défiger</a>' : '') + '</div>';
   h += '<div class="kpis" style="grid-template-columns:repeat(3,1fr);margin-bottom:6px">' +
     '<div class="kpi accent"><div class="v">' + eur(e.montant_ht) + '</div><div class="l">Facturé client HT</div><div class="s">dont ' + eur(c.frais) + ' frais de structure</div></div>' +
-    '<div class="kpi"><div class="v" style="color:var(--ok)">' + eur(c.brutIv) + '</div><div class="l">Brut intervenants (' + c.taux + ' %)</div></div>' +
-    '<div class="kpi"><div class="v">' + eur(c.partJe) + '</div><div class="l">Part JE</div><div class="s">' + (100 - c.taux) + ' % des JEH + frais</div></div></div>' +
-    '<div class="muted">TTC : <b>' + eur(etudeTTC(e)) + '</b> · Encaissé HT : <b>' + eur(enc) + '</b> (' + Math.min(100, pct(enc, num(e.montant_ht))) + ' %)' + (['frais', 'trop'].includes(situationEtude(e, S.factures).etat) ? ' <span class="badge ' + SITUATION_LABEL[situationEtude(e, S.factures).etat][1] + '">' + SITUATION_LABEL[situationEtude(e, S.factures).etat][0] + ' : à corriger dans Comptabilité</span>' : '') + ' — mis à jour par les factures</div>';
+    (SEE_IV ? '<div class="kpi"><div class="v" style="color:var(--ok)">' + eur(c.brutIv) + '</div><div class="l">Brut intervenants (' + c.taux + ' %)</div></div>' +
+    '<div class="kpi"><div class="v">' + eur(c.partJe) + '</div><div class="l">Part JE</div><div class="s">' + (100 - c.taux) + ' % des JEH + frais</div></div>' : '') + '</div>' +
+    (!SEE_COMPTA ? '<div class="muted">TTC : <b>' + eur(etudeTTC(e)) + '</b></div>' : '') + (SEE_COMPTA ? '<div class="muted">TTC : <b>' + eur(etudeTTC(e)) + '</b> · Encaissé HT : <b>' + eur(enc) + '</b> (' + Math.min(100, pct(enc, num(e.montant_ht))) + ' %)' + (['frais', 'trop'].includes(situationEtude(e, S.factures).etat) ? ' <span class="badge ' + SITUATION_LABEL[situationEtude(e, S.factures).etat][1] + '">' + SITUATION_LABEL[situationEtude(e, S.factures).etat][0] + ' : à corriger dans Comptabilité</span>' : '') + ' — mis à jour par les factures</div>' : '');
 
   // Informations
   h += '<div class="sub-title">Informations</div>';
@@ -224,7 +226,7 @@ function renderPanel(resetDraft) {
   const av = e.avenants || [];
   h += '<div class="sub-title">Avenants</div>' + (av.length ? '<div class="list">' + av.map((a, i) => '<div class="item soft"><b>Avenant ' + (i + 1) + '</b> <span class="muted">' + fmtDate(a.date_avenant) + '</span><div>' + fmtDate(a.date_debut) + ' → ' + fmtDate(a.date_fin) + '</div>' + (a.note ? '<div class="muted">' + esc(a.note) + '</div>' : '') + '</div>').join('') + '</div>' : '<div class="muted">Aucun avenant.</div>');
   if (can) h += '<div class="form" id="av-form" style="margin-top:10px"><div class="field"><label>Nouveau début</label><input type="date" data-f="date_debut"></div><div class="field"><label>Nouvelle fin</label><input type="date" data-f="date_fin"></div><div class="field full"><label>Motif</label><input data-f="note"></div><div class="full"><button class="btn sm" data-action="avenant">Enregistrer l’avenant</button></div></div>';
-  h += '<div class="sub-title">Historique des modifications</div><div id="journal-box">' + journalHTML(S.journal) + '</div>';
+  if (SEE_IV || SEE_COMPTA) h += '<div class="sub-title">Historique des modifications</div><div id="journal-box">' + journalHTML(S.journal) + '</div>';
   if (App.isSA()) h += '<div class="sub-title">Super Admin</div><button class="btn sm danger" data-action="delete">Supprimer l’étude</button>';
   document.getElementById('p-body').innerHTML = h;
   renderPhases();
@@ -257,7 +259,7 @@ function phaseCard(e, p, i, can, taux) {
     h += '<div class="row"><b class="grow">' + esc(p.label) + '</b><span class="muted">' + num(p.jeh_total) + ' JEH × ' + eur(p.montant_jeh) + '</span><b>' + eur(total) + '</b></div>';
   }
   if (p.sub) h += '<div class="muted" style="margin-top:4px">' + esc(p.sub) + '</div>';
-  ivs.forEach(x => {
+  (SEE_IV ? ivs : []).forEach(x => {
     h += '<div class="row" style="margin-top:8px;background:#faf9f7;border-radius:8px;padding:6px 10px"><span class="avatar" style="width:26px;height:26px;font-size:11px">' + esc((x.nom || '?')[0]) + '</span>' +
       '<span class="grow">' + esc(x.nom || '') + (x.statut === 'Terminé' ? ' <span class="badge b-ok">terminé</span>' : '') + '</span><span class="muted">' + num(x.jeh) + ' JEH</span><b style="color:var(--ok)">' + eur(montantBrutAssignation(x.jeh, p.montant_jeh, taux)) + '</b>' +
       (can ? '<button class="icon-btn" data-action="unassign" data-pid="' + esc(p.id) + '" data-iv="' + esc(x.intervenant_id) + '" title="Retirer">×</button>' : '') + '</div>';

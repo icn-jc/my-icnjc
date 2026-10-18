@@ -18,6 +18,7 @@
     <button class="tab on" data-action="tab" data-t="members">Membres</button>
     <button class="tab" data-action="tab" data-t="external">Accès externes</button>
     <button class="tab" data-action="tab" data-t="mandats">Mandats</button>
+    <button class="tab" data-action="tab" data-t="access">Qui voit quoi</button>
     <button class="tab" data-action="tab" data-t="settings">Paramètres</button>
   </div>
   <section id="t-members">
@@ -29,11 +30,16 @@
     <div class="table-wrap"><div class="table-scroll"><table class="t"><thead><tr><th>Personne</th><th>Accès</th><th>Ajouté le</th><th></th></tr></thead><tbody id="x-body"></tbody></table></div></div>
     <div class="card" style="margin-top:16px"><h3>Ce que voit chaque accès externe</h3><dl class="kv">
       <dt>Tuteur</dt><dd>Accueil, prospection (vue CA, tous les prospects, après RDV), études et indicateurs — en lecture seule.</dd>
-      <dt>Commercial externe</dt><dd>Prospection, clients, intervenants, études, comptabilité (lecture) et ses missions.</dd>
+      <dt>Commercial externe</dt><dd>Accueil, prospection, clients, études (lecture seule, sans encaissements ni intervenants) et ses missions. Ni comptabilité ni intervenants.</dd>
       <dt>Intervenant</dt><dd>Uniquement « Mes missions ». Inutile de l'ajouter ici s'il a une fiche dans « Intervenants » avec son email : l'accès est automatique.</dd>
       <dt>Membre COS</dt><dd>Les mêmes accès qu'un membre COS interne.</dd></dl></div>
   </section>
   <section id="t-mandats" hidden><div id="mandats"></div></section>
+  <section id="t-access" hidden>
+    <p class="muted" style="margin-top:0">Lecture : <span class="badge b-ok">Modifie</span> peut modifier, <span class="badge b-info">Voit</span> lecture seule, — aucun accès. Un membre cumulant plusieurs rôles a la somme de leurs accès.</p>
+    <h3>Par rôle</h3><div class="table-wrap"><div class="table-scroll"><table class="t" id="acc-roles"></table></div></div>
+    <h3 style="margin-top:20px">Par personne</h3><div class="table-wrap"><div class="table-scroll"><table class="t" id="acc-people"></table></div></div>
+  </section>
   <section id="t-settings" hidden>
     <div class="card" style="max-width:640px"><div class="form" id="settings-form">
       <div class="field"><label>Objectif hebdomadaire de premiers contacts</label><input type="number" min="1" data-f="objectif_semaine"><div class="hint">Par commercial actif. Modifiable aussi depuis la prospection.</div></div>
@@ -138,8 +144,28 @@ function render() {
       (m.president_email ? ' · ' + esc(fullName(S.users.find(u => u.id === m.president_email)) || m.president_email) : '') + '</span>' +
       '<button class="btn sm' + (m.statut === 'actif' ? ' dark' : '') + '" data-action="cloture" data-id="' + esc(m.id) + '">Contrôle de clôture</button>' +
       (IS_SA ? '<button class="btn sm" data-action="edit-mandat" data-id="' + esc(m.id) + '">Modifier</button><button class="btn sm" data-action="del-mandat" data-id="' + esc(m.id) + '" style="color:var(--bad)">Supprimer</button>' : '') + '</div>').join('') + '</div>' : '<div class="card empty">Aucun mandat.</div>');
-  document.getElementById('btn-add').hidden = S.tab === 'settings' || (S.tab === 'mandats' && !IS_SA);
+  if (S.tab === 'access') renderAccess();
+  document.getElementById('btn-add').hidden = S.tab === 'settings' || S.tab === 'access' || (S.tab === 'mandats' && !IS_SA);
   document.getElementById('btn-add').textContent = { members: '+ Membre', external: '+ Accès externe', mandats: '+ Mandat' }[S.tab] || '';
+}
+
+/* Tableau « qui voit quoi » : calculé depuis ACCESS (core.js), donc toujours à jour. */
+function accLevel(roles, page) {
+  const r = ACCESS[page]; if (!r) return '';
+  if (roles.some(x => (r.edit || []).includes(x))) return '<span class="badge b-ok">Modifie</span>';
+  if (roles.some(x => (r.view || []).includes(x))) return '<span class="badge b-info">Voit</span>';
+  return '<span class="muted">—</span>';
+}
+function renderAccess() {
+  const pages = NAV.filter(n => n.key), head = '<thead><tr><th>' + 'QUI' + '</th>' + pages.map(p => '<th>' + esc(p.label) + '</th>').join('') + '</tr></thead>';
+  document.getElementById('acc-roles').innerHTML = head.replace('QUI', 'Rôle') + '<tbody>' + ROLE_ORDER.map(r =>
+    '<tr><td><b>' + esc(ROLE_LABELS[r]) + '</b></td>' + pages.map(p => '<td>' + accLevel([r], p.key) + '</td>').join('') + '</tr>').join('') + '</tbody>';
+  const people = S.users.map(u => ({ name: fullName(u), mail: u.id, roles: rolesOf(u), ext: false }))
+    .concat(S.ext.map(x => ({ name: ((x.prenom || '') + ' ' + (x.nom || '')).trim() || x.id, mail: x.id, roles: [x.role], ext: true })))
+    .sort((a, b) => a.name.localeCompare(b.name));
+  document.getElementById('acc-people').innerHTML = head.replace('QUI', 'Personne') + '<tbody>' + people.map(p =>
+    '<tr><td><b>' + esc(p.name) + '</b>' + (p.ext ? ' <span class="badge">externe</span>' : '') + '<div class="muted">' + esc(p.mail) + ' · ' + esc(p.roles.map(r => ROLE_LABELS[r] || r).join(', ')) + '</div></td>' +
+    pages.map(pg => '<td>' + accLevel(p.roles, pg.key) + '</td>').join('') + '</tr>').join('') + '</tbody>';
 }
 
 function openUser(u) {
@@ -270,7 +296,7 @@ function nextMandat(m) {
 }
 
 onActions({
-  tab: el => { S.tab = el.dataset.t; document.querySelectorAll('#tabs .tab').forEach(b => b.classList.toggle('on', b === el)); ['members', 'external', 'mandats', 'settings'].forEach(t => { document.getElementById('t-' + t).hidden = t !== S.tab; }); render(); if (S.tab === 'settings') demoRefresh(); },
+  tab: el => { S.tab = el.dataset.t; document.querySelectorAll('#tabs .tab').forEach(b => b.classList.toggle('on', b === el)); ['members', 'external', 'mandats', 'access', 'settings'].forEach(t => { document.getElementById('t-' + t).hidden = t !== S.tab; }); render(); if (S.tab === 'settings') demoRefresh(); },
   add: () => S.tab === 'members' ? openUser(null) : S.tab === 'external' ? (fillForm(document.getElementById('x-form'), { role: 'tuteur' }), openModal('m-ext')) : openMandat(null),
   'edit-user': el => openUser(S.users.find(u => u.id === el.dataset.id)),
   'del-user': el => { if (confirm('Retirer l’accès de ' + el.dataset.id + ' ?')) db.collection('users').doc(el.dataset.id).delete().then(() => toast('Membre retiré')).catch(fail); },
