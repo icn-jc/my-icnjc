@@ -530,6 +530,13 @@ function renderTimeline() {
     : '<div class="muted">Aucune action enregistrée.</div>';
 }
 
+
+/* Le montant estimé est unique par prospect : on le recopie sur ses comptes rendus de RDV pour qu'ils affichent la même valeur. */
+async function syncRdvAmount(pid, amount) {
+  const l = S.rdvs.filter(r => r.prospect_id === pid && r.id && num(r.montant) !== num(amount));
+  if (l.length) await Promise.all(l.map(r => db.collection('prospects_rdv').doc(r.id).update({ montant: amount })));
+}
+
 /* Cœur métier : une action met à jour le statut, les dates, le pipeline, l'après-RDV et crée l'étude si signé. */
 async function saveAction(p, a) {
   const newStatus = a.new_status || null;
@@ -550,7 +557,7 @@ async function saveAction(p, a) {
   }
   if (a.rdv_date) up.rdv_date = a.rdv_date;
   if (a.next_action_at !== undefined) up.next_action_at = a.next_action_at || '';
-  if (a.new_amount) up.estimated_amount = a.new_amount;
+  if (a.new_amount) { up.estimated_amount = a.new_amount; await syncRdvAmount(p.id, a.new_amount); }
   await db.collection('prospects').doc(p.id).update(up);
 
   if (newStatus === 'RDV planifié' && a.rdv_date) {
@@ -607,6 +614,7 @@ async function saveProspectForm() {
   if (S.editId) {
     if (owner) { data.owner_email = owner; data.owner_name = userName(owner); }
     await db.collection('prospects').doc(S.editId).update(data);
+    if (num(data.estimated_amount) > 0) await syncRdvAmount(S.editId, num(data.estimated_amount));
   } else {
     const contacted = f.status === 'Contacté';
     const date = f.contact_date || today();
@@ -626,7 +634,7 @@ function openRdv(id, pid, date) {
   S.rdvEditId = id || null; S.rdvProspectId = p ? p.id : (pid || null);
   document.getElementById('mr-title').textContent = 'Compte rendu — ' + ((r && r.entreprise) || (p && p.company_name) || '');
   document.getElementById('mr-result').innerHTML = options(RDV_RESULTS.map(x => x.v), '', '— Choisir —');
-  fillForm(document.getElementById('mr-form'), Object.assign({ date: date || today(), type_rdv: 'Présentiel', urgence: 'Normale', montant: p ? p.estimated_amount : '' }, r || {}));
+  fillForm(document.getElementById('mr-form'), Object.assign({ date: date || today(), type_rdv: 'Présentiel', urgence: 'Normale' }, r || {}, p && num(p.estimated_amount) ? { montant: p.estimated_amount } : {}));
   openModal('m-rdv');
 }
 async function saveRdv() {
@@ -638,11 +646,17 @@ async function saveRdv() {
   if (S.rdvEditId) await db.collection('prospects_rdv').doc(S.rdvEditId).update(data);
   else await db.collection('prospects_rdv').add(Object.assign(data, { prospect_id: S.rdvProspectId || '', entreprise: p ? p.company_name : '',
     owner_email: p ? p.owner_email : ME, owner_name: userName(p ? p.owner_email : ME), created_at: FV.serverTimestamp() }));
-  // Le résultat du RDV fait avancer le prospect (une seule fois, quand le résultat change)
+  // Le prospect est la source unique : résultat, montant estimé et prochaine étape du compte rendu remontent sur sa fiche
+  // (donc dans le pipeline, « Mes prospects », « Tous les prospects » et l'agenda), même si seul le montant a changé.
   const res = RDV_RESULTS.find(x => x.v === f.signe);
-  if (p && f.signe !== wasResult) {
-    await saveAction(p, { canal: 'RDV', date: f.date, note: f.notes_apres || ('Compte rendu de RDV : ' + f.signe), new_status: res && res.status && res.status !== p.status ? res.status : null,
-      next_action_at: f.next_date || undefined, new_amount: f.montant || null });
+  if (p) {
+    const amount = num(f.montant), amountChanged = amount > 0 && amount !== num(p.estimated_amount);
+    const nextChanged = !!f.next_date && f.next_date !== p.next_action_at;
+    if (f.signe !== wasResult || amountChanged || nextChanged) {
+      await saveAction(p, { canal: 'RDV', date: f.date, note: f.notes_apres || ('Compte rendu de RDV : ' + f.signe),
+        new_status: f.signe !== wasResult && res && res.status && res.status !== p.status ? res.status : null,
+        next_action_at: nextChanged ? f.next_date : undefined, new_amount: amountChanged ? amount : null });
+    }
   }
   closeModal('m-rdv'); toast('Compte rendu enregistré');
 }
