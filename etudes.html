@@ -103,7 +103,8 @@ App.start('etudes', () => {
   getAll(db.collection('clients')).then(l => { S.clients = l; });
   getAll(db.collection('users')).then(l => { S.users = l; render(); });
   getAll(db.collection('mandats')).then(l => { S.mandats = l.sort((a, b) => (b.date_debut || '').localeCompare(a.date_debut || '')); render(); });
-  getAll(db.collection('intervenants')).then(l => { S.ivs = l.sort((a, b) => (a.nom || '').localeCompare(b.nom || '')); });
+  watch(db.collection('intervenants'), l => { S.ivs = l.sort((a, b) => (a.nom || '').localeCompare(b.nom || '')); });
+  if (App.canEdit('etudes')) syncIntervenants().catch(() => {});
   ['f-q', 'f-statut', 'f-mandat', 'f-resp', 'f-todo'].forEach(id => document.getElementById(id).addEventListener('input', render));
   document.getElementById('add-type').addEventListener('change', ev => { S.addDraft = tplPhases(ev.target.value); renderAddPhases(); });
   document.getElementById('add-client').addEventListener('input', () => { document.getElementById('add-ref').value = genRef(document.getElementById('add-client').value); });

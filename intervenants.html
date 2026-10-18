@@ -43,6 +43,7 @@ App.start('intervenants', () => {
   CAN_EDIT = App.canEdit('intervenants');
   document.getElementById('btn-add').hidden = !CAN_EDIT;
   watch(db.collection('intervenants'), l => { S.ivs = l; render(); if (S.current) renderPanel(); });
+  if (App.canEdit('intervenants')) syncIntervenants().then(n => n && toast(n + ' fiche(s) intervenant créée(s) depuis les accès')).catch(() => {});
   watch(db.collection('etudes'), l => { S.etudes = l; render(); });
   getAll(db.collection('mandats')).then(l => { S.mandats = l.sort((a, b) => (b.date_debut || '').localeCompare(a.date_debut || '')); render(); });
   ['f-q', 'f-statut', 'f-dispo', 'f-mandat'].forEach(id => document.getElementById(id).addEventListener('input', render));

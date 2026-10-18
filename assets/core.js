@@ -117,6 +117,24 @@ function situationEtude(e, factures) {
 }
 const SITUATION_LABEL = { solde: ['Soldée', 'b-ok'], reste: ['Reste à encaisser', 'b-warn'], frais: ['Frais de structure oubliés', 'b-info'], trop: ['Encaissé > montant', 'b-bad'], vide: ['Montant manquant', 'b-warn'] };
 
+/* Toute personne ayant le rôle intervenant (accès externe ou membre) doit avoir une fiche dans « Intervenants »,
+   sinon on ne peut pas lui assigner de mission. Crée les fiches manquantes, renvoie le nombre créé. */
+async function syncIntervenants() {
+  const [ivs, ext, users] = await Promise.all([getAll(db.collection('intervenants')), getAll(db.collection('whitelist_emails')), getAll(db.collection('users'))]);
+  const known = new Set(ivs.map(i => (i.email || '').toLowerCase()).filter(Boolean));
+  const people = ext.filter(x => x.role === 'intervenant').map(x => ({ email: x.id, prenom: x.prenom, nom: x.nom }))
+    .concat(users.filter(u => (u.roles || []).includes('intervenant')).map(u => ({ email: u.email || u.id, prenom: u.prenom, nom: u.nom })));
+  let n = 0;
+  for (const p of people) {
+    const email = (p.email || '').toLowerCase();
+    if (!email || known.has(email)) continue;
+    known.add(email); n++;
+    await db.collection('intervenants').add({ prenom: p.prenom || '', nom: p.nom || '', email, statut: 'Actif', disponibilite: 'Disponible', mandats_ids: [], note_interne: 0,
+      notes: 'Fiche créée automatiquement depuis les accès du site.', created_at_str: today(), created_at: FV.serverTimestamp() });
+  }
+  return n;
+}
+
 /* Indicateurs d'un mandat, calculés à partir des données du site sur la période du mandat.
    Une étude compte pour le mandat si elle y est rattachée, ou (sans rattachement valide) si sa date de signature tombe dans la période.
    Quand le site n'a pas de données (anciens mandats), on reprend la valeur saisie à la main dans Administration → Mandats. */

@@ -137,7 +137,7 @@ function render() {
       (m.statut === 'actif' ? '<span class="badge b-ok">en cours</span>' : '<span class="badge">clos</span>') + '<span class="grow muted">' + fmtDate(m.date_debut) + ' → ' + fmtDate(m.date_fin) +
       (m.president_email ? ' · ' + esc(fullName(S.users.find(u => u.id === m.president_email)) || m.president_email) : '') + '</span>' +
       '<button class="btn sm' + (m.statut === 'actif' ? ' dark' : '') + '" data-action="cloture" data-id="' + esc(m.id) + '">Contrôle de clôture</button>' +
-      (IS_SA ? '<button class="btn sm" data-action="edit-mandat" data-id="' + esc(m.id) + '">Modifier</button>' : '') + '</div>').join('') + '</div>' : '<div class="card empty">Aucun mandat.</div>');
+      (IS_SA ? '<button class="btn sm" data-action="edit-mandat" data-id="' + esc(m.id) + '">Modifier</button><button class="btn sm" data-action="del-mandat" data-id="' + esc(m.id) + '" style="color:var(--bad)">Supprimer</button>' : '') + '</div>').join('') + '</div>' : '<div class="card empty">Aucun mandat.</div>');
   document.getElementById('btn-add').hidden = S.tab === 'settings' || (S.tab === 'mandats' && !IS_SA);
   document.getElementById('btn-add').textContent = { members: '+ Membre', external: '+ Accès externe', mandats: '+ Mandat' }[S.tab] || '';
 }
@@ -162,6 +162,7 @@ async function saveUser() {
   const roles = S.roles.slice().sort((a, b) => ROLE_ORDER.indexOf(a) - ROLE_ORDER.indexOf(b));
   await db.collection('users').doc(email).set({ prenom: f.prenom, nom: f.nom.toUpperCase(), email, roles, role: roles[0], prospecte: !!f.prospecte, membre_ca: !!f.membre_ca,
     updated_at: FV.serverTimestamp() }, { merge: true });
+  if (roles.includes('intervenant')) await syncIntervenants();
   closeModal('m-user'); toast('Membre enregistré');
 }
 function openMandat(m) {
@@ -280,11 +281,20 @@ onActions({
     if (!email.includes('@')) return toast('Email invalide', true);
     if (email.endsWith('@' + DOMAIN)) return toast('Adresse ICN : ajoute-la plutôt dans « Membres »', true);
     db.collection('whitelist_emails').doc(email).set({ prenom: f.prenom, nom: f.nom, role: f.role, added_by: App.user.email, added_at: today() })
-      .then(() => { closeModal('m-ext'); toast('Accès ajouté'); }).catch(fail);
+      .then(() => f.role === 'intervenant' ? syncIntervenants() : 0)
+      .then(() => { closeModal('m-ext'); toast(f.role === 'intervenant' ? 'Accès ajouté : sa fiche est dans « Intervenants »' : 'Accès ajouté'); }).catch(fail);
   },
   'del-ext': el => { if (confirm('Retirer l’accès de ' + el.dataset.id + ' ?')) db.collection('whitelist_emails').doc(el.dataset.id).delete().then(() => toast('Accès retiré')).catch(fail); },
   'edit-mandat': el => openMandat(S.mandats.find(m => m.id === el.dataset.id)),
   'save-mandat': () => saveMandat().catch(fail),
+  'del-mandat': el => {
+    const m = S.mandats.find(x => x.id === el.dataset.id), linked = S.etudes.filter(e => e.mandat_id === m.id);
+    if (!confirm('Supprimer le mandat ' + (m.label || m.id) + ' ?' + (linked.length ? '\n' + linked.length + ' étude(s) y sont rattachées : elles restent dans le site, simplement sans mandat.' : '') + '\nLes études, factures et prospects ne sont pas supprimés.')) return;
+    const batch = db.batch();
+    linked.forEach(e => batch.update(db.collection('etudes').doc(e.id), { mandat_id: '' }));
+    batch.delete(db.collection('mandats').doc(m.id));
+    batch.commit().then(() => toast('Mandat supprimé')).catch(fail);
+  },
   cloture: el => { S.clos = el.dataset.id; renderCloture(); openPanel('cl-panel'); },
   'cl-fix': el => { if (confirm('Appliquer cette correction ?')) clotureFix(el.dataset.k).catch(fail); },
   'cl-close': () => {
