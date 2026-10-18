@@ -78,6 +78,8 @@ App.start('compta', () => {
   document.getElementById('file').addEventListener('change', readFile);
 });
 
+const FACT_LABELS = { numero: 'N° facture', type: 'Type', montant_ht: 'Montant HT', taux_tva: 'Taux de TVA', montant_ttc: 'Montant TTC', statut: 'Statut', date_emission: 'Date d\u2019émission', date_echeance: 'Échéance', date_encaissement: 'Date d\u2019encaissement', etude_id: 'Étude' };
+const logF = (f, action, changes) => logChange({ entity: 'facture', entity_id: f.id || '', etude_id: f.etude_id, ref: f.numero, action, changes: changes || [{ cle: 'montant_ht', champ: 'Montant HT', avant: '', apres: num(f.montant_ht) }] });
 const signed = () => S.etudes.filter(e => ETUDE_SIGNEE.includes(e.statut));
 const facturesOf = e => S.factures.filter(f => f.etude_id === e.id);
 const factured = e => round2(facturesOf(e).reduce((a, f) => a + num(f.montant_ht), 0));
@@ -214,8 +216,14 @@ async function save() {
   Object.assign(f, { etude_ref: e.reference || '', client_name: e.client_name || '' });
   if (f.statut === 'Encaissée' && !f.date_encaissement) f.date_encaissement = today();
   const old = S.editId && S.factures.find(x => x.id === S.editId);
-  if (S.editId) await db.collection('factures').doc(S.editId).update(f);
-  else await db.collection('factures').add(Object.assign(f, { created_by: App.user.email, created_at: FV.serverTimestamp() }));
+  if (S.editId) {
+    const before = S.factures.find(x => x.id === S.editId) || {};
+    await db.collection('factures').doc(S.editId).update(f);
+    await logF(Object.assign({ id: S.editId }, f), 'Facture modifiée', diffFields(Object.assign({}, before, { montant_ttc: factureTTC(before) }), f, FACT_LABELS));
+  } else {
+    const ref = await db.collection('factures').add(Object.assign(f, { created_by: App.user.email, created_at: FV.serverTimestamp() }));
+    await logF(Object.assign({ id: ref.id }, f), 'Facture créée');
+  }
   await syncEtude(f.etude_id);
   if (old && old.etude_id !== f.etude_id) await syncEtude(old.etude_id);
   closeModal('m-facture'); toast('Facture enregistrée');
@@ -260,7 +268,9 @@ async function doImport() {
 async function fixFrais(list) {
   const batch = db.batch();
   list.forEach(e => batch.update(db.collection('etudes').doc(e.id), { montant_ht: round2(num(e.montant_ht) + num(e.frais_structure, 100)), frais_corriges_le: today() }));
-  await batch.commit(); toast(list.length + ' étude(s) corrigée(s)');
+  await batch.commit();
+  await Promise.all(list.map(e => logChange({ entity: 'etude', entity_id: e.id, etude_id: e.id, ref: e.reference, action: 'Frais de structure ajoutés au montant HT', changes: [{ cle: 'montant_ht', champ: 'Montant HT', avant: num(e.montant_ht), apres: round2(num(e.montant_ht) + num(e.frais_structure, 100)) }], motif: 'Régularisation : frais de structure facturés mais absents du montant de l\u2019étude' })));
+  toast(list.length + ' étude(s) corrigée(s)');
 }
 async function solder(list) {
   const batch = db.batch();
@@ -268,7 +278,9 @@ async function solder(list) {
     batch.update(db.collection('etudes').doc(e.id), { solde_declare: true, solde_declare_le: today(), solde_declare_par: App.user.email, montant_encaisse: num(e.montant_ht) });
     facturesOf(e).filter(f => f.statut !== 'Encaissée').forEach(f => batch.update(db.collection('factures').doc(f.id), { statut: 'Encaissée', date_encaissement: f.date_echeance && f.date_echeance < today() ? f.date_echeance : today() }));
   });
-  await batch.commit(); toast(list.length + ' étude(s) marquée(s) soldée(s)');
+  await batch.commit();
+  await Promise.all(list.map(e => logChange({ entity: 'etude', entity_id: e.id, etude_id: e.id, ref: e.reference, action: 'Étude marquée soldée', changes: [{ cle: 'montant_ht', champ: 'Encaissé HT', avant: round2(cashed(e)), apres: num(e.montant_ht) }], motif: 'Encaissement déclaré complet par la trésorerie' })));
+  toast(list.length + ' étude(s) marquée(s) soldée(s)');
 }
 
 onActions({
@@ -281,8 +293,8 @@ onActions({
   add: () => openForm(null),
   edit: el => openForm(S.factures.find(x => x.id === el.dataset.id)),
   save: () => save().catch(fail),
-  del: el => { const f = S.factures.find(x => x.id === el.dataset.id); if (confirm('Supprimer la facture ' + f.numero + ' ?')) db.collection('factures').doc(f.id).delete().then(() => syncEtude(f.etude_id)).then(() => toast('Facture supprimée')).catch(fail); },
-  cash: el => { const f = S.factures.find(x => x.id === el.dataset.id); db.collection('factures').doc(f.id).update({ statut: 'Encaissée', date_encaissement: today() }).then(() => syncEtude(f.etude_id)).then(() => toast('Encaissée')).catch(fail); },
+  del: el => { const f = S.factures.find(x => x.id === el.dataset.id); if (confirm('Supprimer la facture ' + f.numero + ' ?')) db.collection('factures').doc(f.id).delete().then(() => logF(f, 'Facture supprimée')).then(() => syncEtude(f.etude_id)).then(() => toast('Facture supprimée')).catch(fail); },
+  cash: el => { const f = S.factures.find(x => x.id === el.dataset.id); db.collection('factures').doc(f.id).update({ statut: 'Encaissée', date_encaissement: today() }).then(() => logF(f, 'Facture encaissée', [{ cle: 'statut', champ: 'Statut', avant: f.statut, apres: 'Encaissée' }])).then(() => syncEtude(f.etude_id)).then(() => toast('Encaissée')).catch(fail); },
   import: () => doImport().catch(fail),
   export: () => {
     const r1 = [['Référence', 'Client', 'Statut', 'Montant HT', 'Encaissé HT', 'Reste HT', 'Situation']];

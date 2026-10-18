@@ -506,7 +506,7 @@ function renderPanel() {
       '<div class="field" data-rdv hidden><label>Date du RDV *</label><input type="date" data-f="rdv_date"></div>' +
       '<div class="field" data-rdv hidden><label>Heure</label><input type="time" data-f="rdv_heure"></div>' +
       '<div class="field"><label>Prochaine action le</label><input type="date" data-f="next_action_at"></div>' +
-      '<div class="field"><label>Montant estimé (€)</label><input type="number" min="0" data-f="new_amount" value="' + esc(p.estimated_amount || '') + '"></div>' +
+      '<div class="field"><label>Montant estimé (€)</label><input type="number" min="0" data-f="new_amount" value="' + esc(p.estimated_amount || '') + '"' + (amountFrozen(p) ? ' disabled title="Montant figé : à modifier dans Études"' : '') + '>' + (amountFrozen(p) ? '<div class="hint">🔒 Figé depuis la signature : modifiable uniquement dans l’étude' + (p.etude_ref ? ' ' + esc(p.etude_ref) : '') + '</div>' : '') + '</div>' +
       '<div class="field full"><label>Note</label><textarea data-f="note" placeholder="Ce qui s’est dit, la suite…"></textarea></div>' +
       '<div class="full"><button class="btn primary" data-action="save-action">Enregistrer l’action</button></div></div>';
   }
@@ -539,6 +539,19 @@ function renderTimeline() {
 }
 
 
+/* Montant figé : dès que le lien avec l'étude est coupé, le montant ne se modifie plus que dans « Études » (phases ou avenant). */
+const amountFrozen = p => !!p && p.montant_fige === true;
+/* Tant que le lien est actif et que l'étude n'a pas encore de phases chiffrées, le montant de la prospection fait foi côté étude. */
+async function syncEtudeAmount(p, amount) {
+  const l = await db.collection('etudes').where('prospect_id', '==', p.id).get();
+  for (const d of l.docs) {
+    const e = Object.assign({ id: d.id }, d.data());
+    if (e.lien_crm_stoppe || (e.phases || []).some(x => num(x.jeh_total) > 0) || num(e.montant_ht) === num(amount)) continue;
+    await d.ref.update({ montant_ht: num(amount) });
+    await logChange({ entity: 'etude', entity_id: e.id, etude_id: e.id, ref: e.reference, action: 'Montant mis à jour depuis la prospection', changes: [{ cle: 'montant_ht', champ: 'Montant HT', avant: num(e.montant_ht), apres: num(amount) }] });
+  }
+}
+
 /* Le montant estimé est unique par prospect : on le recopie sur ses comptes rendus de RDV pour qu'ils affichent la même valeur. */
 async function syncRdvAmount(pid, amount) {
   const l = S.rdvs.filter(r => r.prospect_id === pid && r.id && num(r.montant) !== num(amount));
@@ -565,7 +578,7 @@ async function saveAction(p, a) {
   }
   if (a.rdv_date) up.rdv_date = a.rdv_date;
   if (a.next_action_at !== undefined) up.next_action_at = a.next_action_at || '';
-  if (a.new_amount) { up.estimated_amount = a.new_amount; await syncRdvAmount(p.id, a.new_amount); }
+  if (a.new_amount && !amountFrozen(p)) { up.estimated_amount = a.new_amount; await syncRdvAmount(p.id, a.new_amount); await syncEtudeAmount(p, a.new_amount); }
   await db.collection('prospects').doc(p.id).update(up);
 
   if (newStatus === 'RDV planifié' && a.rdv_date) {
@@ -603,6 +616,8 @@ function openProspectForm(p) {
     prospectors().some(u => (u.email || u.id) === ME) ? [] : [{ value: ME, label: fullName(App.user) + ' (moi)' }]), p ? p.owner_email : ME);
   fillForm(form, p ? Object.assign({}, p, { tags: Array.isArray(p.tags) ? p.tags.join(', ') : (p.tags || '') })
     : { priority: 'Normale', status: 'À contacter', contact_date: today(), owner_email: ME });
+  const am = form.querySelector('[data-f=estimated_amount]');
+  am.disabled = amountFrozen(p); am.title = am.disabled ? 'Montant figé : à modifier dans Études' : '';
   document.getElementById('dl-companies').innerHTML = S.prospects.map(x => '<option value="' + esc(x.company_name) + '">').join('');
   document.getElementById('mp-dup').textContent = '';
   openModal('m-prospect');
@@ -621,8 +636,10 @@ async function saveProspectForm() {
   const owner = App.isCA() && f.owner_email ? f.owner_email : null;
   if (S.editId) {
     if (owner) { data.owner_email = owner; data.owner_name = userName(owner); }
+    const cur = S.prospects.find(x => x.id === S.editId);
+    if (amountFrozen(cur)) delete data.estimated_amount;
     await db.collection('prospects').doc(S.editId).update(data);
-    if (num(data.estimated_amount) > 0) await syncRdvAmount(S.editId, num(data.estimated_amount));
+    if (!amountFrozen(cur) && num(data.estimated_amount) > 0) { await syncRdvAmount(S.editId, num(data.estimated_amount)); await syncEtudeAmount(cur, num(data.estimated_amount)); }
   } else {
     const contacted = f.status === 'Contacté';
     const date = f.contact_date || today();
@@ -643,13 +660,14 @@ function openRdv(id, pid, date) {
   document.getElementById('mr-title').textContent = 'Compte rendu — ' + ((r && r.entreprise) || (p && p.company_name) || '');
   document.getElementById('mr-result').innerHTML = options(RDV_RESULTS.map(x => x.v), '', '— Choisir —');
   fillForm(document.getElementById('mr-form'), Object.assign({ date: date || today(), type_rdv: 'Présentiel', urgence: 'Normale' }, r || {}, p && num(p.estimated_amount) ? { montant: p.estimated_amount } : {}));
+  const mm = document.querySelector('#mr-form [data-f=montant]'); mm.disabled = amountFrozen(p); mm.title = mm.disabled ? 'Montant figé : à modifier dans Études' : '';
   openModal('m-rdv');
 }
 async function saveRdv() {
   const f = readForm(document.getElementById('mr-form'));
   if (!f.date || !f.signe) return toast('La date et le résultat sont obligatoires', true);
   const p = S.prospects.find(x => x.id === S.rdvProspectId);
-  const data = Object.assign(f, { montant: f.montant || 0, rdv_status: f.signe, updated_at: FV.serverTimestamp() });
+  const data = Object.assign(f, { montant: amountFrozen(p) ? num(p.estimated_amount) : (f.montant || 0), rdv_status: f.signe, updated_at: FV.serverTimestamp() });
   const wasResult = S.rdvEditId ? (S.rdvs.find(x => x.id === S.rdvEditId) || {}).signe : '';
   if (S.rdvEditId) await db.collection('prospects_rdv').doc(S.rdvEditId).update(data);
   else await db.collection('prospects_rdv').add(Object.assign(data, { prospect_id: S.rdvProspectId || '', entreprise: p ? p.company_name : '',
@@ -658,7 +676,7 @@ async function saveRdv() {
   // (donc dans le pipeline, « Mes prospects », « Tous les prospects » et l'agenda), même si seul le montant a changé.
   const res = RDV_RESULTS.find(x => x.v === f.signe);
   if (p) {
-    const amount = num(f.montant), amountChanged = amount > 0 && amount !== num(p.estimated_amount);
+    const amount = num(f.montant), amountChanged = !amountFrozen(p) && amount > 0 && amount !== num(p.estimated_amount);
     const nextChanged = !!f.next_date && f.next_date !== p.next_action_at;
     if (f.signe !== wasResult || amountChanged || nextChanged) {
       await saveAction(p, { canal: 'RDV', date: f.date, note: f.notes_apres || ('Compte rendu de RDV : ' + f.signe),
@@ -712,7 +730,7 @@ onActions({
     if (!a.date) return toast('La date est obligatoire', true);
     if (a.new_status === 'RDV planifié' && !a.rdv_date) return toast('La date du RDV est obligatoire', true);
     if (!a.new_status && !a.note) return toast('Ajoute une note ou un nouveau statut', true);
-    a.new_amount = num(a.new_amount) > 0 && num(a.new_amount) !== num(p.estimated_amount) ? num(a.new_amount) : null;
+    a.new_amount = !amountFrozen(p) && num(a.new_amount) > 0 && num(a.new_amount) !== num(p.estimated_amount) ? num(a.new_amount) : null;
     saveAction(p, a).then(() => { toast('Action enregistrée'); loadActions(p.id); }).catch(fail);
   },
   rdv: el => openRdv(el.dataset.id, el.dataset.pid, el.dataset.date),

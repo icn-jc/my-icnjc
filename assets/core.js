@@ -268,6 +268,39 @@ function watch(ref, cb) {
 }
 function getAll(ref) { return ref.get().then(snap => snap.docs.map(d => Object.assign({ id: d.id }, d.data()))); }
 
+/* ───────── Journal des modifications ─────────
+   Chaque changement important (montant, statut, dates, phases, avenants, factures…) est inscrit dans la collection `journal` :
+   qui, quand, ancienne et nouvelle valeur, motif. Les entrées ne se modifient ni ne se suppriment depuis le site. */
+function fmtVal(k, v) {
+  if (v == null || v === '') return '—';
+  if (/montant|frais|ht$|ttc$/.test(k) && !isNaN(+v)) return eurc(v);
+  if (/^date|_at$|_le$/.test(k) && /^\d{4}-\d{2}-\d{2}/.test(String(v))) return fmtDate(v);
+  if (/taux/.test(k) && !isNaN(+v)) return v + ' %';
+  return String(v);
+}
+/* Compare deux objets sur une liste de champs {cle: 'Libellé'} et renvoie les écarts. */
+function diffFields(oldObj, newObj, labels) {
+  const out = [];
+  Object.keys(labels).forEach(k => {
+    if (!(k in newObj)) return;
+    const a = oldObj[k], b = newObj[k], same = (a == null || a === '') && (b == null || b === '') || String(a) === String(b) || (!isNaN(+a) && !isNaN(+b) && a !== '' && b !== '' && +a === +b);
+    if (!same) out.push({ cle: k, champ: labels[k], avant: a == null ? '' : a, apres: b == null ? '' : b });
+  });
+  return out;
+}
+function logChange(entry) {
+  if (!entry || (!(entry.changes || []).length && !entry.action)) return Promise.resolve();
+  return db.collection('journal').add(Object.assign({ by: App.user.email, by_name: fullName(App.user), at_str: today(), at: FV.serverTimestamp(), changes: [] }, entry))
+    .catch(() => {});
+}
+function journalHTML(list) {
+  if (!list.length) return '<div class="muted">Aucune modification enregistrée pour le moment.</div>';
+  return '<div class="timeline">' + list.slice().sort((a, b) => (b.at_str || '').localeCompare(a.at_str || '') || (b.seq || 0) - (a.seq || 0)).map(j =>
+    '<div class="tl"><b>' + esc(j.action || 'Modification') + '</b> <small>' + fmtDate(j.at_str) + ' · ' + esc(j.by_name || j.by || '') + (j.entity === 'facture' ? ' · facture ' + esc(j.ref || '') : '') + '</small>' +
+    (j.changes || []).map(x => '<div class="muted">' + esc(x.champ) + ' : <s>' + esc(fmtVal(x.cle, x.avant)) + '</s> → <b style="color:var(--ink)">' + esc(fmtVal(x.cle, x.apres)) + '</b></div>').join('') +
+    (j.motif ? '<div style="margin-top:3px">Motif : ' + esc(j.motif) + '</div>' : '') + '</div>').join('') + '</div>';
+}
+
 /* Export Excel (SheetJS chargé à la demande) */
 function exportExcel(fileName, sheets) {
   const run = () => {

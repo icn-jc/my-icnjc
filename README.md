@@ -43,3 +43,9 @@ Administration → Paramètres (Super Admin) : ajoute/supprime des données fict
 
 ## HT / TVA / TTC
 Les factures stockent `montant_ht`, `taux_tva`, `montant_tva`, `montant_ttc`. Les études sont en HT ; l'encaissé est calculé en HT depuis les factures encaissées. Une facture dont le HT dépasse le reste à facturer est refusée.
+
+## Journal des modifications et montant figé
+- Collection `journal` : qui, quand, avant → après, motif. Alimentée par les études (infos, phases, avenants, assignations, lien coupé), les factures et les régularisations de compta. Affichée dans le panneau d'une étude (« Historique des modifications »).
+- Le montant HT d'une étude signée ne se modifie qu'avec un motif obligatoire.
+- Tant que le lien avec la prospection est actif et que l'étude n'a pas de phases chiffrées, le montant saisi en prospection met l'étude à jour.
+- « Couper le lien » dans une étude fige le montant du prospect (`montant_fige`) : il n'est plus modifiable depuis « Mes prospects », « Après RDV » ou « Enregistrer une action ».

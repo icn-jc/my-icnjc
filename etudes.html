@@ -85,7 +85,7 @@ const newPhase = (label, sub) => ({ id: 'ph_' + Math.random().toString(36).slice
 const tplPhases = type => PHASES_TPL[typeFamily(type)].map(p => newPhase(p[0], p[1]));
 const typeOptions = cur => '<option value="">— Choisir —</option>' + Object.keys(TYPES).map(g => '<optgroup label="' + esc(g) + '">' + options(TYPES[g], cur) + '</optgroup>').join('');
 
-const S = { etudes: [], clients: [], users: [], mandats: [], ivs: [], factures: [], current: null, draft: null, addDraft: [], assign: null };
+const S = { journal: [], unJournal: null, etudes: [], clients: [], users: [], mandats: [], ivs: [], factures: [], current: null, draft: null, addDraft: [], assign: null };
 let CAN_EDIT;
 
 App.start('etudes', () => {
@@ -114,6 +114,13 @@ App.start('etudes', () => {
 const userName = e => { const u = S.users.find(x => (x.email || x.id) === e); return u ? fullName(u) : (e || '—').split('@')[0]; };
 const respList = () => S.users.filter(u => (u.roles || [u.role]).some(r => CA.includes(r))).map(u => ({ value: u.email || u.id, label: fullName(u) }));
 const encaisse = e => encaisseHT(e, S.factures);
+const ETUDE_LABELS = { statut: 'Statut', montant_ht: 'Montant HT', frais_structure: 'Frais de structure', taux_intervenants: 'Taux intervenants', taux_tva: 'Taux de TVA', date_signature: 'Date de signature', date_debut: 'Date de début', date_fin: 'Date de fin', title: 'Titre', type_etude: 'Type', responsable_email: 'Responsable', mandat_id: 'Mandat', client_name: 'Client' };
+/* Motif obligatoire quand le montant d'une étude déjà signée change : la trace doit dire pourquoi. */
+function askMotif(e, oldHt, newHt) {
+  if (!ETUDE_SIGNEE.includes(e.statut) || Math.abs(num(oldHt) - num(newHt)) < 0.005) return '';
+  const m = (prompt('Le montant HT passe de ' + eurc(oldHt) + ' à ' + eurc(newHt) + '.\nMotif de cette modification (obligatoire) :') || '').trim();
+  return m || null;
+}
 const isFrozen = e => e.statut === 'Clôturé' && !e.defige;
 const editable = e => CAN_EDIT && !isFrozen(e);
 
@@ -157,7 +164,14 @@ function render() {
 }
 
 /* ───────── Panneau étude ───────── */
-function openEtude(id) { S.current = id; S.draft = null; S.curJson = JSON.stringify(S.etudes.find(x => x.id === id) || null); renderPanel(true); openPanel('panel'); }
+function watchJournal(id) {
+  if (S.unJournal) S.unJournal(); S.journal = [];
+  S.unJournal = db.collection('journal').where('etude_id', '==', id).onSnapshot(snap => {
+    S.journal = snap.docs.map(d => Object.assign({ id: d.id }, d.data()));
+    const box = document.getElementById('journal-box'); if (box) box.innerHTML = journalHTML(S.journal);
+  }, () => {});
+}
+function openEtude(id) { watchJournal(id); S.current = id; S.draft = null; S.curJson = JSON.stringify(S.etudes.find(x => x.id === id) || null); renderPanel(true); openPanel('panel'); }
 function renderPanel(resetDraft) {
   const e = S.etudes.find(x => x.id === S.current); if (!e) return;
   if (resetDraft || !S.draft) S.draft = JSON.parse(JSON.stringify(e.phases || []));
@@ -210,6 +224,7 @@ function renderPanel(resetDraft) {
   const av = e.avenants || [];
   h += '<div class="sub-title">Avenants</div>' + (av.length ? '<div class="list">' + av.map((a, i) => '<div class="item soft"><b>Avenant ' + (i + 1) + '</b> <span class="muted">' + fmtDate(a.date_avenant) + '</span><div>' + fmtDate(a.date_debut) + ' → ' + fmtDate(a.date_fin) + '</div>' + (a.note ? '<div class="muted">' + esc(a.note) + '</div>' : '') + '</div>').join('') + '</div>' : '<div class="muted">Aucun avenant.</div>');
   if (can) h += '<div class="form" id="av-form" style="margin-top:10px"><div class="field"><label>Nouveau début</label><input type="date" data-f="date_debut"></div><div class="field"><label>Nouvelle fin</label><input type="date" data-f="date_fin"></div><div class="field full"><label>Motif</label><input data-f="note"></div><div class="full"><button class="btn sm" data-action="avenant">Enregistrer l’avenant</button></div></div>';
+  h += '<div class="sub-title">Historique des modifications</div><div id="journal-box">' + journalHTML(S.journal) + '</div>';
   if (App.isSA()) h += '<div class="sub-title">Super Admin</div><button class="btn sm danger" data-action="delete">Supprimer l’étude</button>';
   document.getElementById('p-body').innerHTML = h;
   renderPhases();
@@ -270,7 +285,13 @@ async function savePhases() {
   const up = { phases: S.draft, jeh_total_etude: c.jeh, updated_at: FV.serverTimestamp() };
   if (c.montantJeh > 0) up.montant_ht = c.ht;
   if (S.draft.some(p => num(p.jeh_total) > 0)) up.a_completer = false;
-  await db.collection('etudes').doc(e.id).update(up);
+  const motif = askMotif(e, e.montant_ht, up.montant_ht != null ? up.montant_ht : e.montant_ht);
+  if (motif === null) return toast('Modification annulée : le motif est obligatoire', true);
+  const ch = diffFields(e, up, { montant_ht: 'Montant HT' }).concat(diffFields({ jeh: num(e.jeh_total_etude) }, { jeh: c.jeh }, { jeh: 'Total JEH' }).map(x => Object.assign(x, { cle: 'jeh' })));
+  if (JSON.stringify((e.phases || []).map(p => [p.label, p.jeh_total, p.montant_jeh, p.actif])) !== JSON.stringify(S.draft.map(p => [p.label, p.jeh_total, p.montant_jeh, p.actif]))) {
+    await db.collection('etudes').doc(e.id).update(up);
+    await logChange({ entity: 'etude', entity_id: e.id, etude_id: e.id, ref: e.reference, action: 'Phases modifiées', changes: ch, motif });
+  } else await db.collection('etudes').doc(e.id).update(up);
   toast('Phases enregistrées');
 }
 
@@ -286,7 +307,11 @@ async function saveInfo() {
   if (f.taux_intervenants !== num(e.taux_intervenants, 50)) {
     f.phases = (e.phases || []).map(p => Object.assign({}, p, { intervenants: (p.intervenants || []).map(x => Object.assign({}, x, { montant_brut: montantBrutAssignation(x.jeh, p.montant_jeh, f.taux_intervenants) })) }));
   }
+  const motif = askMotif(e, e.montant_ht, f.montant_ht);
+  if (motif === null) return toast('Modification annulée : le motif est obligatoire', true);
+  const ch = diffFields(Object.assign({}, e, { taux_intervenants: num(e.taux_intervenants, 50), taux_tva: num(e.taux_tva, 20), frais_structure: num(e.frais_structure, 100) }), f, ETUDE_LABELS);
   await db.collection('etudes').doc(e.id).update(f);
+  await logChange({ entity: 'etude', entity_id: e.id, etude_id: e.id, ref: e.reference, action: 'Informations modifiées', changes: ch, motif });
   if (ETUDE_SIGNEE.includes(f.statut)) await ensureClient(e.id, e.client_name, e.client_id);
   toast('Étude mise à jour');
 }
@@ -330,6 +355,7 @@ async function confirmAssign() {
   await db.collection('documents').add({ type: 'RM', etude_id: e.id, etude_ref: e.reference || '', phase_id: p.id, phase_label: p.label, intervenant_id: ivId,
     intervenant_nom: nom, intervenant_email: (iv.email || '').toLowerCase(), nom_affiche: 'RM — ' + (e.reference || '') + ' — ' + p.label + ' — ' + nom,
     lien_gdrive: '', statut: 'en_attente_lien', vu_par_intervenant: false, created_at: FV.serverTimestamp() });
+  await logChange({ entity: 'etude', entity_id: e.id, etude_id: e.id, ref: e.reference, action: 'Intervenant assigné', changes: [{ cle: 'intervenant', champ: p.label, avant: '', apres: nom + ' · ' + jeh + ' JEH · ' + eurc(montantBrutAssignation(jeh, p.montant_jeh, S.assign.taux)) + ' bruts' }] });
   closeModal('m-assign'); S.draft = null; toast(nom + ' assigné(e)');
 }
 async function unassign(phaseId, ivId) {
@@ -339,6 +365,7 @@ async function unassign(phaseId, ivId) {
   const p = phases.find(x => x.id === phaseId);
   p.intervenants = (p.intervenants || []).filter(x => x.intervenant_id !== ivId);
   await db.collection('etudes').doc(e.id).update({ phases });
+  await logChange({ entity: 'etude', entity_id: e.id, etude_id: e.id, ref: e.reference, action: 'Intervenant retiré', changes: [{ cle: 'intervenant', champ: p.label, avant: (e.phases.find(x => x.id === phaseId).intervenants || []).filter(x => x.intervenant_id === ivId).map(x => x.nom).join(''), apres: '' }] });
   const docs = await db.collection('documents').where('etude_id', '==', e.id).get();
   await Promise.all(docs.docs.filter(d => d.data().phase_id === phaseId && d.data().intervenant_id === ivId && !d.data().lien_gdrive).map(d => d.ref.delete()));
   S.draft = null; toast('Intervenant retiré');
@@ -401,13 +428,27 @@ onActions({
   assign: el => openAssign(el.dataset.pid),
   'confirm-assign': () => confirmAssign().catch(fail),
   unassign: el => unassign(el.dataset.pid, el.dataset.iv).catch(fail),
-  'break-link': () => { if (confirm('Couper le lien avec la prospection ?')) db.collection('etudes').doc(S.current).update({ a_completer: false, lien_crm_stoppe: true, prospect_id: FV.delete() }).catch(fail); },
-  defreeze: () => { if (confirm('Rendre cette étude clôturée à nouveau modifiable ?')) db.collection('etudes').doc(S.current).update({ defige: true }).catch(fail); },
+  'break-link': async () => {
+    const e = S.etudes.find(x => x.id === S.current);
+    if (!confirm('Couper le lien avec la prospection ?\n\nLe montant sera alors figé dans « Mes prospects » et « Après RDV » : il ne pourra plus être modifié que depuis l’étude (phases ou avenant).')) return;
+    try {
+      const batch = db.batch();
+      batch.update(db.collection('etudes').doc(e.id), { a_completer: false, lien_crm_stoppe: true, lien_crm_stoppe_le: today(), prospect_id: FV.delete() });
+      if (e.prospect_id) batch.update(db.collection('prospects').doc(e.prospect_id), { montant_fige: true, montant_fige_le: today(), estimated_amount: num(e.montant_ht), etude_id: e.id, etude_ref: e.reference || '' });
+      await batch.commit();
+      await logChange({ entity: 'etude', entity_id: e.id, etude_id: e.id, ref: e.reference, action: 'Lien avec la prospection coupé', changes: [{ cle: 'montant_ht', champ: 'Montant figé en prospection', avant: '', apres: num(e.montant_ht) }] });
+      toast('Lien coupé : montant figé côté prospection');
+    } catch (err) { fail(err); }
+  },
+  defreeze: () => { if (confirm('Rendre cette étude clôturée à nouveau modifiable ?')) db.collection('etudes').doc(S.current).update({ defige: true }).then(() => logChange({ entity: 'etude', entity_id: S.current, etude_id: S.current, ref: (S.etudes.find(x => x.id === S.current) || {}).reference, action: 'Étude défigée (clôture levée)' })).catch(fail); },
   avenant: () => {
     const a = readForm(document.getElementById('av-form'));
     if (!a.date_debut || !a.date_fin) return toast('Les deux dates sont obligatoires', true);
+    if (!a.note) return toast('Le motif de l’avenant est obligatoire', true);
     const e = S.etudes.find(x => x.id === S.current);
-    db.collection('etudes').doc(e.id).update({ avenants: (e.avenants || []).concat([Object.assign(a, { date_avenant: today() })]), date_debut: a.date_debut, date_fin: a.date_fin, statut: 'En cours' })
+    const ch = diffFields(e, { date_debut: a.date_debut, date_fin: a.date_fin, statut: 'En cours' }, { date_debut: 'Date de début', date_fin: 'Date de fin', statut: 'Statut' });
+    db.collection('etudes').doc(e.id).update({ avenants: (e.avenants || []).concat([Object.assign(a, { date_avenant: today(), par: App.user.email })]), date_debut: a.date_debut, date_fin: a.date_fin, statut: 'En cours' })
+      .then(() => logChange({ entity: 'etude', entity_id: e.id, etude_id: e.id, ref: e.reference, action: 'Avenant n°' + ((e.avenants || []).length + 1), changes: ch, motif: a.note }))
       .then(() => toast('Avenant enregistré — statut repassé à « En cours »')).catch(fail);
   },
   delete: () => { if (confirm('Supprimer définitivement cette étude ?')) db.collection('etudes').doc(S.current).delete().then(() => { closePanel('panel'); toast('Étude supprimée'); }).catch(fail); },
