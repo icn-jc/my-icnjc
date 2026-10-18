@@ -212,10 +212,12 @@ function clotureChecks(m) {
     { k: 'todo', level: 'warn', title: 'Études à compléter', help: 'Créées depuis la prospection, phases ou montant manquants.', link: 'etudes.html',
       items: E.filter(e => e.a_completer).map(e => ({ html: ref(e) })) },
     { k: 'noamount', level: 'bad', title: 'Études signées sans montant HT', link: 'etudes.html', items: signed.filter(e => !ht(e)).map(e => ({ html: ref(e) })) },
+    { k: 'frais', level: 'warn', title: 'Montant HT enregistré sans les frais de structure', help: 'Le client a payé les frais de structure (souvent 100 €) mais le montant HT de l\u2019étude ne les inclut pas : d\u2019où un faux « trop-perçu ».',
+      items: signed.filter(e => situationEtude(e, S.factures).etat === 'frais').map(e => ({ id: e.id, html: ref(e) + ' — ' + eurc(ht(e)) + ' HT, encaissé ' + eurc(enc(e)) })), fix: 'Ajouter les frais au montant HT' },
     { k: 'over', level: 'bad', title: 'Encaissé supérieur au montant HT', help: 'Souvent une facture saisie en TTC dans la case HT. Corrige la facture dans Comptabilité.', link: 'compta.html',
-      items: signed.filter(e => ht(e) && enc(e) > ht(e) + 0.5).map(e => ({ html: ref(e) + ' — encaissé ' + eurc(enc(e)) + ' pour ' + eurc(ht(e)) + ' HT (' + pct(enc(e), ht(e)) + ' %)' })) },
+      items: signed.filter(e => situationEtude(e, S.factures).etat === 'trop').map(e => ({ html: ref(e) + ' — encaissé ' + eurc(enc(e)) + ' pour ' + eurc(ht(e)) + ' HT' })) },
     { k: 'unpaid', level: 'warn', title: 'Études pas entièrement encaissées', link: 'compta.html',
-      items: signed.filter(e => ht(e) && enc(e) < ht(e) - 0.5).map(e => ({ html: ref(e) + ' — reste ' + eurc(ht(e) - enc(e)) + ' HT' })) },
+      help: 'Si tout a été encaissé, va dans Comptabilité, filtre sur ce mandat et clique « Marquer comme soldées ».', items: signed.filter(e => situationEtude(e, S.factures).etat === 'reste').map(e => ({ html: ref(e) + ' — reste ' + eurc(ht(e) - enc(e)) + ' HT' })) },
     { k: 'factures', level: 'warn', title: 'Factures en attente ou impayées', link: 'compta.html',
       items: fact.filter(f => f.statut !== 'Encaissée').map(f => ({ html: '<b>' + esc(f.numero) + '</b> ' + esc(f.client_name || '') + ' — ' + eurc(factureTTC(f)) + ' TTC · ' + esc(f.statut) })) },
     { k: 'orphanf', level: 'bad', title: 'Factures rattachées à aucune étude', link: 'compta.html',
@@ -223,7 +225,7 @@ function clotureChecks(m) {
     { k: 'running', level: 'warn', title: 'Études encore « Signé » ou « En cours »', help: 'À livrer, ou à repasser en « Prospection » si elles ne se feront pas.', link: 'etudes.html',
       items: E.filter(e => ['Signé', 'En cours'].includes(e.statut)).map(e => ({ html: ref(e) + ' <span class="badge ' + ETUDE_BADGE[e.statut] + '">' + esc(e.statut) + '</span>' })) },
     { k: 'toclose', level: 'info', title: 'Études soldées à passer en « Clôturé »', help: 'Livrées ou facturées et entièrement encaissées.',
-      items: signed.filter(e => ['Livré', 'Facturé'].includes(e.statut) && ht(e) && Math.abs(enc(e) - ht(e)) <= 0.5).map(e => ({ id: e.id, html: ref(e) })), fix: 'Tout passer en « Clôturé »' },
+      items: signed.filter(e => ['Livré', 'Facturé'].includes(e.statut) && situationEtude(e, S.factures).etat === 'solde').map(e => ({ id: e.id, html: ref(e) })), fix: 'Tout passer en « Clôturé »' },
     { k: 'orphans', level: 'info', title: 'Prospects en cours de membres qui ne prospectent plus', help: 'À réaffecter ou passer en « Perdu » avant le nouveau mandat.', link: 'prospection.html',
       items: S.prospects.filter(p => STATUTS_OUVERTS.includes(p.status) && !active.includes(p.owner_email)).map(p => ({ html: '<b>' + esc(p.company_name) + '</b> <span class="muted">' + esc(p.owner_email || '') + '</span>' })) }
   ];
@@ -254,7 +256,10 @@ function renderCloture() {
 async function clotureFix(k) {
   const m = S.mandats.find(x => x.id === S.clos), c = clotureChecks(m).find(x => x.k === k);
   const batch = db.batch();
-  c.items.forEach(i => batch.update(db.collection('etudes').doc(i.id), k === 'unlinked' ? { mandat_id: m.id } : { statut: 'Clôturé' }));
+  c.items.forEach(i => {
+    const e = S.etudes.find(x => x.id === i.id);
+    batch.update(db.collection('etudes').doc(i.id), k === 'unlinked' ? { mandat_id: m.id } : k === 'frais' ? { montant_ht: round2(num(e.montant_ht) + num(e.frais_structure, 100)), frais_corriges_le: today() } : { statut: 'Clôturé' });
+  });
   await batch.commit(); toast(c.items.length + ' étude(s) mise(s) à jour');
 }
 function nextMandat(m) {

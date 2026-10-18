@@ -12,7 +12,7 @@
 <body>
 <main hidden>
   <div class="page-head">
-    <div><h1>Comptabilité</h1><div class="sub">Les encaissements se saisissent sur les factures (HT, TVA, TTC). L'étude se met à jour toute seule, en comparant toujours HT contre HT.</div></div>
+    <div><h1>Comptabilité</h1><div class="sub">Tous les montants de cette page sont <b>hors taxes (HT)</b>, comme sur les études. La TVA et le TTC n'apparaissent que sur les factures.</div></div>
     <div class="actions"><button class="btn" data-action="export">Export Excel</button><button class="btn primary" data-action="add" id="btn-add" hidden>+ Facture</button></div>
   </div>
   <div class="kpis" id="kpis"></div>
@@ -24,8 +24,9 @@
   </div>
 
   <section id="t-etudes">
-    <div class="filters"><input type="search" id="e-q" placeholder="Réf, client…"><select id="e-state"><option value="">Toutes</option><option value="reste">Reste à encaisser</option><option value="solde">Soldées</option></select></div>
-    <div class="table-wrap"><div class="table-scroll"><table class="t"><thead><tr><th>Réf.</th><th>Client</th><th>Statut étude</th><th class="num">Montant HT</th><th class="num">Montant TTC</th><th class="num">Facturé HT</th><th class="num">Encaissé HT</th><th>Progression</th><th class="num">Reste HT</th><th class="num">Reste TTC</th></tr></thead><tbody id="e-body"></tbody></table></div></div>
+    <div id="fix-box"></div>
+    <div class="filters"><input type="search" id="e-q" placeholder="Réf, client…"><select id="e-mandat"></select><select id="e-state"><option value="">Toutes les études</option><option value="reste">Reste à encaisser</option><option value="solde">Soldées</option><option value="pb">À corriger</option></select></div>
+    <div class="table-wrap"><div class="table-scroll"><table class="t"><thead><tr><th>Réf.</th><th>Client</th><th>Mandat</th><th>Statut étude</th><th class="num">Montant HT</th><th class="num">Encaissé HT</th><th class="num">Reste HT</th><th>Situation</th><th></th></tr></thead><tbody id="e-body"></tbody></table></div></div>
   </section>
   <section id="t-factures" hidden>
     <div class="filters"><input type="search" id="f-q" placeholder="N°, client, réf…"><select id="f-statut"></select></div>
@@ -62,7 +63,7 @@
 </div></div>
 
 <script>
-const S = { etudes: [], factures: [], clients: [], tab: 'etudes', editId: null, rows: null };
+const S = { etudes: [], factures: [], clients: [], mandats: [], tab: 'etudes', editId: null, rows: null };
 let CAN_EDIT;
 
 App.start('compta', () => {
@@ -72,7 +73,8 @@ App.start('compta', () => {
   watch(db.collection('etudes'), l => { S.etudes = l; render(); });
   watch(db.collection('factures'), l => { S.factures = l; render(); });
   watch(db.collection('clients'), l => { S.clients = l; });
-  ['e-q', 'e-state', 'f-q', 'f-statut'].forEach(id => document.getElementById(id).addEventListener('input', render));
+  watch(db.collection('mandats'), l => { S.mandats = l.sort((a, b) => (b.date_debut || '').localeCompare(a.date_debut || '')); render(); });
+  ['e-q', 'e-state', 'e-mandat', 'f-q', 'f-statut'].forEach(id => document.getElementById(id).addEventListener('input', render));
   document.getElementById('file').addEventListener('change', readFile);
 });
 
@@ -91,33 +93,55 @@ async function syncEtude(etudeId) {
     montant_encaisse_ttc: round2(enc.reduce((a, f) => a + factureTTC(f), 0)) });
 }
 
+const sit = e => situationEtude(e, S.factures);
+/* Mandat d'une étude : rattachement explicite, sinon date de signature dans la période. */
+function mandatOf(e) {
+  if (S.mandats.some(m => m.id === e.mandat_id)) return e.mandat_id;
+  const d = e.date_signature || e.created_at_str || '';
+  const m = S.mandats.find(m => d && inRange(d, m.date_debut || '', m.date_fin || '9999-12-31'));
+  return m ? m.id : '';
+}
+function shownEtudes() {
+  const q = document.getElementById('e-q').value.toLowerCase(), st = document.getElementById('e-state').value, md = document.getElementById('e-mandat').value;
+  return signed().filter(e => (!q || [e.reference, e.client_name].join(' ').toLowerCase().includes(q)) && (!md || mandatOf(e) === md) &&
+    (!st || (st === 'reste' ? sit(e).etat === 'reste' : st === 'solde' ? sit(e).etat === 'solde' : ['frais', 'trop', 'vide'].includes(sit(e).etat))));
+}
+
 function render() {
-  const E = signed(), ht = E.reduce((a, e) => a + num(e.montant_ht), 0), enc = E.reduce((a, e) => a + cashed(e), 0);
-  const late = S.factures.filter(isLate), lateSum = late.reduce((a, f) => a + factureTTC(f), 0);
-  const over = E.filter(e => cashed(e) > num(e.montant_ht) + 0.5);
-  const encTTC = S.factures.filter(f => f.statut === 'Encaissée').reduce((a, f) => a + factureTTC(f), 0);
+  const mSel = document.getElementById('e-mandat'), mv = mSel.value;
+  mSel.innerHTML = options(S.mandats.map(m => ({ value: m.id, label: 'Mandat ' + (m.label || m.id) })), '', 'Tous les mandats'); mSel.value = mv;
+  const E = shownEtudes(), X = E.map(sit);
+  const ht = X.reduce((a, x) => a + x.ht, 0), enc = X.reduce((a, x) => a + Math.min(x.enc, x.ht || x.enc), 0), reste = X.reduce((a, x) => a + x.reste, 0);
+  const late = S.factures.filter(isLate);
   document.getElementById('kpis').innerHTML =
-    '<div class="kpi accent"><div class="v">' + eur(ht) + '</div><div class="l">CA signé HT</div><div class="s">' + eur(E.reduce((a, e) => a + etudeTTC(e), 0)) + ' TTC</div></div>' +
-    '<div class="kpi"><div class="v" style="color:var(--ok)">' + eur(enc) + '</div><div class="l">Encaissé HT</div><div class="s">' + eur(encTTC) + ' TTC reçus</div></div>' +
-    '<div class="kpi"><div class="v">' + eur(Math.max(0, ht - enc)) + '</div><div class="l">Reste à encaisser HT</div></div>' +
-    '<div class="kpi' + (late.length ? ' warn' : '') + '"><div class="v">' + eur(lateSum) + '</div><div class="l">Impayés / en retard TTC</div><div class="s">' + late.length + ' facture(s)</div></div>' +
-    (over.length ? '<div class="kpi warn"><div class="v">' + over.length + '</div><div class="l">Étude(s) encaissée(s) au-delà du HT</div><div class="s">à corriger : HT saisi en TTC ?</div></div>' : '');
+    '<div class="kpi accent"><div class="v">' + eur(ht) + '</div><div class="l">Montant des études (HT)</div><div class="s">' + E.length + ' étude(s) affichée(s)</div></div>' +
+    '<div class="kpi"><div class="v" style="color:var(--ok)">' + eur(enc) + '</div><div class="l">Déjà encaissé (HT)</div><div class="s">' + X.filter(x => x.etat === 'solde').length + ' étude(s) soldée(s)</div></div>' +
+    '<div class="kpi' + (reste > 0.5 ? ' warn' : '') + '"><div class="v">' + eur(reste) + '</div><div class="l">Reste à encaisser (HT)</div><div class="s">' + X.filter(x => x.reste > 0.5).length + ' étude(s)</div></div>' +
+    '<div class="kpi' + (late.length ? ' warn' : '') + '"><div class="v">' + late.length + '</div><div class="l">Facture(s) en retard</div><div class="s">' + eur(late.reduce((a, f) => a + factureTTC(f), 0)) + ' TTC à réclamer</div></div>';
   const c = document.getElementById('count-imp'); c.hidden = !late.length; c.textContent = late.length;
 
-  // Par étude (lecture seule)
-  const q = document.getElementById('e-q').value.toLowerCase(), st = document.getElementById('e-state').value;
-  const le = E.filter(e => (!q || [e.reference, e.client_name].join(' ').toLowerCase().includes(q)) &&
-    (!st || (st === 'reste' ? cashed(e) < num(e.montant_ht) : cashed(e) >= num(e.montant_ht))))
-    .sort((a, b) => (num(b.montant_ht) - cashed(b)) - (num(a.montant_ht) - cashed(a)));
-  document.getElementById('e-body').innerHTML = le.length ? le.map(e => {
-    const m = num(e.montant_ht), k = cashed(e), p = pct(k, m), over = k > m + 0.5, rest = round2(m - k);
-    return '<tr><td><span class="ref">' + esc(e.reference || '—') + '</span></td><td>' + esc(e.client_name || '—') + '</td><td><span class="badge ' + (ETUDE_BADGE[e.statut] || '') + '">' + esc(e.statut) + '</span></td>' +
-      '<td class="num"><b>' + eurc(m) + '</b></td><td class="num">' + eurc(etudeTTC(e)) + '</td><td class="num">' + eurc(factured(e)) + '</td><td class="num" style="color:var(--ok)">' + eurc(k) + '</td>' +
-      '<td>' + (!m ? '<span class="badge b-warn">montant HT manquant</span>' : over ? '<span class="badge b-bad">trop-perçu ' + eurc(k - m) + '</span>' :
-        '<div class="row" style="flex-wrap:nowrap"><div class="bar ' + (p >= 100 ? 'ok' : '') + '"><i style="width:' + Math.min(100, p) + '%"></i></div><span class="muted">' + Math.min(100, p) + '%</span></div>') + '</td>' +
-      '<td class="num">' + (rest > 0.5 ? '<b style="color:var(--warn)">' + eurc(rest) + '</b>' : over ? '—' : '<span class="badge b-ok">soldée</span>') + '</td>' +
-      '<td class="num">' + (rest > 0.5 ? eurc(rest * (1 + num(e.taux_tva, 20) / 100)) : '—') + '</td></tr>';
-  }).join('') : '<tr><td colspan="10" class="empty">Aucune étude signée.</td></tr>';
+  // Encadrés de correction (trésorerie)
+  const fraisPb = E.filter(e => sit(e).etat === 'frais'), toSolde = E.filter(e => sit(e).etat === 'reste');
+  let fx = '';
+  if (CAN_EDIT && fraisPb.length) fx += '<div class="alert info" style="align-items:center"><span class="grow"><b>' + fraisPb.length + ' étude(s) affichent exactement les frais de structure en trop</b> (souvent 100 €). Ce n’est pas un vrai trop-perçu : le client a bien payé les frais de structure, mais le montant HT de l’étude a été enregistré sans eux. La correction ajoute les frais au montant HT de ces études.</span><button class="btn sm primary" data-action="fix-frais">Corriger les ' + fraisPb.length + ' études</button></div>';
+  if (CAN_EDIT && toSolde.length) fx += '<div class="alert warn" style="align-items:center"><span class="grow"><b>Tout a déjà été encaissé ?</b> ' + toSolde.length + ' étude(s) affichée(s) ont encore un reste à encaisser (' + eur(toSolde.reduce((a, e) => a + sit(e).reste, 0)) + ' HT). Si l’argent est bien arrivé, marque-les comme soldées : leurs factures en attente passent en « Encaissée ».</span><button class="btn sm dark" data-action="solde-all">Marquer les ' + toSolde.length + ' comme soldées</button></div>';
+  document.getElementById('fix-box').innerHTML = fx;
+
+  const order = { trop: 0, frais: 1, vide: 2, reste: 3, solde: 4 };
+  const rows = E.slice().sort((a, b) => order[sit(a).etat] - order[sit(b).etat] || (a.reference || '').localeCompare(b.reference || ''));
+  const mLabel = id => { const m = S.mandats.find(x => x.id === id); return m ? (m.label || m.id) : '—'; };
+  document.getElementById('e-body').innerHTML = rows.length ? rows.map(e => {
+    const x = sit(e), L = SITUATION_LABEL[x.etat];
+    const detail = x.etat === 'frais' ? ' <span class="muted">+' + eurc(x.ecart) + '</span>' : x.etat === 'trop' ? ' <span class="muted">+' + eurc(x.ecart) + ' : vérifier les factures</span>' : '';
+    return '<tr><td><span class="ref">' + esc(e.reference || '—') + '</span></td><td>' + esc(e.client_name || '—') + '</td><td>' + esc(mLabel(mandatOf(e))) + '</td>' +
+      '<td><span class="badge ' + (ETUDE_BADGE[e.statut] || '') + '">' + esc(e.statut) + '</span></td>' +
+      '<td class="num"><b>' + eurc(x.ht) + '</b></td><td class="num" style="color:var(--ok)">' + eurc(x.enc) + '</td>' +
+      '<td class="num">' + (x.reste > 0.5 ? '<b style="color:var(--warn)">' + eurc(x.reste) + '</b>' : '—') + '</td>' +
+      '<td><span class="badge ' + L[1] + '">' + L[0] + '</span>' + detail + (e.solde_declare ? ' <span class="muted">(déclarée)</span>' : '') + '</td>' +
+      '<td>' + (CAN_EDIT ? (x.etat === 'reste' ? '<button class="btn sm" data-action="solde" data-id="' + e.id + '">Soldée</button>' :
+        x.etat === 'frais' ? '<button class="btn sm" data-action="fix-one" data-id="' + e.id + '">Corriger</button>' :
+        e.solde_declare ? '<button class="btn sm" data-action="unsolde" data-id="' + e.id + '">Annuler</button>' : '') : '') + '</td></tr>';
+  }).join('') : '<tr><td colspan="9" class="empty">Aucune étude.</td></tr>';
 
   // Factures
   const fs = document.getElementById('f-statut'), fv = fs.value; fs.innerHTML = options(['En attente', 'Encaissée', 'Impayée'], '', 'Tous statuts'); fs.value = fv;
@@ -231,7 +255,28 @@ async function doImport() {
   document.getElementById('file').value = '';
 }
 
+
+/* Corrections groupées */
+async function fixFrais(list) {
+  const batch = db.batch();
+  list.forEach(e => batch.update(db.collection('etudes').doc(e.id), { montant_ht: round2(num(e.montant_ht) + num(e.frais_structure, 100)), frais_corriges_le: today() }));
+  await batch.commit(); toast(list.length + ' étude(s) corrigée(s)');
+}
+async function solder(list) {
+  const batch = db.batch();
+  list.forEach(e => {
+    batch.update(db.collection('etudes').doc(e.id), { solde_declare: true, solde_declare_le: today(), solde_declare_par: App.user.email, montant_encaisse: num(e.montant_ht) });
+    facturesOf(e).filter(f => f.statut !== 'Encaissée').forEach(f => batch.update(db.collection('factures').doc(f.id), { statut: 'Encaissée', date_encaissement: f.date_echeance && f.date_echeance < today() ? f.date_echeance : today() }));
+  });
+  await batch.commit(); toast(list.length + ' étude(s) marquée(s) soldée(s)');
+}
+
 onActions({
+  'fix-frais': () => { const l = shownEtudes().filter(e => sit(e).etat === 'frais'); if (confirm('Ajouter les frais de structure au montant HT de ' + l.length + ' étude(s) ?')) fixFrais(l).catch(fail); },
+  'fix-one': el => fixFrais([S.etudes.find(e => e.id === el.dataset.id)]).catch(fail),
+  'solde-all': () => { const l = shownEtudes().filter(e => sit(e).etat === 'reste'); if (confirm('Marquer ' + l.length + ' étude(s) comme entièrement encaissées ? Leurs factures en attente passeront en « Encaissée ».')) solder(l).catch(fail); },
+  solde: el => { const e = S.etudes.find(x => x.id === el.dataset.id); if (confirm('Marquer ' + (e.reference || 'cette étude') + ' comme entièrement encaissée ?')) solder([e]).catch(fail); },
+  unsolde: el => db.collection('etudes').doc(el.dataset.id).update({ solde_declare: false }).then(() => toast('Annulé')).catch(fail),
   tab: el => { S.tab = el.dataset.t; document.querySelectorAll('#tabs .tab').forEach(b => b.classList.toggle('on', b === el)); ['etudes', 'factures', 'impayes', 'import'].forEach(t => { document.getElementById('t-' + t).hidden = t !== S.tab; }); },
   add: () => openForm(null),
   edit: el => openForm(S.factures.find(x => x.id === el.dataset.id)),
@@ -240,8 +285,8 @@ onActions({
   cash: el => { const f = S.factures.find(x => x.id === el.dataset.id); db.collection('factures').doc(f.id).update({ statut: 'Encaissée', date_encaissement: today() }).then(() => syncEtude(f.etude_id)).then(() => toast('Encaissée')).catch(fail); },
   import: () => doImport().catch(fail),
   export: () => {
-    const r1 = [['Référence', 'Client', 'Statut', 'Montant HT', 'Montant TTC', 'Facturé HT', 'Encaissé HT', 'Reste HT']];
-    signed().forEach(e => r1.push([e.reference, e.client_name, e.statut, num(e.montant_ht), etudeTTC(e), factured(e), cashed(e), round2(num(e.montant_ht) - cashed(e))]));
+    const r1 = [['Référence', 'Client', 'Statut', 'Montant HT', 'Encaissé HT', 'Reste HT', 'Situation']];
+    signed().forEach(e => { const x = sit(e); r1.push([e.reference, e.client_name, e.statut, x.ht, x.enc, x.reste, SITUATION_LABEL[x.etat][0]]); });
     const r2 = [['N°', 'Type', 'Étude', 'Client', 'HT', 'Taux TVA', 'TVA', 'TTC', 'Émission', 'Échéance', 'Statut', 'Encaissement']];
     S.factures.forEach(f => r2.push([f.numero, f.type, f.etude_ref, f.client_name, num(f.montant_ht), tvaTaux(f), round2(factureTTC(f) - num(f.montant_ht)), factureTTC(f), f.date_emission, f.date_echeance, f.statut, f.date_encaissement]));
     exportExcel('Comptabilite_' + today() + '.xlsx', { 'Par étude': r1, Factures: r2 });

@@ -150,7 +150,7 @@ function render() {
       '<td><b>' + esc(e.title || '—') + '</b><div class="muted">' + esc(e.type_etude || '') + '</div></td><td>' + esc(e.client_name || '—') + '</td>' +
       '<td><span class="badge ' + (ETUDE_BADGE[e.statut] || '') + '">' + esc(e.statut || '—') + '</span></td>' +
       '<td class="num"><b>' + (e.montant_ht ? eur(e.montant_ht) : '—') + '</b></td>' +
-      '<td>' + (ETUDE_SIGNEE.includes(e.statut) ? (enc > num(e.montant_ht) + 0.5 ? '<span class="badge b-bad">trop-perçu</span>' : '<div class="row" style="flex-wrap:nowrap"><div class="bar ' + (p >= 100 ? 'ok' : '') + '"><i style="width:' + Math.min(100, p) + '%"></i></div><span class="muted">' + Math.min(100, p) + '%</span></div>') : '') + '</td>' +
+      '<td>' + (ETUDE_SIGNEE.includes(e.statut) ? (['frais', 'trop'].includes(situationEtude(e, S.factures).etat) ? '<span class="badge ' + SITUATION_LABEL[situationEtude(e, S.factures).etat][1] + '">' + SITUATION_LABEL[situationEtude(e, S.factures).etat][0] + '</span>' : '<div class="row" style="flex-wrap:nowrap"><div class="bar ' + (p >= 100 ? 'ok' : '') + '"><i style="width:' + Math.min(100, p) + '%"></i></div><span class="muted">' + Math.min(100, p) + '%</span></div>') : '') + '</td>' +
       '<td>' + esc(userName(e.responsable_email)) + '</td><td>' + fmtDate(e.date_debut) + '</td><td>' + fmtDate(e.date_fin) + '</td></tr>';
   }).join('') : '<tr><td colspan="9" class="empty">Aucune étude.</td></tr>';
 }
@@ -171,7 +171,7 @@ function renderPanel(resetDraft) {
     '<div class="kpi accent"><div class="v">' + eur(e.montant_ht) + '</div><div class="l">Facturé client HT</div><div class="s">dont ' + eur(c.frais) + ' frais de structure</div></div>' +
     '<div class="kpi"><div class="v" style="color:var(--ok)">' + eur(c.brutIv) + '</div><div class="l">Brut intervenants (' + c.taux + ' %)</div></div>' +
     '<div class="kpi"><div class="v">' + eur(c.partJe) + '</div><div class="l">Part JE</div><div class="s">' + (100 - c.taux) + ' % des JEH + frais</div></div></div>' +
-    '<div class="muted">TTC : <b>' + eur(etudeTTC(e)) + '</b> · Encaissé HT : <b>' + eur(enc) + '</b> (' + Math.min(100, pct(enc, num(e.montant_ht))) + ' %)' + (enc > num(e.montant_ht) + 0.5 ? ' <span class="badge b-bad">trop-perçu à corriger dans Comptabilité</span>' : '') + ' — mis à jour par les factures</div>';
+    '<div class="muted">TTC : <b>' + eur(etudeTTC(e)) + '</b> · Encaissé HT : <b>' + eur(enc) + '</b> (' + Math.min(100, pct(enc, num(e.montant_ht))) + ' %)' + (['frais', 'trop'].includes(situationEtude(e, S.factures).etat) ? ' <span class="badge ' + SITUATION_LABEL[situationEtude(e, S.factures).etat][1] + '">' + SITUATION_LABEL[situationEtude(e, S.factures).etat][0] + ' : à corriger dans Comptabilité</span>' : '') + ' — mis à jour par les factures</div>';
 
   // Informations
   h += '<div class="sub-title">Informations</div>';

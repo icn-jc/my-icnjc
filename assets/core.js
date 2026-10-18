@@ -97,11 +97,25 @@ function round2(n) { return Math.round(num(n) * 100) / 100; }
 function tvaTaux(f) { return num(f.taux_tva, 20); }
 function factureTTC(f) { return f.montant_ttc != null && f.montant_ttc !== '' ? num(f.montant_ttc) : round2(num(f.montant_ht) * (1 + tvaTaux(f) / 100)); }
 function etudeTTC(e) { return round2(num(e.montant_ht) * (1 + num(e.taux_tva, 20) / 100)); }
-/* Encaissé HT d'une étude = somme HT de ses factures encaissées (ou ancienne saisie s'il n'y a aucune facture). */
+/* Encaissé HT d'une étude = somme HT de ses factures encaissées (ou ancienne saisie s'il n'y a aucune facture).
+   Une étude marquée « soldée » par la trésorerie est considérée comme entièrement encaissée. */
 function encaisseHT(e, factures) {
+  if (e.solde_declare) return Math.max(num(e.montant_ht), round2((factures || []).filter(f => f.etude_id === e.id && f.statut === 'Encaissée').reduce((a, f) => a + num(f.montant_ht), 0)));
   const fs = (factures || []).filter(f => f.etude_id === e.id);
   return fs.length ? round2(fs.filter(f => f.statut === 'Encaissée').reduce((a, f) => a + num(f.montant_ht), 0)) : num(e.montant_encaisse);
 }
+/* Situation d'encaissement d'une étude, en mots simples.
+   etat : 'solde' | 'reste' | 'frais' (montant HT enregistré sans les frais de structure) | 'trop' | 'vide' */
+function situationEtude(e, factures) {
+  const ht = num(e.montant_ht), enc = encaisseHT(e, factures), frais = num(e.frais_structure, 100), diff = round2(enc - ht);
+  let etat = 'reste';
+  if (!ht) etat = 'vide';
+  else if (Math.abs(diff) <= 0.5) etat = 'solde';
+  else if (diff > 0 && frais > 0 && Math.abs(diff - frais) <= 1) etat = 'frais';
+  else if (diff > 0) etat = 'trop';
+  return { ht, enc, reste: Math.max(0, round2(ht - enc)), ecart: diff, frais, etat };
+}
+const SITUATION_LABEL = { solde: ['Soldée', 'b-ok'], reste: ['Reste à encaisser', 'b-warn'], frais: ['Frais de structure oubliés', 'b-info'], trop: ['Encaissé > montant', 'b-bad'], vide: ['Montant manquant', 'b-warn'] };
 
 /* Indicateurs d'un mandat, calculés à partir des données du site sur la période du mandat.
    Une étude compte pour le mandat si elle y est rattachée, ou (sans rattachement valide) si sa date de signature tombe dans la période.
@@ -113,9 +127,7 @@ function mandatStats(m, D) {
     (e.mandat_id === m.id || (!ids.includes(e.mandat_id) && inRange(e.date_signature || e.created_at_str, a, b))));
   const caSigne = etudes.reduce((s, e) => s + num(e.montant_ht), 0);
   const factures = D.factures || [];
-  const caEnc = factures.length
-    ? factures.filter(f => f.statut === 'Encaissée' && inRange(f.date_encaissement || f.date_emission, a, b)).reduce((s, f) => s + num(f.montant_ht), 0)
-    : etudes.reduce((s, e) => s + num(e.montant_encaisse), 0);
+  const caEnc = round2(etudes.reduce((s, e) => s + encaisseHT(e, factures), 0));
   const ivs = new Set();
   etudes.forEach(e => (e.phases || []).forEach(p => (p.intervenants || []).forEach(x => ivs.add(x.intervenant_id || x.email))));
   const P = D.prospects || [];
@@ -325,7 +337,7 @@ const App = {
     document.querySelector('main').hidden = true;
     let el = document.getElementById('login');
     if (!el) { el = document.createElement('div'); el.id = 'login'; el.className = 'login'; document.body.prepend(el); }
-    el.innerHTML = '<div class="login-art"><img src="assets/logo-mark.png" alt="">' +
+    el.innerHTML = '<div class="login-art"><img src="assets/logo-mark-xl.png" alt="">' +
         '<p><b>L\u2019intranet d\u2019ICN Junior Conseil</b>Prospection, études, intervenants et pilotage du mandat, au même endroit.</p></div>' +
       '<div class="login-form"><img src="assets/logo.png" alt="ICN Junior Conseil">' +
         '<h1>Connexion</h1><p>Utilise ton compte Google ICN Junior Conseil ou l\u2019adresse qui t\u2019a été autorisée.</p>' +
