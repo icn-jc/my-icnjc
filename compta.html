@@ -8,6 +8,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script src="assets/core.js"></script>
+<script src="assets/facture.js"></script>
 </head>
 <body>
 <main hidden>
@@ -29,6 +30,11 @@
     <div class="table-wrap"><div class="table-scroll"><table class="t"><thead><tr><th>Réf.</th><th>Client</th><th>Mandat</th><th>Statut étude</th><th class="num">Montant HT</th><th class="num">Encaissé HT</th><th class="num">Reste HT</th><th>Situation</th><th></th></tr></thead><tbody id="e-body"></tbody></table></div></div>
   </section>
   <section id="t-factures" hidden>
+    <div class="row" id="gen-bar" style="margin-bottom:12px" hidden>
+      <button class="btn primary" data-action="gen">+ Générer une facture</button>
+      <button class="btn" data-action="je">Coordonnées de la JE (RIB…)</button>
+      <span class="muted">Une facture générée est enregistrée <b>une seule fois</b> dans la compta ; ensuite on la retélécharge en PDF ou en Word autant qu'on veut.</span>
+    </div>
     <div class="filters"><input type="search" id="f-q" placeholder="N°, client, réf…"><select id="f-statut"></select></div>
     <div class="table-wrap"><div class="table-scroll"><table class="t"><thead><tr><th>N° facture</th><th>Étude</th><th>Client</th><th class="num">HT</th><th class="num">TVA</th><th class="num">TTC</th><th>Émission</th><th>Échéance</th><th>Statut</th><th></th></tr></thead><tbody id="f-body"></tbody></table></div></div>
   </section>
@@ -62,12 +68,95 @@
   <div class="modal-foot"><button class="btn" data-close="m-facture">Annuler</button><button class="btn primary" data-action="save">Enregistrer</button></div>
 </div></div>
 
+<div class="modal" id="m-gen"><div class="modal-box">
+  <div class="modal-head"><h2>Générer une facture</h2><button class="x" data-close="m-gen">×</button></div>
+  <div class="modal-body">
+    <div id="g-result" hidden></div>
+    <div class="form" id="g-form">
+      <div class="field"><label>Type de facture</label><select data-f="type" id="g-type"><option>Acompte</option><option>Intermédiaire</option><option>Solde</option><option>Refacturation</option></select></div>
+      <div class="field" id="g-f-etude"><label>Étude *</label><select data-f="etude_id" id="g-etude"></select></div>
+      <div class="field" id="g-f-taux"><label>Taux d'acompte (%)</label><input type="number" min="1" max="100" step="0.5" data-f="taux_acompte"></div>
+      <div class="field" id="g-f-montant"><label>Montant HT de cette facture (€)</label><input type="number" min="0" step="0.01" data-f="montant"><div class="hint">Par défaut : tout le reste à facturer</div></div>
+      <div class="field"><label>TVA</label><select data-f="taux_tva" id="g-tva"></select></div>
+      <div class="field"><label>Date d'émission</label><input type="date" data-f="date_emission"></div>
+      <div class="field"><label>Échéance</label><input type="date" data-f="date_echeance"></div>
+      <div class="full" id="g-sum"></div>
+
+      <div class="full sub-title" style="margin-top:6px">Client — à contrôler</div>
+      <div class="field full"><label>Nom de l'entreprise / du destinataire *</label><input data-f="c_nom" class="g-chk"></div>
+      <div class="field"><label>Civilité</label><select data-f="c_civilite"><option value="">—</option><option>Monsieur</option><option>Madame</option></select></div>
+      <div class="field"><label>Prénom et nom du contact</label><input data-f="c_contact"></div>
+      <div class="field full"><label>Adresse *</label><input data-f="c_adresse" class="g-chk"></div>
+      <div class="field"><label>Code postal et ville *</label><input data-f="c_cp_ville" class="g-chk"></div>
+      <div class="field" id="g-f-siren"><label>SIREN du client *</label><input data-f="c_siren" class="g-chk"></div>
+
+      <div class="full form" id="g-etude-fields" style="padding:0">
+        <div class="full sub-title" style="margin-top:6px">Étude</div>
+        <div class="field"><label>Référence convention d'étude</label><input data-f="convention"></div>
+        <div class="field"><label>Nombre total de JEH</label><input type="number" step="0.5" data-f="nb_jeh"></div>
+        <div class="field full"><label>Dénomination du service rendu</label><input data-f="denomination"></div>
+        <div class="field"><label>Date de fin d'étude</label><input type="date" data-f="date_fin"></div>
+      </div>
+      <div class="full form" id="g-refa-fields" style="padding:0">
+        <div class="full sub-title" style="margin-top:6px">Refacturation</div>
+        <div class="field full"><label>Objet *</label><input data-f="objet" placeholder="Refacturation de l'achat de…"></div>
+        <div class="field"><label>Désignation 1</label><input data-f="l1_label"></div><div class="field"><label>Montant HT 1 (€)</label><input type="number" step="0.01" data-f="l1_montant"></div>
+        <div class="field"><label>Désignation 2</label><input data-f="l2_label"></div><div class="field"><label>Montant HT 2 (€)</label><input type="number" step="0.01" data-f="l2_montant"></div>
+      </div>
+      <label class="full row" style="gap:8px"><input type="checkbox" data-f="save_client" checked> Enregistrer ces informations sur la fiche client</label>
+      <div class="full alert warn" id="g-warn"><span><b>Contrôle les informations avant de continuer.</b> Une fois la facture générée, elle ne se régénère pas : pour la corriger il faudrait un avoir puis une nouvelle facture (seuls les textes, comme le nom ou le RIB, restent modifiables après coup).</span></div>
+      <label class="full row" style="gap:8px"><input type="checkbox" id="g-ok"> <b>J'ai vérifié les informations et les montants</b></label>
+    </div>
+  </div>
+  <div class="modal-foot" id="g-foot"><button class="btn" data-close="m-gen">Annuler</button><button class="btn primary" data-action="gen-go" id="g-go" disabled>Générer la facture</button></div>
+</div></div>
+
+<div class="modal" id="m-finfo"><div class="modal-box">
+  <div class="modal-head"><h2 id="fi-title">Corriger les informations</h2><button class="x" data-close="m-finfo">×</button></div>
+  <div class="modal-body"><div class="form" id="fi-form">
+    <div class="full muted">Les montants ne changent pas ici. Seuls les textes imprimés sur la facture sont modifiables ; les téléchargements suivants les reprennent.</div>
+    <div class="field full"><label>Nom du client</label><input data-f="c_nom"></div>
+    <div class="field"><label>Civilité</label><select data-f="c_civilite"><option value="">—</option><option>Monsieur</option><option>Madame</option></select></div>
+    <div class="field"><label>Prénom et nom du contact</label><input data-f="c_contact"></div>
+    <div class="field full"><label>Adresse</label><input data-f="c_adresse"></div>
+    <div class="field"><label>Code postal et ville</label><input data-f="c_cp_ville"></div>
+    <div class="field"><label>SIREN du client</label><input data-f="c_siren"></div>
+    <div class="field"><label>Convention d'étude</label><input data-f="convention"></div>
+    <div class="field"><label>Date de fin d'étude</label><input type="date" data-f="date_fin"></div>
+    <div class="field full"><label>Dénomination du service rendu</label><input data-f="denomination"></div>
+    <div class="field full"><label>Objet de la facture</label><input data-f="objet"></div>
+    <div class="full sub-title" style="margin-top:6px">Paiement imprimé sur cette facture</div>
+    <div class="field"><label>RIB</label><input data-f="rib"></div><div class="field"><label>Domiciliation</label><input data-f="domiciliation"></div>
+    <div class="field"><label>IBAN</label><input data-f="iban"></div><div class="field"><label>BIC</label><input data-f="bic"></div>
+  </div></div>
+  <div class="modal-foot"><button class="btn" data-close="m-finfo">Annuler</button><button class="btn primary" data-action="finfo-save">Enregistrer</button></div>
+</div></div>
+
+<div class="modal" id="m-je"><div class="modal-box">
+  <div class="modal-head"><h2>Coordonnées de la JE sur les factures</h2><button class="x" data-close="m-je">×</button></div>
+  <div class="modal-body"><div class="form" id="je-form">
+    <div class="full muted">Reprises sur toutes les nouvelles factures. Les factures déjà générées gardent les coordonnées de leur émission (modifiables facture par facture).</div>
+    <div class="field full"><label>Mention de la structure</label><input data-f="forme"></div>
+    <div class="field full"><label>Adresse</label><input data-f="adresse"></div>
+    <div class="field"><label>Code postal et ville</label><input data-f="cp_ville"></div><div class="field"><label>Téléphone</label><input data-f="tel"></div>
+    <div class="field"><label>SIRET</label><input data-f="siret"></div><div class="field"><label>SIREN</label><input data-f="siren"></div>
+    <div class="field"><label>Code APE</label><input data-f="ape"></div><div class="field"><label>N° TVA intracommunautaire</label><input data-f="tva_intra"></div>
+    <div class="full sub-title" style="margin-top:6px">Paiement</div>
+    <div class="field"><label>RIB</label><input data-f="rib"></div><div class="field"><label>Domiciliation</label><input data-f="domiciliation"></div>
+    <div class="field"><label>IBAN</label><input data-f="iban"></div><div class="field"><label>BIC</label><input data-f="bic"></div>
+    <div class="field full"><label>Chèques à l'ordre de</label><input data-f="cheque_ordre"></div>
+  </div></div>
+  <div class="modal-foot"><button class="btn" data-close="m-je">Annuler</button><button class="btn primary" data-action="je-save">Enregistrer</button></div>
+</div></div>
+
 <script>
 const S = { etudes: [], factures: [], clients: [], mandats: [], tab: 'etudes', editId: null, rows: null };
 let CAN_EDIT;
 
 App.start('compta', () => {
   CAN_EDIT = App.canEdit('compta');
+  document.getElementById('gen-bar').hidden = !CAN_EDIT;
+  loadJe().catch(() => {});
   document.getElementById('btn-add').hidden = !CAN_EDIT;
   document.querySelector('[data-t=import]').hidden = !CAN_EDIT;
   watch(db.collection('etudes'), l => { S.etudes = l; render(); });
@@ -153,7 +242,8 @@ function render() {
   document.getElementById('f-body').innerHTML = lf.length ? lf.map(f => '<tr><td><b>' + esc(f.numero) + '</b><div class="muted">' + esc(f.type || '') + '</div></td><td><span class="ref">' + esc(f.etude_ref || '—') + '</span></td><td>' + esc(f.client_name || '—') + '</td>' +
     '<td class="num"><b>' + eurc(f.montant_ht) + '</b></td><td class="num">' + tvaTaux(f) + ' %</td><td class="num">' + eurc(factureTTC(f)) + '</td><td>' + fmtDate(f.date_emission) + '</td><td' + (isLate(f) ? ' style="color:var(--bad);font-weight:600"' : '') + '>' + fmtDate(f.date_echeance) + '</td>' +
     '<td>' + (CAN_EDIT ? '<select class="input" style="width:auto;padding:4px 8px" data-statut="' + f.id + '">' + options(['En attente', 'Encaissée', 'Impayée'], f.statut) + '</select>' : '<span class="badge ' + statutBadge(f) + '">' + esc(f.statut) + '</span>') + '</td>' +
-    '<td>' + (CAN_EDIT ? '<button class="btn sm ghost" data-action="edit" data-id="' + f.id + '">Modifier</button><button class="icon-btn" data-action="del" data-id="' + f.id + '">×</button>' : '') + '</td></tr>').join('')
+    '<td style="white-space:nowrap">' + (f.doc ? '<button class="btn sm" data-action="dl" data-fmt="pdf" data-id="' + f.id + '">PDF</button> <button class="btn sm" data-action="dl" data-fmt="word" data-id="' + f.id + '">Word</button> ' : '') +
+      (CAN_EDIT ? (f.doc ? '<button class="btn sm ghost" data-action="finfo" data-id="' + f.id + '" title="Corriger le nom, le RIB…">Infos</button>' : '') + '<button class="btn sm ghost" data-action="edit" data-id="' + f.id + '">Modifier</button><button class="icon-btn" data-action="del" data-id="' + f.id + '">×</button>' : '') + '</td></tr>').join('')
     : '<tr><td colspan="10" class="empty">Aucune facture.</td></tr>';
 
   // Impayés
@@ -216,6 +306,7 @@ async function save() {
   Object.assign(f, { etude_ref: e.reference || '', client_name: e.client_name || '' });
   if (f.statut === 'Encaissée' && !f.date_encaissement) f.date_encaissement = today();
   const old = S.editId && S.factures.find(x => x.id === S.editId);
+  if (old && old.doc && round2(old.montant_ht) !== f.montant_ht && !confirm('Cette facture a été générée : modifier son montant ne met pas à jour le détail des lignes du PDF / Word. Il vaut mieux faire un avoir puis une nouvelle facture. Modifier quand même ?')) return;
   if (S.editId) {
     const before = S.factures.find(x => x.id === S.editId) || {};
     await db.collection('factures').doc(S.editId).update(f);
@@ -283,6 +374,123 @@ async function solder(list) {
   toast(list.length + ' étude(s) marquée(s) soldée(s)');
 }
 
+/* ───────── Génération de factures ───────── */
+const GEN = { je: null, built: null, last: null };
+async function loadJe() { const d = await db.collection('crm_config').doc('facturation').get(); GEN.je = Object.assign({}, JE_DEFAUT, d.exists ? d.data() : {}); }
+const gForm = () => document.getElementById('g-form');
+const gEtude = () => S.etudes.find(x => x.id === document.getElementById('g-etude').value);
+const gClientOf = e => e && (S.clients.find(c => c.id === e.client_id) || S.clients.find(c => (c.company_name || '').toLowerCase() === (e.client_name || '').toLowerCase()));
+
+function openGen() {
+  if (!GEN.je) GEN.je = Object.assign({}, JE_DEFAUT);
+  document.getElementById('g-result').hidden = true; gForm().hidden = false; document.getElementById('g-foot').hidden = false;
+  document.getElementById('g-ok').checked = false;
+  document.getElementById('g-etude').innerHTML = options(signed().sort((a, b) => (a.reference || '').localeCompare(b.reference || '')).map(e => ({ value: e.id, label: (e.reference || '—') + ' — ' + (e.client_name || '') })), '', '— Choisir —');
+  document.getElementById('g-tva').innerHTML = options(TVA_TAUX.map(t => ({ value: t, label: String(t).replace('.', ',') + ' %' })), 20);
+  fillForm(gForm(), { type: 'Acompte', taux_acompte: 30, taux_tva: 20, date_emission: today(), date_echeance: addDays(today(), 30), save_client: true });
+  genPrefill(); openModal('m-gen');
+}
+function genPrefill() {
+  const f = readForm(gForm()), refa = f.type === 'Refacturation', e = gEtude();
+  document.getElementById('g-f-etude').hidden = refa; document.getElementById('g-etude-fields').hidden = refa; document.getElementById('g-refa-fields').hidden = !refa;
+  document.getElementById('g-f-taux').hidden = f.type !== 'Acompte'; document.getElementById('g-f-montant').hidden = f.type !== 'Intermédiaire'; document.getElementById('g-f-siren').hidden = refa;
+  const v = {};
+  if (!refa && e) {
+    const c = gClientOf(e) || {}, k = (c.contacts || []).find(x => x.facturation) || (c.contacts || [])[0] || {};
+    Object.assign(v, { c_nom: c.company_name || e.client_name || '', c_civilite: k.civilite || '', c_contact: k.nom || '', c_adresse: c.adresse || '',
+      c_cp_ville: [c.cp, c.ville].filter(Boolean).join(' '), c_siren: c.siren || '', convention: (e.reference || '') + '_CE', denomination: e.title || '',
+      nb_jeh: calcEtude(e).jeh || num(e.jeh_total_etude), date_fin: e.date_fin || '' });
+  } else if (!refa) Object.assign(v, { c_nom: '', c_civilite: '', c_contact: '', c_adresse: '', c_cp_ville: '', c_siren: '', convention: '', denomination: '', nb_jeh: '', date_fin: '' });
+  gForm().querySelectorAll('[data-f]').forEach(el => { if (v[el.dataset.f] !== undefined) el.value = v[el.dataset.f]; });
+  if (f.type === 'Intermédiaire' && e) gForm().querySelector('[data-f=montant]').value = Math.max(0, round2(num(e.montant_ht) - factured(e)));
+  document.getElementById('g-ok').checked = false; genRecalc();
+}
+function genBuild() {
+  const f = readForm(gForm()), e = gEtude(), refa = f.type === 'Refacturation';
+  const client = { nom: f.c_nom, civilite: f.c_civilite, contact: f.c_contact, adresse: f.c_adresse, cp_ville: f.c_cp_ville, siren: refa ? '' : f.c_siren };
+  const b = construireFacture({ type: f.type, etude: e, client, je: GEN.je, prevHT: e ? factured(e) : 0, tauxAcompte: f.taux_acompte, montant: f.montant == null ? '' : f.montant, tva: f.taux_tva,
+    convention: f.convention, denomination: f.denomination, nb_jeh: f.nb_jeh == null ? undefined : f.nb_jeh, date_fin: f.date_fin, objet: f.objet,
+    lignes: [{ label: f.l1_label, montant: f.l1_montant }, { label: f.l2_label, montant: f.l2_montant }] });
+  return { f, e, client, refa, b };
+}
+function genRecalc() {
+  const g = genBuild(), sum = document.getElementById('g-sum');
+  const need = [['c_nom'], ['c_adresse'], ['c_cp_ville']].concat(g.refa ? [] : [['c_siren']]);
+  gForm().querySelectorAll('.g-chk').forEach(el => { el.style.borderColor = !el.value.trim() && !el.closest('[hidden]') ? 'var(--bad)' : ''; });
+  const missing = need.filter(n => !g.f[n[0]]);
+  if (g.b.erreur) sum.innerHTML = '<div class="alert warn"><span>' + esc(g.b.erreur) + '</span></div>';
+  else sum.innerHTML = '<div class="kpis" style="grid-template-columns:repeat(3,1fr)"><div class="kpi accent"><div class="v">' + eurc(g.b.montant_ht) + '</div><div class="l">HT à facturer</div></div>' +
+    '<div class="kpi"><div class="v">' + eurc(g.b.montant_tva) + '</div><div class="l">TVA ' + g.b.taux_tva + ' %</div></div><div class="kpi"><div class="v">' + eurc(g.b.montant_ttc) + '</div><div class="l">TTC</div></div></div>' +
+    (g.e ? '<div class="muted" style="margin-top:6px">Étude : ' + eurc(g.e.montant_ht) + ' HT · déjà facturé : ' + eurc(factured(g.e)) + ' HT</div>' : '') +
+    (!GEN.je || !GEN.je.iban ? '<div class="alert warn" style="margin-top:8px"><span>Les coordonnées bancaires de la JE ne sont pas renseignées (bouton « Coordonnées de la JE »).</span></div>' : '');
+  document.getElementById('g-go').disabled = !(!g.b.erreur && !missing.length && document.getElementById('g-ok').checked);
+}
+document.getElementById('g-form').addEventListener('input', ev => { if (ev.target.id === 'g-etude' || ev.target.id === 'g-type') genPrefill(); else genRecalc(); });
+document.getElementById('g-form').addEventListener('change', ev => { if (ev.target.id === 'g-etude' || ev.target.id === 'g-type') genPrefill(); else genRecalc(); });
+
+/* Prochain numéro : année sur 2 chiffres + compteur unique, quel que soit le type (2601, 2602, 2603…) */
+async function prochainNumero() {
+  const yy = String(new Date().getFullYear()).slice(2), all = await db.collection('factures').get();
+  const max = all.docs.map(d => String(d.data().numero || '')).filter(n => n.startsWith(yy) && /^\d+$/.test(n)).map(n => parseInt(n.slice(2), 10) || 0).reduce((a, b) => Math.max(a, b), 0);
+  return yy + String(max + 1).padStart(2, '0');
+}
+async function genGo() {
+  const g = genBuild(); if (g.b.erreur) return toast(g.b.erreur, true);
+  const btn = document.getElementById('g-go'); btn.disabled = true;
+  const numero = await prochainNumero(), e = g.e;
+  const payload = { numero, type: g.f.type, etude_id: e ? e.id : '', etude_ref: e ? (e.reference || '') : '', client_name: g.client.nom,
+    montant_ht: g.b.montant_ht, taux_tva: g.b.taux_tva, montant_tva: g.b.montant_tva, montant_ttc: g.b.montant_ttc, statut: 'En attente',
+    date_emission: g.f.date_emission, date_echeance: g.f.date_echeance, doc: g.b.doc, generee: true, created_by: App.user.email, created_at: FV.serverTimestamp() };
+  const ref = await db.collection('factures').add(payload);
+  GEN.last = Object.assign({ id: ref.id }, payload);
+  await logF(GEN.last, 'Facture générée (' + g.f.type + ')');
+  if (e) await syncEtude(e.id);
+  if (g.f.save_client && !g.refa) await saveClientInfo(e, g.client).catch(() => {});
+  gForm().hidden = true; document.getElementById('g-foot').hidden = true;
+  const r = document.getElementById('g-result'); r.hidden = false;
+  r.innerHTML = '<div class="alert info"><span>✅ Facture <b>' + esc(numero) + '</b> créée dans la compta (' + eurc(g.b.montant_ht) + ' HT · ' + eurc(g.b.montant_ttc) + ' TTC). Elle ne sera pas recréée : retélécharge-la ici ou depuis la liste, en PDF ou en Word.</span></div>' +
+    '<div class="row" style="margin-top:14px"><button class="btn primary" data-action="dl" data-fmt="pdf" data-id="' + ref.id + '">Télécharger le PDF</button><button class="btn" data-action="dl" data-fmt="word" data-id="' + ref.id + '">Télécharger le Word</button><button class="btn ghost" data-close="m-gen">Fermer</button></div>';
+}
+async function saveClientInfo(e, cl) {
+  const c = gClientOf(e); if (!c) return;
+  const up = {}, m = String(cl.cp_ville || '').match(/^(\d{4,5})\s+(.*)$/);
+  if (cl.adresse && cl.adresse !== c.adresse) up.adresse = cl.adresse;
+  if (m) { if (m[1] !== c.cp) up.cp = m[1]; if (m[2] !== c.ville) up.ville = m[2]; } else if (cl.cp_ville && !c.ville) up.ville = cl.cp_ville;
+  if (cl.siren && cl.siren !== c.siren) up.siren = cl.siren;
+  if (cl.contact) {
+    const cs = (c.contacts || []).map(x => Object.assign({}, x)), k = cs.find(x => x.nom === cl.contact);
+    if (k) { if (cl.civilite) k.civilite = cl.civilite; } else cs.unshift({ nom: cl.contact, civilite: cl.civilite || '', poste: '', email: '', tel: '' });
+    if (JSON.stringify(cs) !== JSON.stringify(c.contacts || [])) up.contacts = cs;
+  }
+  if (Object.keys(up).length) await db.collection('clients').doc(c.id).update(up);
+}
+
+/* Corriger les textes d'une facture déjà générée (jamais les montants) */
+function openFinfo(f) {
+  S.finfo = f.id; const d = f.doc || {}, c = d.client || {}, et = d.etude || {}, je = d.je || {};
+  document.getElementById('fi-title').textContent = 'Corriger la facture ' + f.numero;
+  fillForm(document.getElementById('fi-form'), { c_nom: c.nom, c_civilite: c.civilite, c_contact: c.contact, c_adresse: c.adresse, c_cp_ville: c.cp_ville, c_siren: c.siren,
+    convention: et.convention, date_fin: et.date_fin, denomination: et.denomination, objet: d.objet, rib: je.rib, domiciliation: je.domiciliation, iban: je.iban, bic: je.bic });
+  openModal('m-finfo');
+}
+async function saveFinfo() {
+  const f0 = S.factures.find(x => x.id === S.finfo), v = readForm(document.getElementById('fi-form')), d = JSON.parse(JSON.stringify(f0.doc || {}));
+  const T = [['Client', 'client.nom', v.c_nom], ['Civilité', 'client.civilite', v.c_civilite], ['Contact', 'client.contact', v.c_contact], ['Adresse', 'client.adresse', v.c_adresse], ['Code postal et ville', 'client.cp_ville', v.c_cp_ville],
+    ['SIREN client', 'client.siren', v.c_siren], ['Convention', 'etude.convention', v.convention], ['Date de fin d’étude', 'etude.date_fin', v.date_fin], ['Dénomination', 'etude.denomination', v.denomination],
+    ['Objet', 'objet', v.objet], ['RIB', 'je.rib', v.rib], ['Domiciliation', 'je.domiciliation', v.domiciliation], ['IBAN', 'je.iban', v.iban], ['BIC', 'je.bic', v.bic]];
+  const get = (o, p) => p.split('.').reduce((a, k) => (a == null ? a : a[k]), o), changes = [];
+  T.forEach(t => {
+    if (t[1].startsWith('etude.') && !d.etude) return;
+    const old = get(d, t[1]) || ''; if (String(old) === String(t[2] || '')) return;
+    const parts = t[1].split('.'); let o = d; while (parts.length > 1) { const k = parts.shift(); o[k] = o[k] || {}; o = o[k]; } o[parts[0]] = t[2];
+    changes.push({ cle: 'texte', champ: t[0], avant: old, apres: t[2] });
+  });
+  if (!changes.length) { closeModal('m-finfo'); return; }
+  await db.collection('factures').doc(f0.id).update({ doc: d, client_name: (d.client && d.client.nom) || f0.client_name });
+  await logF(f0, 'Informations de la facture corrigées', changes);
+  closeModal('m-finfo'); toast('Facture corrigée : retélécharge le PDF ou le Word');
+}
+
 onActions({
   'fix-frais': () => { const l = shownEtudes().filter(e => sit(e).etat === 'frais'); if (confirm('Ajouter les frais de structure au montant HT de ' + l.length + ' étude(s) ?')) fixFrais(l).catch(fail); },
   'fix-one': el => fixFrais([S.etudes.find(e => e.id === el.dataset.id)]).catch(fail),
@@ -293,8 +501,15 @@ onActions({
   add: () => openForm(null),
   edit: el => openForm(S.factures.find(x => x.id === el.dataset.id)),
   save: () => save().catch(fail),
-  del: el => { const f = S.factures.find(x => x.id === el.dataset.id); if (confirm('Supprimer la facture ' + f.numero + ' ?')) db.collection('factures').doc(f.id).delete().then(() => logF(f, 'Facture supprimée')).then(() => syncEtude(f.etude_id)).then(() => toast('Facture supprimée')).catch(fail); },
+  del: el => { const f = S.factures.find(x => x.id === el.dataset.id); if (confirm('Supprimer la facture ' + f.numero + ' ?' + (f.doc ? ' Son numéro ne sera pas réattribué automatiquement : pour annuler une facture émise, fais plutôt un avoir.' : ''))) db.collection('factures').doc(f.id).delete().then(() => logF(f, 'Facture supprimée')).then(() => syncEtude(f.etude_id)).then(() => toast('Facture supprimée')).catch(fail); },
   cash: el => { const f = S.factures.find(x => x.id === el.dataset.id); db.collection('factures').doc(f.id).update({ statut: 'Encaissée', date_encaissement: today() }).then(() => logF(f, 'Facture encaissée', [{ cle: 'statut', champ: 'Statut', avant: f.statut, apres: 'Encaissée' }])).then(() => syncEtude(f.etude_id)).then(() => toast('Encaissée')).catch(fail); },
+  gen: () => openGen(),
+  'gen-go': () => genGo().catch(fail),
+  dl: el => { const f = S.factures.find(x => x.id === el.dataset.id) || (GEN.last && GEN.last.id === el.dataset.id ? GEN.last : null); if (!f) return; el.disabled = true; telechargerFacture(f, el.dataset.fmt).catch(fail).then(() => { el.disabled = false; }); },
+  finfo: el => openFinfo(S.factures.find(x => x.id === el.dataset.id)),
+  'finfo-save': () => saveFinfo().catch(fail),
+  je: () => { fillForm(document.getElementById('je-form'), GEN.je || JE_DEFAUT); openModal('m-je'); },
+  'je-save': () => { const f = readForm(document.getElementById('je-form')); db.collection('crm_config').doc('facturation').set(f, { merge: true }).then(() => { GEN.je = Object.assign({}, JE_DEFAUT, f); closeModal('m-je'); toast('Coordonnées enregistrées'); }).catch(fail); },
   import: () => doImport().catch(fail),
   export: () => {
     const r1 = [['Référence', 'Client', 'Statut', 'Montant HT', 'Encaissé HT', 'Reste HT', 'Situation']];

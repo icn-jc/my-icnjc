@@ -49,3 +49,11 @@ Les factures stockent `montant_ht`, `taux_tva`, `montant_tva`, `montant_ttc`. Le
 - Le montant HT d'une étude signée ne se modifie qu'avec un motif obligatoire.
 - Tant que le lien avec la prospection est actif et que l'étude n'a pas de phases chiffrées, le montant saisi en prospection met l'étude à jour.
 - « Couper le lien » dans une étude fige le montant du prospect (`montant_fige`) : il n'est plus modifiable depuis « Mes prospects », « Après RDV » ou « Enregistrer une action ».
+
+## Factures générées (PDF + Word)
+- Comptabilité → Factures → **+ Générer une facture** : acompte (30 % par défaut), intermédiaire, solde, refacturation.
+- Une fenêtre de contrôle préremplit le client depuis sa fiche (adresse, CP, SIREN, civilité/contact) et signale les champs manquants ; ils sont réenregistrés sur la fiche client.
+- **Une seule écriture** par facture (n° = année + compteur unique : 2601, 2602…). Les boutons PDF / Word de la liste retéléchargent à volonté, sans rien recréer.
+- « Infos » corrige les textes d'une facture générée (nom, adresse, RIB…), jamais les montants ; tout est tracé dans le journal.
+- Coordonnées de la JE (RIB, IBAN, SIRET…) : bouton « Coordonnées de la JE », stockées dans Firestore (`crm_config/facturation`), jamais dans le dépôt.
+- Bibliothèques embarquées (pas de CDN) : `assets/vendor/pdf-lib.min.js`, `assets/vendor/docx.min.js`.

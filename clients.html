@@ -32,7 +32,10 @@
   <div class="modal-body"><div class="form" id="add-form">
     <div class="field full"><label>Nom de l'entreprise *</label><input data-f="company_name"></div>
     <div class="field"><label>Secteur</label><input data-f="sector"></div>
+    <div class="field full"><label>Adresse</label><input data-f="adresse"></div>
+    <div class="field"><label>Code postal</label><input data-f="cp"></div>
     <div class="field"><label>Ville</label><input data-f="ville"></div>
+    <div class="field"><label>SIREN</label><input data-f="siren" placeholder="9 chiffres"></div>
     <div class="field"><label>Email</label><input data-f="email" type="email"></div>
     <div class="field"><label>Téléphone</label><input data-f="tel"></div>
     <div class="field"><label>Site web</label><input data-f="website"></div>
@@ -93,7 +96,10 @@ function renderPanel() {
       '<div class="field full"><label>Nom</label><input data-f="company_name"' + dis + '></div>' +
       '<div class="field"><label>Statut</label><select data-f="status"' + dis + '>' + options(STATUS) + '</select></div>' +
       '<div class="field"><label>Secteur</label><input data-f="sector"' + dis + '></div>' +
+      '<div class="field full"><label>Adresse (pour les factures)</label><input data-f="adresse"' + dis + '></div>' +
+      '<div class="field"><label>Code postal</label><input data-f="cp"' + dis + '></div>' +
       '<div class="field"><label>Ville</label><input data-f="ville"' + dis + '></div>' +
+      '<div class="field"><label>SIREN (pour les factures)</label><input data-f="siren"' + dis + '></div>' +
       '<div class="field"><label>Code client SAGE</label><input data-f="code_comptable"' + dis + '></div>' +
       '<div class="field"><label>Email</label><input data-f="email"' + dis + '></div>' +
       '<div class="field"><label>Téléphone</label><input data-f="tel"' + dis + '></div>' +
@@ -104,7 +110,7 @@ function renderPanel() {
   } else if (S.tab === 'contacts') {
     if (!S.contacts) S.contacts = JSON.parse(JSON.stringify(c.contacts || []));
     body.innerHTML = '<div class="list" id="contacts">' + (S.contacts.length ? S.contacts.map((k, i) => CAN_EDIT ?
-      '<div class="item form" data-i="' + i + '"><div class="field"><label>Nom</label><input data-c="nom" value="' + esc(k.nom || '') + '"></div><div class="field"><label>Poste</label><input data-c="poste" value="' + esc(k.poste || '') + '"></div>' +
+      '<div class="item form" data-i="' + i + '"><div class="field"><label>Civilité</label><select data-c="civilite"><option value="">—</option><option' + (k.civilite === 'Monsieur' ? ' selected' : '') + '>Monsieur</option><option' + (k.civilite === 'Madame' ? ' selected' : '') + '>Madame</option></select></div><div class="field"><label>Nom</label><input data-c="nom" value="' + esc(k.nom || '') + '"></div><div class="field"><label>Poste</label><input data-c="poste" value="' + esc(k.poste || '') + '"></div>' +
       '<div class="field"><label>Email</label><input data-c="email" value="' + esc(k.email || '') + '"></div><div class="field"><label>Téléphone</label><input data-c="tel" value="' + esc(k.tel || '') + '"></div>' +
       '<div class="full"><button class="btn sm danger" data-action="contact-del" data-i="' + i + '">Retirer</button></div></div>'
       : '<div class="item"><b>' + esc(k.nom) + '</b> <span class="muted">' + esc(k.poste || '') + '</span><div class="muted">' + esc(k.email || '') + ' ' + esc(k.tel || '') + '</div></div>').join('') : '<div class="muted">Aucun contact.</div>') + '</div>' +
