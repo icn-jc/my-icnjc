@@ -77,6 +77,24 @@
     </tr></thead><tbody id="all-body"></tbody></table></div></div>
   </section>
 
+  <!-- AGENDA -->
+  <section id="tab-agenda" hidden>
+    <div class="row" style="margin-bottom:14px">
+      <button class="btn sm" data-action="cal" data-d="-1">‹</button>
+      <b id="cal-label" style="min-width:150px;text-align:center"></b>
+      <button class="btn sm" data-action="cal" data-d="1">›</button>
+      <button class="btn sm ghost" data-action="cal" data-d="0">Aujourd'hui</button>
+      <span class="grow"></span>
+      <select id="cal-owner" class="input" style="width:auto" hidden></select>
+    </div>
+    <div class="cal-wrap">
+      <div class="card cal-card"><div class="cal" id="cal"></div>
+        <div class="cal-legend"><span><i class="dot d-relance"></i>Relance</span><span><i class="dot d-rdv"></i>RDV</span><span><i class="dot d-suite"></i>Suite de RDV</span><span><i class="dot d-debrief"></i>Compte rendu à faire</span></div>
+      </div>
+      <div class="card"><h3 id="day-title" style="margin-top:0"></h3><div id="day-list"></div></div>
+    </div>
+  </section>
+
   <!-- APRÈS RDV -->
   <section id="tab-rdv" hidden>
     <div class="filters"><select id="rdv-owner"></select></div>
@@ -163,7 +181,7 @@ App.start('prospection', () => {
   const tabs = [];
   if (IS_CA) tabs.push(['ca', 'Vue CA']);
   if (App.user.prospecte) tabs.push(['mine', 'Mes prospects']);
-  tabs.push(['all', 'Tous les prospects'], ['rdv', 'Après RDV']);
+  tabs.push(['agenda', 'Agenda'], ['all', 'Tous les prospects'], ['rdv', 'Après RDV']);
   document.getElementById('tabs').innerHTML = tabs.map(t => '<button class="tab" data-action="tab" data-tab="' + t[0] + '">' + t[1] + '<span class="count" id="count-' + t[0] + '" hidden></span></button>').join('');
   setTab(tabs[0][0]);
 
@@ -173,11 +191,73 @@ App.start('prospection', () => {
   watch(db.collection('prospects'), list => { S.prospects = list; renderAll(); if (S.current) renderPanel(); });
   watch(db.collection('prospects_rdv'), list => { S.rdvs = list; renderAll(); });
 
-  ['mine-q', 'mine-status', 'mine-due', 'all-q', 'all-owner', 'all-status', 'all-sector', 'all-week', 'rdv-owner']
+  ['mine-q', 'mine-status', 'mine-due', 'all-q', 'all-owner', 'all-status', 'all-sector', 'all-week', 'rdv-owner', 'cal-owner']
     .forEach(id => document.getElementById(id).addEventListener('input', renderAll));
   document.getElementById('chart-period').addEventListener('change', renderChart);
   document.querySelector('#mp-form [data-f=company_name]').addEventListener('input', checkDuplicate);
 });
+
+
+/* ───────── Agenda : tout ce qu'un commercial a à faire, jour par jour ─────────
+   Relances (prochaine action), RDV, suites de RDV (prochaine étape du compte rendu), comptes rendus à faire. */
+const CAL_TYPES = { relance: 'Relance', rdv: 'RDV', suite: 'Suite de RDV', debrief: 'Compte rendu à faire' };
+function agendaOwner() {
+  const sel = document.getElementById('cal-owner');
+  if (!IS_CA) return ME;
+  return sel.value === '__all' ? '' : (sel.value || ME);
+}
+function agendaItems(owner) {
+  const mine = x => !owner || x === owner, out = [];
+  const pName = id => { const p = S.prospects.find(x => x.id === id); return p ? p.company_name : ''; };
+  S.prospects.filter(p => mine(p.owner_email) && p.next_action_at && !['Signé', 'Perdu'].includes(p.status))
+    .forEach(p => out.push({ type: 'relance', date: p.next_action_at, pid: p.id, title: p.company_name, sub: p.status + (p.contact_name ? ' · ' + p.contact_name : '') + (p.contact_phone ? ' · ' + p.contact_phone : ''), owner: p.owner_email }));
+  rdvItems().filter(r => mine(r.owner_email) && r.date).forEach(r => {
+    out.push({ type: r.state === 'todo' ? 'debrief' : 'rdv', date: r.date, pid: r.prospect_id, rid: r.id, title: r.entreprise || pName(r.prospect_id), sub: [r.heure, r.type_rdv, r.state === 'done' ? 'fait · ' + r.signe : ''].filter(Boolean).join(' · '), owner: r.owner_email, done: r.state === 'done' });
+    if (r.next && r.next_date && r.state === 'done') out.push({ type: 'suite', date: r.next_date, pid: r.prospect_id, title: r.entreprise || pName(r.prospect_id), sub: r.next, owner: r.owner_email });
+  });
+  return out;
+}
+const pendingOf = items => items.filter(i => !i.done);
+function renderAgendaBadge() {
+  const el = document.getElementById('count-agenda'); if (!el) return;
+  const n = pendingOf(agendaItems(ME)).filter(i => i.date <= today()).length;
+  el.hidden = !n; el.textContent = n;
+}
+function renderAgenda() {
+  const sel = document.getElementById('cal-owner');
+  if (IS_CA) {
+    const v = sel.value;
+    sel.hidden = false;
+    sel.innerHTML = '<option value="">Mon agenda</option><option value="__all">Tous les commerciaux</option>' + prospectors().filter(u => (u.email || u.id) !== ME).map(u => '<option value="' + esc(u.email || u.id) + '">' + esc(fullName(u)) + '</option>').join('');
+    sel.value = S.calInit ? v : (App.user.prospecte ? '' : '__all'); S.calInit = true;
+  }
+  const items = agendaItems(agendaOwner()), T = today();
+  const m = S.calMonth || T.slice(0, 7), [y, mo] = m.split('-').map(Number);
+  const first = new Date(y, mo - 1, 1), start = addDays(dateStr(first), -((first.getDay() + 6) % 7));
+  const label = first.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
+  document.getElementById('cal-label').textContent = label.charAt(0).toUpperCase() + label.slice(1);
+  const late = pendingOf(items).filter(i => i.date < T && i.type !== 'rdv');
+  let h = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'].map(d => '<div class="cal-h">' + d + '</div>').join('');
+  for (let k = 0; k < 42; k++) {
+    const d = addDays(start, k); if (k >= 35 && d.slice(0, 7) !== m) break;
+    const day = pendingOf(items.filter(i => i.date === d)), types = [...new Set(day.map(i => i.type))];
+    h += '<button class="cal-d' + (d.slice(0, 7) !== m ? ' out' : '') + (d === T ? ' today' : '') + (d === S.calDay ? ' sel' : '') + '" data-action="cal-day" data-date="' + d + '">' +
+      '<span class="n">' + parseInt(d.slice(8), 10) + '</span>' +
+      (day.length ? '<span class="bubble' + (d < T ? ' late' : '') + '">' + day.length + '</span>' : '') +
+      '<span class="dots">' + types.map(t => '<i class="dot d-' + t + '"></i>').join('') + '</span></button>';
+  }
+  document.getElementById('cal').innerHTML = h;
+
+  // Liste du jour sélectionné (+ retards quand on regarde aujourd'hui)
+  const sd = S.calDay || T, list = items.filter(i => i.date === sd).sort((a, b) => (a.done ? 1 : 0) - (b.done ? 1 : 0));
+  document.getElementById('day-title').textContent = (sd === T ? 'Aujourd’hui — ' : '') + longDate(parseDate(sd));
+  const row = i => '<div class="item soft row cal-item" data-action="open" data-id="' + esc(i.pid || '') + '" style="cursor:pointer' + (i.done ? ';opacity:.55' : '') + '">' +
+    '<i class="dot d-' + i.type + '"></i><div class="grow"><b>' + esc(i.title || '—') + '</b><div class="muted">' + esc(CAL_TYPES[i.type]) + (i.sub ? ' · ' + esc(i.sub) : '') +
+    (!agendaOwner() ? ' · ' + esc(userName(i.owner)) : '') + (i.date !== sd ? ' · prévu le ' + fmtDate(i.date) : '') + '</div></div></div>';
+  let out = list.length ? '<div class="list">' + list.map(row).join('') + '</div>' : '<div class="muted">Rien de prévu ce jour-là.</div>';
+  if (sd === T && late.length) out += '<div class="sub-title" style="color:var(--bad)">En retard (' + late.length + ')</div><div class="list">' + late.sort((a, b) => a.date.localeCompare(b.date)).map(row).join('') + '</div>';
+  document.getElementById('day-list').innerHTML = out;
+}
 
 /* ───────── Helpers ───────── */
 const userName = email => { const u = S.users.find(x => x.email === email || x.id === email); return u ? fullName(u) : (email || '—').split('@')[0]; };
@@ -190,7 +270,7 @@ const goalFor = key => S.frozenGoals[key] != null ? S.frozenGoals[key] : S.goal;
 function setTab(t) {
   S.tab = t;
   document.querySelectorAll('#tabs .tab').forEach(b => b.classList.toggle('on', b.dataset.tab === t));
-  ['ca', 'mine', 'all', 'rdv'].forEach(k => { document.getElementById('tab-' + k).hidden = k !== t; });
+  ['ca', 'mine', 'agenda', 'all', 'rdv'].forEach(k => { document.getElementById('tab-' + k).hidden = k !== t; });
   renderAll();
 }
 
@@ -202,6 +282,8 @@ function renderAll() {
   if (S.tab === 'mine') renderMine();
   if (S.tab === 'all') renderAllTab();
   if (S.tab === 'rdv') renderRdv();
+  if (S.tab === 'agenda') renderAgenda();
+  renderAgendaBadge();
 }
 
 function fillFilterLists() {
@@ -590,7 +672,9 @@ onActions({
   tab: el => setTab(el.dataset.tab),
   week: el => { const d = +el.dataset.d; S.week = d === 0 ? today() : addDays(S.week, 7 * d); renderCA(); },
   'edit-goal': editGoal,
-  open: el => openProspect(el.dataset.id),
+  open: el => { if (el.dataset.id) openProspect(el.dataset.id); },
+  cal: el => { const d = +el.dataset.d, T = today(); if (!d) { S.calMonth = T.slice(0, 7); S.calDay = T; } else { const [y, m] = (S.calMonth || T.slice(0, 7)).split('-').map(Number); const n = new Date(y, m - 1 + d, 1); S.calMonth = dateStr(n).slice(0, 7); } renderAgenda(); },
+  'cal-day': el => { S.calDay = el.dataset.date; if (el.dataset.date.slice(0, 7) !== (S.calMonth || today().slice(0, 7))) S.calMonth = el.dataset.date.slice(0, 7); renderAgenda(); },
   add: () => openProspectForm(null),
   'edit-prospect': () => openProspectForm(S.prospects.find(x => x.id === S.current)),
   'save-prospect': () => saveProspectForm().catch(fail),
