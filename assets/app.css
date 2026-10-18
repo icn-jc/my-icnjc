@@ -221,3 +221,5 @@ input[type=checkbox]{accent-color:var(--brand);width:16px;height:16px}
 .toast.err{background:var(--bad)}
 .readonly-note{background:var(--info-bg);color:#1c3a8a;border-radius:var(--r);padding:9px 14px;margin-bottom:16px}
 .loading{padding:40px;text-align:center;color:var(--ink-3)}
+
+.side-mail{display:block;font-size:11px;color:var(--ink-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:160px}

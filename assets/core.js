@@ -16,6 +16,8 @@ const DOMAIN = 'icnjuniorconseil.com';
 
 /* ═════════════════ RÔLES & DROITS ═════════════════
    Un membre peut avoir plusieurs rôles : il a accès à une page si AU MOINS un de ses rôles l'autorise. */
+/* Comptes propriétaires : gardent toujours le rôle Super Admin, même si leur fiche membre est modifiée ou supprimée par erreur. */
+const OWNERS = ['stella.yathe@icnjuniorconseil.com'];
 const ROLE_LABELS = {
   super_admin: 'Super Admin', president: 'Président', vice_president: 'Vice-Président', tresorier: 'Trésorier',
   secretaire: 'Secrétaire général', responsable_commercial: 'Resp. Commercial', responsable_qualite: 'Resp. Qualité',
@@ -324,6 +326,7 @@ const App = {
     let doc = null, externe = false;
     if (internal) {
       doc = await db.collection('users').doc(email).get();
+      if (!doc.exists && OWNERS.includes(email)) doc = { exists: true, data: () => ({ prenom: 'Stella', nom: 'YATHE', roles: ['super_admin'] }) };
     } else {
       doc = await db.collection('whitelist_emails').doc(email).get();
       externe = doc.exists;
@@ -340,6 +343,7 @@ const App = {
     const d = doc.data();
     let roles = Array.isArray(d.roles) && d.roles.length ? d.roles.slice() : (d.role ? [d.role] : []);
     if (!roles.length) roles = externe ? ['tuteur'] : ['commercial'];
+    if (OWNERS.includes(email) && !roles.includes('super_admin')) roles.push('super_admin'); // filet de sécurité
     roles.sort((a, b) => ROLE_ORDER.indexOf(a) - ROLE_ORDER.indexOf(b));
     return {
       email, uid: fbUser.uid, photo: fbUser.photoURL || '',
@@ -393,7 +397,7 @@ const App = {
         '<div class="side-head"><img src="assets/logo-mark.png" alt=""><div class="side-title">My-ICN-JC<small>Intranet</small></div>' +
         '<button class="side-toggle" id="side-toggle" title="Réduire / agrandir">' + (mini ? '›' : '‹') + '</button></div>' +
         '<nav class="side-nav">' + nav + '</nav>' +
-        '<div class="side-foot"><div class="side-user">' + avatar + '<div><b>' + esc(u.prenom) + '</b><span>' + esc(ROLE_LABELS[u.role] || u.role) + '</span></div></div>' +
+        '<div class="side-foot"><div class="side-user" title="' + esc(u.email) + '">' + avatar + '<div><b>' + esc(u.prenom) + '</b><span>' + esc(ROLE_LABELS[u.role] || u.role) + '</span><span class="side-mail">' + esc(u.email) + '</span></div></div>' +
         '<button class="side-logout" id="logout" title="Se déconnecter">⏻ <span class="label">Se déconnecter</span></button></div>' +
       '</aside>';
     main.parentNode.insertBefore(layout, main);
