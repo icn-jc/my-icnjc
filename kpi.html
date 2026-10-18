@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Indicateurs — My-ICN-JC</title>
+<link rel="icon" href="assets/logo-mark.png"><link rel="stylesheet" href="assets/app.css">
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="assets/core.js"></script>
+</head>
+<body>
+<main hidden>
+  <div class="page-head">
+    <div><h1>Indicateurs</h1><div class="sub" id="sub">Calculés automatiquement à partir des études, factures et prospects de la période du mandat.</div></div>
+    <div class="actions"><select class="input" id="mandat" style="width:auto"></select></div>
+  </div>
+  <div id="empty" class="readonly-note" hidden>Aucun mandat n'est encore créé. Un Super Admin peut en créer un dans Administration → Mandats.</div>
+
+  <h2 class="section-title">Activité commerciale</h2>
+  <div class="kpis" id="k-com"></div>
+  <h2 class="section-title">Trésorerie</h2>
+  <div class="kpis" id="k-treso"></div>
+
+  <div class="grid2" style="margin-top:8px">
+    <div class="card">
+      <div class="row" style="margin-bottom:12px"><h3 class="grow" style="margin:0">Comparaison des mandats</h3><select class="input" style="width:auto" id="metric"></select></div>
+      <div style="height:280px"><canvas id="chart-cmp"></canvas></div>
+    </div>
+    <div class="card">
+      <h3>Études signées du mandat</h3>
+      <div id="etudes-list"></div>
+    </div>
+  </div>
+  <p class="muted" style="margin-top:16px">Une valeur suivie de « saisi » vient de la saisie manuelle faite dans Administration → Mandats (anciens mandats sans données dans le site).</p>
+</main>
+<script>
+const METRICS = { caSigne: ['CA signé', true], caEnc: ['CA encaissé', true], nbEtudes: ['Études signées', false], panier: ['Panier moyen', true],
+  nbIv: ['Intervenants mobilisés', false], contactes: ['Prospects contactés', false], tauxConv: ['Taux de conversion (%)', false] };
+const S = { mandats: [], etudes: [], factures: [], prospects: [], chart: null };
+
+App.start('kpi', () => {
+  document.getElementById('metric').innerHTML = options(Object.keys(METRICS).map(k => ({ value: k, label: METRICS[k][0] })), 'caSigne');
+  const D = () => render();
+  getAll(db.collection('mandats')).then(l => {
+    S.mandats = l.sort((a, b) => (b.date_debut || '').localeCompare(a.date_debut || ''));
+    const actif = S.mandats.find(m => m.statut === 'actif') || S.mandats[0];
+    document.getElementById('mandat').innerHTML = options(S.mandats.map(m => ({ value: m.id, label: (m.label || m.id) + (m.statut === 'actif' ? ' (en cours)' : '') })), actif && actif.id);
+    document.getElementById('empty').hidden = S.mandats.length > 0;
+    render();
+  });
+  watch(db.collection('etudes'), l => { S.etudes = l; D(); });
+  watch(db.collection('factures'), l => { S.factures = l; D(); });
+  watch(db.collection('prospects'), l => { S.prospects = l; D(); });
+  ['mandat', 'metric'].forEach(id => document.getElementById(id).addEventListener('change', render));
+});
+
+const val = (x, money) => (money ? eur(x.v) : Math.round(x.v).toLocaleString('fr-FR')) + (x.manual ? ' <span class="muted" style="font-size:12px;font-weight:500">saisi</span>' : '');
+const tile = (label, html, sub, cls) => '<div class="kpi ' + (cls || '') + '"><div class="v">' + html + '</div><div class="l">' + label + '</div>' + (sub ? '<div class="s">' + sub + '</div>' : '') + '</div>';
+
+function render() {
+  const m = S.mandats.find(x => x.id === document.getElementById('mandat').value);
+  if (!m) return;
+  const D = { mandats: S.mandats, etudes: S.etudes, factures: S.factures, prospects: S.prospects };
+  const s = mandatStats(m, D);
+  document.getElementById('sub').textContent = 'Mandat ' + (m.label || m.id) + ' · du ' + fmtDate(m.date_debut) + ' au ' + fmtDate(m.date_fin) + ' · calculé à partir des données du site';
+  document.getElementById('k-com').innerHTML =
+    tile('CA signé', val(s.caSigne, true), '', 'accent') + tile('Études signées', val(s.nbEtudes)) + tile('Panier moyen', val(s.panier, true)) +
+    tile('Prospects contactés', val(s.contactes)) + tile('Taux de conversion', val(s.tauxConv) + ' %', s.signes + ' signés') + tile('Intervenants mobilisés', val(s.nbIv));
+  document.getElementById('k-treso').innerHTML =
+    tile('CA encaissé', val(s.caEnc, true), 'factures encaissées sur la période', 'accent') + tile('Taux de transformation', val(s.transfo) + ' %', 'encaissé / signé') +
+    tile('Reste à encaisser', eur(Math.max(0, s.caSigne.v - s.caEnc.v))) + tile('Cash disponible', s.cash ? eur(s.cash) : '—', 'saisi dans Administration') +
+    (s.marge ? tile('Marge nette moyenne', s.marge + ' %') : '') + (s.coutMoyen ? tile('Coût moyen par étude', eur(s.coutMoyen)) : '');
+  const l = s.etudes.slice().sort((a, b) => num(b.montant_ht) - num(a.montant_ht));
+  document.getElementById('etudes-list').innerHTML = l.length ? '<div class="list">' + l.slice(0, 12).map(e => '<div class="row" style="padding:6px 0;border-bottom:1px solid var(--line)"><span class="ref">' + esc(e.reference || '—') + '</span><span class="grow">' + esc(e.client_name || '') + '</span><span class="badge ' + (ETUDE_BADGE[e.statut] || '') + '">' + esc(e.statut) + '</span><b>' + eur(e.montant_ht) + '</b></div>').join('') + '</div>' : '<div class="muted">Aucune étude signée sur ce mandat.</div>';
+
+  // Comparaison
+  const key = document.getElementById('metric').value, money = METRICS[key][1];
+  const ms = S.mandats.slice().reverse();
+  const values = ms.map(x => Math.round(mandatStats(x, D)[key].v));
+  if (!window.Chart) return;
+  if (S.chart) S.chart.destroy();
+  S.chart = new Chart(document.getElementById('chart-cmp'), {
+    type: 'bar',
+    data: { labels: ms.map(x => x.label || x.id), datasets: [{ label: METRICS[key][0], data: values, backgroundColor: ms.map(x => x.id === m.id ? '#A3215F' : '#3A3A9C'), borderRadius: 6, maxBarThickness: 64 }] },
+    options: { maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => money ? eur(c.raw) : c.raw } } },
+      scales: { y: { beginAtZero: true, ticks: { callback: v => money ? (v >= 1000 ? (v / 1000) + ' k€' : v + ' €') : v } }, x: { grid: { display: false } } } }
+  });
+}
+</script>
+</body>
+</html>

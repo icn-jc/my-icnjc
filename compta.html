@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Comptabilité — My-ICN-JC</title>
+<link rel="icon" href="assets/logo-mark.png"><link rel="stylesheet" href="assets/app.css">
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script src="assets/core.js"></script>
+</head>
+<body>
+<main hidden>
+  <div class="page-head">
+    <div><h1>Comptabilité</h1><div class="sub">Les encaissements se saisissent sur les factures : l'étude se met à jour toute seule.</div></div>
+    <div class="actions"><button class="btn" data-action="export">Export Excel</button><button class="btn primary" data-action="add" id="btn-add" hidden>+ Facture</button></div>
+  </div>
+  <div class="kpis" id="kpis"></div>
+  <div class="tabs" id="tabs">
+    <button class="tab on" data-action="tab" data-t="etudes">Par étude</button>
+    <button class="tab" data-action="tab" data-t="factures">Factures</button>
+    <button class="tab" data-action="tab" data-t="impayes">Impayés<span class="count" id="count-imp" hidden></span></button>
+    <button class="tab" data-action="tab" data-t="import">Import SAGE</button>
+  </div>
+
+  <section id="t-etudes">
+    <div class="filters"><input type="search" id="e-q" placeholder="Réf, client…"><select id="e-state"><option value="">Toutes</option><option value="reste">Reste à encaisser</option><option value="solde">Soldées</option></select></div>
+    <div class="table-wrap"><div class="table-scroll"><table class="t"><thead><tr><th>Réf.</th><th>Client</th><th>Statut étude</th><th class="num">Montant HT</th><th class="num">Facturé</th><th class="num">Encaissé</th><th>Progression</th><th class="num">Reste</th></tr></thead><tbody id="e-body"></tbody></table></div></div>
+  </section>
+  <section id="t-factures" hidden>
+    <div class="filters"><input type="search" id="f-q" placeholder="N°, client, réf…"><select id="f-statut"></select></div>
+    <div class="table-wrap"><div class="table-scroll"><table class="t"><thead><tr><th>N° facture</th><th>Étude</th><th>Client</th><th class="num">Montant HT</th><th>Émission</th><th>Échéance</th><th>Statut</th><th></th></tr></thead><tbody id="f-body"></tbody></table></div></div>
+  </section>
+  <section id="t-impayes" hidden><div id="imp-body"></div></section>
+  <section id="t-import" hidden>
+    <div class="card" style="max-width:640px">
+      <h3>Import du fichier SAGE</h3>
+      <p class="muted">Fichier Excel ou CSV avec 3 colonnes : <b>Date</b>, <b>Code client</b>, <b>Nom client</b>. Le code est rattaché à la fiche client portant le même nom (créée si elle n'existe pas).</p>
+      <input type="file" id="file" accept=".xlsx,.xls,.csv" class="input">
+      <div id="preview" style="margin-top:14px"></div>
+    </div>
+  </section>
+</main>
+
+<div class="modal" id="m-facture"><div class="modal-box">
+  <div class="modal-head"><h2 id="mf-title">Nouvelle facture</h2><button class="x" data-close="m-facture">×</button></div>
+  <div class="modal-body"><div class="form" id="mf-form">
+    <div class="field"><label>N° facture *</label><input data-f="numero" placeholder="FA-2026-001"></div>
+    <div class="field"><label>Type</label><select data-f="type"><option>Acompte</option><option>Intermédiaire</option><option>Solde</option><option>Unique</option><option>Autre</option></select></div>
+    <div class="field full"><label>Étude *</label><select data-f="etude_id" id="mf-etude"></select></div>
+    <div class="field"><label>Montant HT (€) *</label><input type="number" min="0" step="0.01" data-f="montant_ht"></div>
+    <div class="field"><label>Statut</label><select data-f="statut"><option>En attente</option><option>Encaissée</option><option>Impayée</option></select></div>
+    <div class="field"><label>Date d'émission *</label><input type="date" data-f="date_emission"></div>
+    <div class="field"><label>Échéance *</label><input type="date" data-f="date_echeance"></div>
+    <div class="field"><label>Date d'encaissement</label><input type="date" data-f="date_encaissement"></div>
+    <div class="field full"><label>Notes</label><textarea data-f="notes"></textarea></div>
+  </div></div>
+  <div class="modal-foot"><button class="btn" data-close="m-facture">Annuler</button><button class="btn primary" data-action="save">Enregistrer</button></div>
+</div></div>
+
+<script>
+const S = { etudes: [], factures: [], clients: [], tab: 'etudes', editId: null, rows: null };
+let CAN_EDIT;
+
+App.start('compta', () => {
+  CAN_EDIT = App.canEdit('compta');
+  document.getElementById('btn-add').hidden = !CAN_EDIT;
+  document.querySelector('[data-t=import]').hidden = !CAN_EDIT;
+  watch(db.collection('etudes'), l => { S.etudes = l; render(); });
+  watch(db.collection('factures'), l => { S.factures = l; render(); });
+  watch(db.collection('clients'), l => { S.clients = l; });
+  ['e-q', 'e-state', 'f-q', 'f-statut'].forEach(id => document.getElementById(id).addEventListener('input', render));
+  document.getElementById('file').addEventListener('change', readFile);
+  document.getElementById('mf-etude').addEventListener('change', ev => {
+    const e = S.etudes.find(x => x.id === ev.target.value), m = document.querySelector('#mf-form [data-f=montant_ht]');
+    if (e && !m.value) m.value = Math.max(0, num(e.montant_ht) - factured(e));
+  });
+});
+
+const signed = () => S.etudes.filter(e => ETUDE_SIGNEE.includes(e.statut));
+const facturesOf = e => S.factures.filter(f => f.etude_id === e.id);
+const factured = e => facturesOf(e).reduce((a, f) => a + num(f.montant_ht), 0);
+const cashed = e => facturesOf(e).filter(f => f.statut === 'Encaissée').reduce((a, f) => a + num(f.montant_ht), 0);
+const isLate = f => f.statut === 'Impayée' || (f.statut === 'En attente' && f.date_echeance && f.date_echeance < today());
+const statutBadge = f => isLate(f) && f.statut !== 'Encaissée' ? 'b-bad' : f.statut === 'Encaissée' ? 'b-ok' : 'b-warn';
+
+/* L'encaissé d'une étude = somme de ses factures encaissées. Recalculé à chaque modification de facture. */
+async function syncEtude(etudeId) {
+  if (!etudeId) return;
+  const sum = (await db.collection('factures').where('etude_id', '==', etudeId).get()).docs
+    .map(d => d.data()).filter(f => f.statut === 'Encaissée').reduce((a, f) => a + num(f.montant_ht), 0);
+  await db.collection('etudes').doc(etudeId).update({ montant_encaisse: sum });
+}
+
+function render() {
+  const E = signed(), ht = E.reduce((a, e) => a + num(e.montant_ht), 0), enc = E.reduce((a, e) => a + cashed(e), 0);
+  const late = S.factures.filter(isLate), lateSum = late.reduce((a, f) => a + num(f.montant_ht), 0);
+  document.getElementById('kpis').innerHTML =
+    '<div class="kpi accent"><div class="v">' + eur(ht) + '</div><div class="l">CA signé</div></div>' +
+    '<div class="kpi"><div class="v" style="color:var(--ok)">' + eur(enc) + '</div><div class="l">CA encaissé</div></div>' +
+    '<div class="kpi"><div class="v">' + eur(ht - enc) + '</div><div class="l">Reste à encaisser</div></div>' +
+    '<div class="kpi' + (late.length ? ' warn' : '') + '"><div class="v">' + eur(lateSum) + '</div><div class="l">Impayés / en retard</div><div class="s">' + late.length + ' facture(s)</div></div>';
+  const c = document.getElementById('count-imp'); c.hidden = !late.length; c.textContent = late.length;
+
+  // Par étude (lecture seule)
+  const q = document.getElementById('e-q').value.toLowerCase(), st = document.getElementById('e-state').value;
+  const le = E.filter(e => (!q || [e.reference, e.client_name].join(' ').toLowerCase().includes(q)) &&
+    (!st || (st === 'reste' ? cashed(e) < num(e.montant_ht) : cashed(e) >= num(e.montant_ht))))
+    .sort((a, b) => (num(b.montant_ht) - cashed(b)) - (num(a.montant_ht) - cashed(a)));
+  document.getElementById('e-body').innerHTML = le.length ? le.map(e => {
+    const m = num(e.montant_ht), k = cashed(e), p = pct(k, m);
+    return '<tr><td><span class="ref">' + esc(e.reference || '—') + '</span></td><td>' + esc(e.client_name || '—') + '</td><td><span class="badge ' + (ETUDE_BADGE[e.statut] || '') + '">' + esc(e.statut) + '</span></td>' +
+      '<td class="num"><b>' + eur(m) + '</b></td><td class="num">' + eur(factured(e)) + '</td><td class="num" style="color:var(--ok)">' + eur(k) + '</td>' +
+      '<td><div class="row" style="flex-wrap:nowrap"><div class="bar ' + (p >= 100 ? 'ok' : '') + '"><i style="width:' + Math.min(100, p) + '%"></i></div><span class="muted">' + p + '%</span></div></td>' +
+      '<td class="num">' + (m - k > 0 ? '<b style="color:var(--warn)">' + eur(m - k) + '</b>' : '<span class="badge b-ok">soldée</span>') + '</td></tr>';
+  }).join('') : '<tr><td colspan="8" class="empty">Aucune étude signée.</td></tr>';
+
+  // Factures
+  const fs = document.getElementById('f-statut'), fv = fs.value; fs.innerHTML = options(['En attente', 'Encaissée', 'Impayée'], '', 'Tous statuts'); fs.value = fv;
+  const fq = document.getElementById('f-q').value.toLowerCase();
+  const lf = S.factures.filter(f => (!fq || [f.numero, f.client_name, f.etude_ref].join(' ').toLowerCase().includes(fq)) && (!fv || f.statut === fv))
+    .sort((a, b) => (b.date_emission || '').localeCompare(a.date_emission || ''));
+  document.getElementById('f-body').innerHTML = lf.length ? lf.map(f => '<tr><td><b>' + esc(f.numero) + '</b><div class="muted">' + esc(f.type || '') + '</div></td><td><span class="ref">' + esc(f.etude_ref || '—') + '</span></td><td>' + esc(f.client_name || '—') + '</td>' +
+    '<td class="num"><b>' + eur(f.montant_ht) + '</b></td><td>' + fmtDate(f.date_emission) + '</td><td' + (isLate(f) ? ' style="color:var(--bad);font-weight:600"' : '') + '>' + fmtDate(f.date_echeance) + '</td>' +
+    '<td>' + (CAN_EDIT ? '<select class="input" style="width:auto;padding:4px 8px" data-statut="' + f.id + '">' + options(['En attente', 'Encaissée', 'Impayée'], f.statut) + '</select>' : '<span class="badge ' + statutBadge(f) + '">' + esc(f.statut) + '</span>') + '</td>' +
+    '<td>' + (CAN_EDIT ? '<button class="btn sm ghost" data-action="edit" data-id="' + f.id + '">Modifier</button><button class="icon-btn" data-action="del" data-id="' + f.id + '">×</button>' : '') + '</td></tr>').join('')
+    : '<tr><td colspan="8" class="empty">Aucune facture.</td></tr>';
+
+  // Impayés
+  document.getElementById('imp-body').innerHTML = late.length ? '<div class="list">' + late.sort((a, b) => (a.date_echeance || '').localeCompare(b.date_echeance || '')).map(f =>
+    '<div class="item row"><b>' + esc(f.numero) + '</b><span class="grow">' + esc(f.client_name || '') + ' <span class="ref">' + esc(f.etude_ref || '') + '</span></span>' +
+    '<span class="badge b-bad">' + (f.date_echeance ? daysBetween(f.date_echeance, today()) + ' j de retard' : 'impayée') + '</span><b>' + eur(f.montant_ht) + '</b>' +
+    (CAN_EDIT ? '<button class="btn sm" data-action="cash" data-id="' + f.id + '">Marquer encaissée</button>' : '') + '</div>').join('') + '</div>'
+    : '<div class="alert info"><span>Aucun impayé ni retard. 🎉</span></div>';
+}
+
+document.addEventListener('change', ev => {
+  const id = ev.target.dataset && ev.target.dataset.statut; if (!id) return;
+  const f = S.factures.find(x => x.id === id), statut = ev.target.value;
+  db.collection('factures').doc(id).update({ statut, date_encaissement: statut === 'Encaissée' ? (f.date_encaissement || today()) : '' })
+    .then(() => syncEtude(f.etude_id)).then(() => toast('Statut mis à jour')).catch(fail);
+});
+
+function openForm(f) {
+  S.editId = f ? f.id : null;
+  document.getElementById('mf-title').textContent = f ? 'Modifier la facture' : 'Nouvelle facture';
+  document.getElementById('mf-etude').innerHTML = options(signed().sort((a, b) => (a.reference || '').localeCompare(b.reference || '')).map(e => ({ value: e.id, label: (e.reference || '—') + ' — ' + (e.client_name || '') })), f ? f.etude_id : '', '— Choisir —');
+  fillForm(document.getElementById('mf-form'), f || { statut: 'En attente', type: 'Acompte', date_emission: today(), date_echeance: addDays(today(), 30) });
+  openModal('m-facture');
+}
+async function save() {
+  const f = readForm(document.getElementById('mf-form'));
+  if (!f.numero || !f.etude_id || !f.montant_ht || !f.date_emission || !f.date_echeance) return toast('Remplis les champs obligatoires', true);
+  if (S.factures.some(x => x.id !== S.editId && x.numero === f.numero)) return toast('Ce numéro de facture existe déjà', true);
+  const e = S.etudes.find(x => x.id === f.etude_id);
+  Object.assign(f, { etude_ref: e.reference || '', client_name: e.client_name || '' });
+  if (f.statut === 'Encaissée' && !f.date_encaissement) f.date_encaissement = today();
+  const old = S.editId && S.factures.find(x => x.id === S.editId);
+  if (S.editId) await db.collection('factures').doc(S.editId).update(f);
+  else await db.collection('factures').add(Object.assign(f, { created_by: App.user.email, created_at: FV.serverTimestamp() }));
+  await syncEtude(f.etude_id);
+  if (old && old.etude_id !== f.etude_id) await syncEtude(old.etude_id);
+  closeModal('m-facture'); toast('Facture enregistrée');
+}
+
+/* Import SAGE : Date | Code client | Nom client */
+function readFile(ev) {
+  const file = ev.target.files[0]; if (!file) return;
+  const go = () => {
+    const r = new FileReader();
+    r.onload = e => {
+      const wb = XLSX.read(e.target.result, { type: 'array' });
+      const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, defval: '' }).filter(r => r.some(c => String(c).trim()));
+      const head = rows[0].map(h => String(h).toLowerCase());
+      const ci = k => head.findIndex(h => h.includes(k));
+      const iCode = ci('code'), iNom = head.findIndex(h => h.includes('nom') || h.includes('client') && !h.includes('code')), iDate = ci('date');
+      if (iCode < 0 || iNom < 0) return toast('Colonnes « Code client » et « Nom client » introuvables', true);
+      S.rows = rows.slice(1).map(r => ({ date: r[iDate] || '', code: String(r[iCode]).trim(), nom: String(r[iNom]).trim() })).filter(r => r.code && r.nom);
+      const match = r => S.clients.find(c => (c.company_name || '').trim().toLowerCase() === r.nom.toLowerCase());
+      document.getElementById('preview').innerHTML = '<p><b>' + S.rows.length + '</b> lignes · ' + S.rows.filter(match).length + ' clients reconnus · ' + S.rows.filter(r => !match(r)).length + ' nouveaux</p>' +
+        '<div class="table-wrap" style="max-height:300px;overflow:auto"><table class="t"><thead><tr><th>Date</th><th>Code</th><th>Nom</th><th></th></tr></thead><tbody>' +
+        S.rows.slice(0, 200).map(r => '<tr><td>' + esc(r.date) + '</td><td><b>' + esc(r.code) + '</b></td><td>' + esc(r.nom) + '</td><td>' + (match(r) ? '<span class="badge b-ok">existant</span>' : '<span class="badge b-info">nouveau</span>') + '</td></tr>').join('') +
+        '</tbody></table></div><button class="btn primary" style="margin-top:12px" data-action="import">Importer</button>';
+    };
+    r.readAsArrayBuffer(file);
+  };
+  if (window.XLSX) go(); else { const s = document.createElement('script'); s.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js'; s.onload = go; document.head.appendChild(s); }
+}
+async function doImport() {
+  let n = 0, created = 0;
+  for (const r of S.rows) {
+    const c = S.clients.find(x => (x.company_name || '').trim().toLowerCase() === r.nom.toLowerCase());
+    if (c) { await db.collection('clients').doc(c.id).update({ code_comptable: r.code, sage_date: String(r.date) }); n++; }
+    else { await db.collection('clients').add({ company_name: r.nom, code_comptable: r.code, sage_date: String(r.date), status: 'Actif', source: 'sage', contacts: [], created_at_str: today(), created_at: FV.serverTimestamp() }); created++; }
+  }
+  document.getElementById('preview').innerHTML = '<div class="alert info"><span>' + n + ' clients mis à jour, ' + created + ' créés.</span></div>';
+  document.getElementById('file').value = '';
+}
+
+onActions({
+  tab: el => { S.tab = el.dataset.t; document.querySelectorAll('#tabs .tab').forEach(b => b.classList.toggle('on', b === el)); ['etudes', 'factures', 'impayes', 'import'].forEach(t => { document.getElementById('t-' + t).hidden = t !== S.tab; }); },
+  add: () => openForm(null),
+  edit: el => openForm(S.factures.find(x => x.id === el.dataset.id)),
+  save: () => save().catch(fail),
+  del: el => { const f = S.factures.find(x => x.id === el.dataset.id); if (confirm('Supprimer la facture ' + f.numero + ' ?')) db.collection('factures').doc(f.id).delete().then(() => syncEtude(f.etude_id)).then(() => toast('Facture supprimée')).catch(fail); },
+  cash: el => { const f = S.factures.find(x => x.id === el.dataset.id); db.collection('factures').doc(f.id).update({ statut: 'Encaissée', date_encaissement: today() }).then(() => syncEtude(f.etude_id)).then(() => toast('Encaissée')).catch(fail); },
+  import: () => doImport().catch(fail),
+  export: () => {
+    const r1 = [['Référence', 'Client', 'Statut', 'Montant HT', 'Facturé', 'Encaissé', 'Reste']];
+    signed().forEach(e => r1.push([e.reference, e.client_name, e.statut, num(e.montant_ht), factured(e), cashed(e), num(e.montant_ht) - cashed(e)]));
+    const r2 = [['N°', 'Type', 'Étude', 'Client', 'Montant HT', 'Émission', 'Échéance', 'Statut', 'Encaissement']];
+    S.factures.forEach(f => r2.push([f.numero, f.type, f.etude_ref, f.client_name, num(f.montant_ht), f.date_emission, f.date_echeance, f.statut, f.date_encaissement]));
+    exportExcel('Comptabilite_' + today() + '.xlsx', { 'Par étude': r1, Factures: r2 });
+  }
+});
+</script>
+</body>
+</html>

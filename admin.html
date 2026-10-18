@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Administration — My-ICN-JC</title>
+<link rel="icon" href="assets/logo-mark.png"><link rel="stylesheet" href="assets/app.css">
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script src="assets/core.js"></script>
+</head>
+<body>
+<main hidden>
+  <div class="page-head"><div><h1>Administration</h1><div class="sub">Membres, accès externes, mandats et paramètres</div></div>
+    <div class="actions"><button class="btn primary" data-action="add" id="btn-add">+ Membre</button></div></div>
+  <div class="tabs" id="tabs">
+    <button class="tab on" data-action="tab" data-t="members">Membres</button>
+    <button class="tab" data-action="tab" data-t="external">Accès externes</button>
+    <button class="tab" data-action="tab" data-t="mandats">Mandats</button>
+    <button class="tab" data-action="tab" data-t="settings">Paramètres</button>
+  </div>
+  <section id="t-members">
+    <div class="filters"><input type="search" id="m-q" placeholder="Nom, email…"><span class="muted" id="m-count"></span></div>
+    <div class="table-wrap"><div class="table-scroll"><table class="t"><thead><tr><th>Membre</th><th>Rôles</th><th>Prospecte</th><th>Membre du CA</th><th></th></tr></thead><tbody id="m-body"></tbody></table></div></div>
+  </section>
+  <section id="t-external" hidden>
+    <p class="muted" style="margin-top:0">Pour les personnes sans adresse @icnjuniorconseil.com. Elles se connectent avec leur compte Google habituel.</p>
+    <div class="table-wrap"><div class="table-scroll"><table class="t"><thead><tr><th>Personne</th><th>Accès</th><th>Ajouté le</th><th></th></tr></thead><tbody id="x-body"></tbody></table></div></div>
+    <div class="card" style="margin-top:16px"><h3>Ce que voit chaque accès externe</h3><dl class="kv">
+      <dt>Tuteur</dt><dd>Accueil, prospection (vue CA, tous les prospects, après RDV), études et indicateurs — en lecture seule.</dd>
+      <dt>Commercial externe</dt><dd>Prospection, clients, intervenants, études, comptabilité (lecture) et ses missions.</dd>
+      <dt>Intervenant</dt><dd>Uniquement « Mes missions ». Inutile de l'ajouter ici s'il a une fiche dans « Intervenants » avec son email : l'accès est automatique.</dd>
+      <dt>Membre COS</dt><dd>Les mêmes accès qu'un membre COS interne.</dd></dl></div>
+  </section>
+  <section id="t-mandats" hidden><div id="mandats"></div></section>
+  <section id="t-settings" hidden>
+    <div class="card" style="max-width:640px"><div class="form" id="settings-form">
+      <div class="field"><label>Objectif hebdomadaire de premiers contacts</label><input type="number" min="1" data-f="objectif_semaine"><div class="hint">Par commercial actif. Modifiable aussi depuis la prospection.</div></div>
+      <div class="field full"><label>Lien Sphinx par défaut</label><input data-f="sphinx_url" placeholder="https://…"><div class="hint">Proposé quand on envoie le questionnaire de fin de mission</div></div>
+      <div class="full"><button class="btn primary" data-action="save-settings">Enregistrer</button></div>
+    </div></div>
+  </section>
+</main>
+
+<div class="modal" id="m-user"><div class="modal-box">
+  <div class="modal-head"><h2 id="u-title">Nouveau membre</h2><button class="x" data-close="m-user">×</button></div>
+  <div class="modal-body"><div class="form" id="u-form">
+    <div class="field"><label>Prénom *</label><input data-f="prenom"></div><div class="field"><label>Nom *</label><input data-f="nom"></div>
+    <div class="field full"><label>Email *</label><input data-f="email" type="email" placeholder="prenom.nom@icnjuniorconseil.com"></div>
+    <div class="field full"><label>Rôles</label><div class="chips" id="u-roles"></div><div class="hint">Plusieurs rôles possibles : les accès s'additionnent.</div></div>
+    <div class="field"><label><input type="checkbox" data-f="prospecte"> Prospecte</label><div class="hint">Compte dans les objectifs et le classement</div></div>
+    <div class="field"><label><input type="checkbox" data-f="membre_ca"> Membre du CA</label><div class="hint">Accès à la vue CA de la prospection</div></div>
+  </div></div>
+  <div class="modal-foot"><button class="btn" data-close="m-user">Annuler</button><button class="btn primary" data-action="save-user">Enregistrer</button></div>
+</div></div>
+
+<div class="modal" id="m-ext"><div class="modal-box">
+  <div class="modal-head"><h2>Nouvel accès externe</h2><button class="x" data-close="m-ext">×</button></div>
+  <div class="modal-body"><div class="form" id="x-form">
+    <div class="field"><label>Prénom</label><input data-f="prenom"></div><div class="field"><label>Nom</label><input data-f="nom"></div>
+    <div class="field full"><label>Email Google *</label><input data-f="email" type="email" placeholder="exemple@gmail.com"></div>
+    <div class="field full"><label>Accès</label><select data-f="role"><option value="tuteur">Tuteur</option><option value="commercial_ext">Commercial externe</option><option value="intervenant">Intervenant</option><option value="membre_cos">Membre COS</option></select></div>
+  </div></div>
+  <div class="modal-foot"><button class="btn" data-close="m-ext">Annuler</button><button class="btn primary" data-action="save-ext">Ajouter</button></div>
+</div></div>
+
+<div class="modal" id="m-mandat"><div class="modal-box wide">
+  <div class="modal-head"><h2 id="md-title">Nouveau mandat</h2><button class="x" data-close="m-mandat">×</button></div>
+  <div class="modal-body"><div class="form" id="md-form">
+    <div class="field"><label>Nom du mandat *</label><input data-f="label" placeholder="2026-2027"></div>
+    <div class="field"><label>Statut</label><select data-f="statut"><option value="actif">En cours</option><option value="clos">Clos</option></select></div>
+    <div class="field"><label>Début *</label><input type="date" data-f="date_debut"></div><div class="field"><label>Fin *</label><input type="date" data-f="date_fin"></div>
+    <div class="field full"><label>Président(e)</label><select data-f="president_email" id="md-pres"></select></div>
+  </div>
+  <h3 class="section-title" style="font-size:15px">Valeurs saisies à la main</h3>
+  <p class="muted" style="margin-top:0">Le cash disponible n'existe pas dans le site : saisis-le ici. Pour les anciens mandats sans données dans le site, tu peux aussi saisir leurs chiffres historiques : ils servent dans la comparaison des mandats.</p>
+  <div class="form" id="md-kpi">
+    <div class="field"><label>Cash disponible (€)</label><input type="number" data-k="kpi_treso.cash_disponible"></div>
+    <div class="field"><label>Marge nette moyenne (%)</label><input type="number" data-k="kpi_treso.marge_nette_moy"></div>
+    <div class="field"><label>Coût moyen par étude (€)</label><input type="number" data-k="kpi_treso.cout_moyen_etude"></div>
+    <div class="field"><label>Nb membres du CA</label><input type="number" data-k="kpi_commercial.nb_membres_ca"></div>
+    <div class="field"><label>Historique — CA signé (€)</label><input type="number" data-k="kpi_treso.ca_signe"></div>
+    <div class="field"><label>Historique — CA encaissé (€)</label><input type="number" data-k="kpi_treso.ca_encaisse"></div>
+    <div class="field"><label>Historique — Nb études</label><input type="number" data-k="kpi_treso.nb_etudes"></div>
+    <div class="field"><label>Historique — Nb intervenants</label><input type="number" data-k="kpi_treso.nb_intervenants"></div>
+    <div class="field"><label>Historique — Prospects contactés</label><input type="number" data-k="kpi_commercial.nb_prospects"></div>
+    <div class="field"><label>Historique — Taux de conversion (%)</label><input type="number" data-k="kpi_commercial.taux_conversion"></div>
+  </div></div>
+  <div class="modal-foot"><button class="btn" data-close="m-mandat">Annuler</button><button class="btn primary" data-action="save-mandat">Enregistrer</button></div>
+</div></div>
+
+<script>
+const INTERNAL_ROLES = ROLE_ORDER.filter(r => !['intervenant', 'tuteur', 'commercial_ext'].includes(r));
+const S = { users: [], ext: [], mandats: [], tab: 'members', editUser: null, editMandat: null, roles: [] };
+let IS_SA;
+
+App.start('admin', () => {
+  IS_SA = App.isSA();
+  watch(db.collection('users'), l => { S.users = l; render(); });
+  watch(db.collection('whitelist_emails'), l => { S.ext = l; render(); });
+  watch(db.collection('mandats'), l => { S.mandats = l.sort((a, b) => (b.date_debut || '').localeCompare(a.date_debut || '')); render(); });
+  Promise.all([db.collection('crm_config').doc('objectifs').get(), db.collection('crm_config').doc('parametres').get()]).then(([o, p]) => {
+    fillForm(document.getElementById('settings-form'), { objectif_semaine: o.exists ? o.data().objectif_semaine : 10, sphinx_url: p.exists ? p.data().sphinx_url : '' });
+  });
+  document.getElementById('m-q').addEventListener('input', render);
+});
+
+const roleBadges = roles => roles.map(r => '<span class="badge ' + (r === 'super_admin' ? 'b-pink' : CA.includes(r) ? 'b-violet' : '') + '">' + esc(ROLE_LABELS[r] || r) + '</span>').join(' ');
+const rolesOf = u => Array.isArray(u.roles) && u.roles.length ? u.roles : (u.role ? [u.role] : []);
+
+function render() {
+  const q = document.getElementById('m-q').value.toLowerCase();
+  const users = S.users.filter(u => !q || [fullName(u), u.id].join(' ').toLowerCase().includes(q)).sort((a, b) => (a.nom || '').localeCompare(b.nom || ''));
+  document.getElementById('m-count').textContent = users.length + ' membres';
+  document.getElementById('m-body').innerHTML = users.map(u => '<tr><td><div class="row" style="flex-wrap:nowrap"><span class="avatar">' + esc(initials(u.prenom, u.nom)) + '</span><div><b>' + esc(fullName(u)) + '</b><div class="muted">' + esc(u.id) + '</div></div></div></td>' +
+    '<td>' + roleBadges(rolesOf(u)) + '</td><td>' + (u.prospecte ? '<span class="badge b-ok">oui</span>' : '<span class="muted">non</span>') + '</td><td>' + (u.membre_ca ? '<span class="badge b-violet">oui</span>' : '<span class="muted">non</span>') + '</td>' +
+    '<td class="num"><button class="btn sm" data-action="edit-user" data-id="' + esc(u.id) + '">Modifier</button>' + (u.id !== App.user.email ? '<button class="icon-btn" data-action="del-user" data-id="' + esc(u.id) + '">×</button>' : '') + '</td></tr>').join('') || '<tr><td colspan="5" class="empty">Aucun membre.</td></tr>';
+  document.getElementById('x-body').innerHTML = S.ext.length ? S.ext.map(x => '<tr><td><b>' + esc(((x.prenom || '') + ' ' + (x.nom || '')).trim() || '—') + '</b><div class="muted">' + esc(x.id) + '</div></td>' +
+    '<td><span class="badge b-info">' + esc(ROLE_LABELS[x.role] || x.role) + '</span></td><td>' + fmtDate(x.added_at) + '</td><td class="num"><button class="icon-btn" data-action="del-ext" data-id="' + esc(x.id) + '">×</button></td></tr>').join('')
+    : '<tr><td colspan="4" class="empty">Aucun accès externe.</td></tr>';
+  document.getElementById('mandats').innerHTML = (IS_SA ? '' : '<div class="readonly-note">Seul un Super Admin peut créer ou modifier les mandats.</div>') +
+    (S.mandats.length ? '<div class="list">' + S.mandats.map(m => '<div class="item row"><b style="font-size:16px">' + esc(m.label || m.id) + '</b>' +
+      (m.statut === 'actif' ? '<span class="badge b-ok">en cours</span>' : '<span class="badge">clos</span>') + '<span class="grow muted">' + fmtDate(m.date_debut) + ' → ' + fmtDate(m.date_fin) +
+      (m.president_email ? ' · ' + esc(fullName(S.users.find(u => u.id === m.president_email)) || m.president_email) : '') + '</span>' +
+      (IS_SA ? '<button class="btn sm" data-action="edit-mandat" data-id="' + esc(m.id) + '">Modifier</button>' : '') + '</div>').join('') + '</div>' : '<div class="card empty">Aucun mandat.</div>');
+  document.getElementById('btn-add').hidden = S.tab === 'settings' || (S.tab === 'mandats' && !IS_SA);
+  document.getElementById('btn-add').textContent = { members: '+ Membre', external: '+ Accès externe', mandats: '+ Mandat' }[S.tab] || '';
+}
+
+function openUser(u) {
+  S.editUser = u ? u.id : null; S.roles = u ? rolesOf(u).slice() : [];
+  document.getElementById('u-title').textContent = u ? 'Modifier — ' + fullName(u) : 'Nouveau membre';
+  fillForm(document.getElementById('u-form'), u ? Object.assign({ email: u.id }, u) : { prospecte: false, membre_ca: false });
+  document.querySelector('#u-form [data-f=email]').disabled = !!u;
+  renderRoleChips(); openModal('m-user');
+}
+function renderRoleChips() {
+  document.getElementById('u-roles').innerHTML = INTERNAL_ROLES.filter(r => r !== 'super_admin' || IS_SA)
+    .map(r => '<button class="chip' + (S.roles.includes(r) ? ' on' : '') + '" data-action="role" data-r="' + r + '">' + esc(ROLE_LABELS[r]) + '</button>').join('');
+}
+async function saveUser() {
+  const f = readForm(document.getElementById('u-form'));
+  const email = (S.editUser || f.email || '').toLowerCase().trim();
+  if (!f.prenom || !f.nom || !email.includes('@')) return toast('Prénom, nom et email sont obligatoires', true);
+  if (!S.roles.length) return toast('Choisis au moins un rôle', true);
+  if (!S.editUser && S.users.some(u => u.id === email)) return toast('Ce membre existe déjà', true);
+  const roles = S.roles.slice().sort((a, b) => ROLE_ORDER.indexOf(a) - ROLE_ORDER.indexOf(b));
+  await db.collection('users').doc(email).set({ prenom: f.prenom, nom: f.nom.toUpperCase(), email, roles, role: roles[0], prospecte: !!f.prospecte, membre_ca: !!f.membre_ca,
+    updated_at: FV.serverTimestamp() }, { merge: true });
+  closeModal('m-user'); toast('Membre enregistré');
+}
+function openMandat(m) {
+  S.editMandat = m ? m.id : null;
+  document.getElementById('md-title').textContent = m ? 'Modifier le mandat ' + (m.label || m.id) : 'Nouveau mandat';
+  document.getElementById('md-pres').innerHTML = options(S.users.map(u => ({ value: u.id, label: fullName(u) })), m ? m.president_email : '', '—');
+  fillForm(document.getElementById('md-form'), m || { statut: 'actif' });
+  document.querySelector('#md-form [data-f=label]').disabled = !!m;
+  document.querySelectorAll('#md-kpi [data-k]').forEach(inp => { const [g, k] = inp.dataset.k.split('.'); const v = m && m[g] ? m[g][k] : ''; inp.value = v || v === 0 ? v : ''; });
+  openModal('m-mandat');
+}
+async function saveMandat() {
+  const f = readForm(document.getElementById('md-form'));
+  if (!f.label || !f.date_debut || !f.date_fin) return toast('Nom et dates sont obligatoires', true);
+  if (f.date_debut > f.date_fin) return toast('La date de début doit précéder la date de fin', true);
+  const id = S.editMandat || f.label.replace(/[^\w-]+/g, '-');
+  if (!S.editMandat && S.mandats.some(m => m.id === id)) return toast('Ce mandat existe déjà', true);
+  const data = { label: S.editMandat ? (S.mandats.find(m => m.id === id).label || id) : f.label, statut: f.statut, date_debut: f.date_debut, date_fin: f.date_fin, president_email: f.president_email, updated_at: FV.serverTimestamp() };
+  document.querySelectorAll('#md-kpi [data-k]').forEach(inp => { const [g, k] = inp.dataset.k.split('.'); data[g] = data[g] || {}; data[g][k] = inp.value === '' ? 0 : num(inp.value); });
+  const batch = db.batch();
+  batch.set(db.collection('mandats').doc(id), data, { merge: true });
+  if (f.statut === 'actif') S.mandats.filter(m => m.id !== id && m.statut === 'actif').forEach(m => batch.update(db.collection('mandats').doc(m.id), { statut: 'clos' }));
+  await batch.commit();
+  closeModal('m-mandat'); toast('Mandat enregistré');
+}
+
+onActions({
+  tab: el => { S.tab = el.dataset.t; document.querySelectorAll('#tabs .tab').forEach(b => b.classList.toggle('on', b === el)); ['members', 'external', 'mandats', 'settings'].forEach(t => { document.getElementById('t-' + t).hidden = t !== S.tab; }); render(); },
+  add: () => S.tab === 'members' ? openUser(null) : S.tab === 'external' ? (fillForm(document.getElementById('x-form'), { role: 'tuteur' }), openModal('m-ext')) : openMandat(null),
+  'edit-user': el => openUser(S.users.find(u => u.id === el.dataset.id)),
+  'del-user': el => { if (confirm('Retirer l’accès de ' + el.dataset.id + ' ?')) db.collection('users').doc(el.dataset.id).delete().then(() => toast('Membre retiré')).catch(fail); },
+  role: el => { const r = el.dataset.r, i = S.roles.indexOf(r); if (i >= 0) S.roles.splice(i, 1); else S.roles.push(r); renderRoleChips(); },
+  'save-user': () => saveUser().catch(fail),
+  'save-ext': () => {
+    const f = readForm(document.getElementById('x-form')), email = f.email.toLowerCase();
+    if (!email.includes('@')) return toast('Email invalide', true);
+    if (email.endsWith('@' + DOMAIN)) return toast('Adresse ICN : ajoute-la plutôt dans « Membres »', true);
+    db.collection('whitelist_emails').doc(email).set({ prenom: f.prenom, nom: f.nom, role: f.role, added_by: App.user.email, added_at: today() })
+      .then(() => { closeModal('m-ext'); toast('Accès ajouté'); }).catch(fail);
+  },
+  'del-ext': el => { if (confirm('Retirer l’accès de ' + el.dataset.id + ' ?')) db.collection('whitelist_emails').doc(el.dataset.id).delete().then(() => toast('Accès retiré')).catch(fail); },
+  'edit-mandat': el => openMandat(S.mandats.find(m => m.id === el.dataset.id)),
+  'save-mandat': () => saveMandat().catch(fail),
+  'save-settings': () => {
+    const f = readForm(document.getElementById('settings-form'));
+    Promise.all([db.collection('crm_config').doc('objectifs').set({ objectif_semaine: num(f.objectif_semaine, 10) }, { merge: true }),
+      db.collection('crm_config').doc('parametres').set({ sphinx_url: f.sphinx_url }, { merge: true })]).then(() => toast('Paramètres enregistrés')).catch(fail);
+  }
+});
+</script>
+</body>
+</html>

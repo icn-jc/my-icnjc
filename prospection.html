@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Prospection — My-ICN-JC</title>
+<link rel="icon" href="assets/logo-mark.png"><link rel="stylesheet" href="assets/app.css">
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="assets/core.js"></script>
+</head>
+<body>
+<main hidden>
+  <div class="page-head">
+    <div><h1>Prospection</h1><div class="sub" id="sub"></div></div>
+    <div class="actions">
+      <button class="btn" data-action="export">Export Excel</button>
+      <button class="btn primary" data-action="add" id="btn-add" hidden>+ Prospect</button>
+    </div>
+  </div>
+  <div id="readonly" class="readonly-note" hidden>Accès en lecture seule : tu peux consulter et filtrer, sans modifier.</div>
+
+  <div class="tabs" id="tabs"></div>
+
+  <!-- VUE CA -->
+  <section id="tab-ca" hidden>
+    <div class="row" style="margin-bottom:14px">
+      <button class="btn sm" data-action="week" data-d="-1">‹</button>
+      <b id="week-label"></b>
+      <button class="btn sm" data-action="week" data-d="1">›</button>
+      <button class="btn sm ghost" data-action="week" data-d="0">Cette semaine</button>
+      <span class="grow"></span>
+      <span class="muted" id="goal-label"></span>
+      <button class="btn sm" data-action="edit-goal" id="btn-goal" hidden>Modifier l'objectif</button>
+    </div>
+    <div class="kpis" id="ca-kpis"></div>
+    <div class="grid2">
+      <div class="card"><h3>Classement de la semaine</h3><div id="ranking"></div></div>
+      <div class="card"><h3>Pipeline</h3><div class="kpis" style="margin:0" id="pipeline"></div><div id="orphans"></div></div>
+    </div>
+    <div class="card" style="margin-top:16px">
+      <div class="row" style="margin-bottom:10px"><h3 style="margin:0" class="grow">Premiers contacts par période</h3>
+        <select class="input" style="width:auto" id="chart-period">
+          <option value="week">12 dernières semaines</option><option value="month">12 derniers mois</option><option value="quarter">8 derniers trimestres</option>
+        </select></div>
+      <div style="height:260px"><canvas id="chart"></canvas></div>
+    </div>
+  </section>
+
+  <!-- MES PROSPECTS -->
+  <section id="tab-mine" hidden>
+    <div class="kpis" id="mine-kpis"></div>
+    <div class="filters">
+      <input type="search" id="mine-q" placeholder="Rechercher…">
+      <select id="mine-status"></select>
+      <label class="muted"><input type="checkbox" id="mine-due"> À relancer uniquement</label>
+    </div>
+    <div class="table-wrap"><div class="table-scroll"><table class="t"><thead><tr>
+      <th>Entreprise</th><th>Contact</th><th>Statut</th><th>Priorité</th><th>Dernier contact</th><th>Prochaine action</th><th class="num">Montant</th>
+    </tr></thead><tbody id="mine-body"></tbody></table></div></div>
+  </section>
+
+  <!-- TOUS -->
+  <section id="tab-all" hidden>
+    <div class="filters">
+      <input type="search" id="all-q" placeholder="Entreprise, contact…">
+      <select id="all-owner"></select>
+      <select id="all-status"></select>
+      <select id="all-sector"></select>
+      <select id="all-week"></select>
+      <button class="btn sm ghost" data-action="reset-all">Réinitialiser</button>
+      <span class="muted" id="all-count"></span>
+    </div>
+    <div class="table-wrap"><div class="table-scroll"><table class="t"><thead><tr>
+      <th>Entreprise</th><th>Secteur</th><th>Responsable</th><th>Statut</th><th>1er contact</th><th>Dernier contact</th><th class="num">Montant</th>
+    </tr></thead><tbody id="all-body"></tbody></table></div></div>
+  </section>
+
+  <!-- APRÈS RDV -->
+  <section id="tab-rdv" hidden>
+    <div class="filters"><select id="rdv-owner"></select></div>
+    <div class="section-title">À mettre à jour</div><div class="list" id="rdv-todo"></div>
+    <div class="section-title">À venir</div><div class="list" id="rdv-next"></div>
+    <div class="section-title">Traités</div><div class="list" id="rdv-done"></div>
+  </section>
+</main>
+
+<!-- Panneau prospect -->
+<aside class="panel" id="panel">
+  <div class="panel-head"><div class="grow"><h2 id="p-title"></h2><div class="row" id="p-meta" style="margin-top:6px"></div></div><button class="x" data-close="panel">×</button></div>
+  <div class="panel-body" id="p-body"></div>
+</aside>
+
+<!-- Modale prospect (ajout / modification) -->
+<div class="modal" id="m-prospect"><div class="modal-box">
+  <div class="modal-head"><h2 id="mp-title">Nouveau prospect</h2><button class="x" data-close="m-prospect">×</button></div>
+  <div class="modal-body"><div class="form" id="mp-form">
+    <div class="field full"><label>Entreprise *</label><input data-f="company_name" list="dl-companies"><div class="hint" id="mp-dup"></div></div>
+    <div class="field"><label>Secteur</label><input data-f="sector" list="dl-sectors"></div>
+    <div class="field"><label>Source</label><input data-f="source" placeholder="Cap Financial, réseau, salon…"></div>
+    <div class="field"><label>Interlocuteur</label><input data-f="contact_name"></div>
+    <div class="field"><label>Poste</label><input data-f="contact_poste"></div>
+    <div class="field"><label>Email</label><input data-f="contact_email" type="email"></div>
+    <div class="field"><label>Téléphone</label><input data-f="contact_phone"></div>
+    <div class="field"><label>Montant estimé (€)</label><input data-f="estimated_amount" type="number" min="0"></div>
+    <div class="field"><label>Priorité</label><select data-f="priority"><option>Normale</option><option>Haute</option><option>Basse</option></select></div>
+    <div class="field full"><label>Tags</label><input data-f="tags" placeholder="séparés par des virgules"></div>
+    <div class="field full"><label>Notes</label><textarea data-f="notes"></textarea></div>
+    <div class="field" data-new><label>Statut de départ</label><select data-f="status"><option>À contacter</option><option>Contacté</option></select></div>
+    <div class="field" data-new><label>Date du contact</label><input data-f="contact_date" type="date"></div>
+    <div class="field full" data-owner hidden><label>Responsable</label><select data-f="owner_email" id="mp-owner"></select></div>
+  </div></div>
+  <div class="modal-foot"><button class="btn" data-close="m-prospect">Annuler</button><button class="btn primary" data-action="save-prospect">Enregistrer</button></div>
+</div></div>
+
+<!-- Modale compte rendu de RDV -->
+<div class="modal" id="m-rdv"><div class="modal-box wide">
+  <div class="modal-head"><h2 id="mr-title">Compte rendu de RDV</h2><button class="x" data-close="m-rdv">×</button></div>
+  <div class="modal-body"><div class="form" id="mr-form">
+    <div class="field"><label>Date *</label><input data-f="date" type="date"></div>
+    <div class="field"><label>Heure</label><input data-f="heure" type="time"></div>
+    <div class="field"><label>Type</label><select data-f="type_rdv"><option>Présentiel</option><option>Visio</option><option>Téléphonique</option></select></div>
+    <div class="field"><label>Participants</label><input data-f="participants"></div>
+    <div class="field full"><label>Notes avant RDV</label><textarea data-f="notes_avant"></textarea></div>
+    <div class="field full"><label>Notes après RDV</label><textarea data-f="notes_apres"></textarea></div>
+    <div class="field"><label>Résultat *</label><select data-f="signe" id="mr-result"></select></div>
+    <div class="field"><label>Montant estimé (€)</label><input data-f="montant" type="number" min="0"></div>
+    <div class="field full"><label>Demande du client</label><textarea data-f="demande"></textarea></div>
+    <div class="field full"><label>Pourquoi pas signé ?</label><input data-f="raison"></div>
+    <div class="field"><label>Prochaine étape</label><input data-f="next"></div>
+    <div class="field"><label>Date prochaine étape</label><input data-f="next_date" type="date"></div>
+    <div class="field"><label>Urgence</label><select data-f="urgence"><option>Normale</option><option>Haute</option><option>Basse</option></select></div>
+  </div></div>
+  <div class="modal-foot"><button class="btn" data-close="m-rdv">Annuler</button><button class="btn primary" data-action="save-rdv">Enregistrer</button></div>
+</div></div>
+
+<datalist id="dl-sectors"></datalist><datalist id="dl-companies"></datalist>
+
+<script>
+const RDV_RESULTS = [
+  { v: 'En attente retour client', status: 'RDV effectué' },
+  { v: 'Proposition envoyée', status: 'Proposition envoyée' },
+  { v: 'En cours de négociation', status: 'Négociation' },
+  { v: 'Signé', status: 'Signé' },
+  { v: 'Non signé', status: 'Perdu' },
+  { v: 'RDV non effectué', status: null }
+];
+const CANAUX = ['Appel', 'Mail', 'RDV', 'LinkedIn', 'SMS', 'Autre'];
+const S = { prospects: [], users: [], rdvs: [], mandatActif: null, goal: 10, frozenGoals: {}, week: today(), tab: null, current: null, editId: null, rdvEditId: null, rdvProspectId: null, chart: null };
+let ME, CAN_EDIT, IS_CA, MANAGE_GOAL;
+
+App.start('prospection', () => {
+  ME = App.user.email;
+  CAN_EDIT = App.canEdit('prospection');
+  IS_CA = App.isCA() || App.has('tuteur');
+  MANAGE_GOAL = ['super_admin', 'president', 'vice_president', 'responsable_commercial'].some(r => App.has(r));
+  document.getElementById('sub').textContent = longDate();
+  document.getElementById('readonly').hidden = CAN_EDIT;
+  document.getElementById('btn-add').hidden = !CAN_EDIT;
+  document.getElementById('btn-goal').hidden = !MANAGE_GOAL;
+
+  const tabs = [];
+  if (IS_CA) tabs.push(['ca', 'Vue CA']);
+  if (App.user.prospecte) tabs.push(['mine', 'Mes prospects']);
+  tabs.push(['all', 'Tous les prospects'], ['rdv', 'Après RDV']);
+  document.getElementById('tabs').innerHTML = tabs.map(t => '<button class="tab" data-action="tab" data-tab="' + t[0] + '">' + t[1] + '<span class="count" id="count-' + t[0] + '" hidden></span></button>').join('');
+  setTab(tabs[0][0]);
+
+  getAll(db.collection('users')).then(u => { S.users = u; renderAll(); });
+  db.collection('mandats').where('statut', '==', 'actif').limit(1).get().then(s => { S.mandatActif = s.empty ? null : s.docs[0].id; });
+  db.collection('crm_config').doc('objectifs').get().then(d => { if (d.exists) S.goal = num(d.data().objectif_semaine, 10); renderAll(); });
+  watch(db.collection('prospects'), list => { S.prospects = list; renderAll(); if (S.current) renderPanel(); });
+  watch(db.collection('prospects_rdv'), list => { S.rdvs = list; renderAll(); });
+
+  ['mine-q', 'mine-status', 'mine-due', 'all-q', 'all-owner', 'all-status', 'all-sector', 'all-week', 'rdv-owner']
+    .forEach(id => document.getElementById(id).addEventListener('input', renderAll));
+  document.getElementById('chart-period').addEventListener('change', renderChart);
+  document.querySelector('#mp-form [data-f=company_name]').addEventListener('input', checkDuplicate);
+});
+
+/* ───────── Helpers ───────── */
+const userName = email => { const u = S.users.find(x => x.email === email || x.id === email); return u ? fullName(u) : (email || '—').split('@')[0]; };
+const prospectors = () => S.users.filter(u => u.prospecte === true);
+const isActiveOwner = email => { const u = S.users.find(x => (x.email || x.id) === email); return !!u && u.prospecte === true; };
+const canTouch = p => CAN_EDIT && (p.owner_email === ME || App.isCA());
+const statusBadge = s => '<span class="badge ' + (STATUT_BADGE[s] || '') + '">' + esc(s || '—') + '</span>';
+const goalFor = key => S.frozenGoals[key] != null ? S.frozenGoals[key] : S.goal;
+
+function setTab(t) {
+  S.tab = t;
+  document.querySelectorAll('#tabs .tab').forEach(b => b.classList.toggle('on', b.dataset.tab === t));
+  ['ca', 'mine', 'all', 'rdv'].forEach(k => { document.getElementById('tab-' + k).hidden = k !== t; });
+  renderAll();
+}
+
+function renderAll() {
+  if (!S.tab) return;
+  fillFilterLists();
+  renderRdvBadge();
+  if (S.tab === 'ca') renderCA();
+  if (S.tab === 'mine') renderMine();
+  if (S.tab === 'all') renderAllTab();
+  if (S.tab === 'rdv') renderRdv();
+}
+
+function fillFilterLists() {
+  const keep = (id, html) => { const el = document.getElementById(id); const v = el.value; el.innerHTML = html; el.value = v; };
+  const sectors = [...new Set(S.prospects.map(p => p.sector).filter(Boolean))].sort();
+  const owners = [...new Set(S.prospects.map(p => p.owner_email).filter(Boolean))].sort((a, b) => userName(a).localeCompare(userName(b)));
+  const weeks = [...new Set(S.prospects.map(p => p.first_contact_at && isoWeek(p.first_contact_at).key).filter(Boolean))].sort().reverse();
+  keep('mine-status', options(STATUTS, '', 'Tous statuts'));
+  keep('all-status', options(STATUTS, '', 'Tous statuts'));
+  keep('all-sector', options(sectors, '', 'Tous secteurs'));
+  keep('all-owner', options(owners.map(e => ({ value: e, label: userName(e) + (isActiveOwner(e) ? '' : ' (inactif)') })), '', 'Tous responsables'));
+  keep('all-week', options(weeks.map(k => ({ value: k, label: '1er contact — ' + k.replace('-W', ' · S') })), '', '1er contact : toutes semaines'));
+  keep('rdv-owner', options(owners.map(e => ({ value: e, label: userName(e) })), '', IS_CA ? 'Tous les commerciaux' : 'Tous'));
+  document.getElementById('dl-sectors').innerHTML = sectors.map(s => '<option value="' + esc(s) + '">').join('');
+}
+
+function prospectRow(p, cols) {
+  const due = p.next_action_at && p.next_action_at <= today() && !['Signé', 'Perdu'].includes(p.status);
+  const cells = {
+    company: '<td><b>' + esc(p.company_name) + '</b>' + (due ? ' <span class="badge b-bad">à relancer</span>' : '') + '</td>',
+    contact: '<td>' + esc(p.contact_name || '—') + '<div class="muted">' + esc(p.contact_poste || '') + '</div></td>',
+    sector: '<td>' + esc(p.sector || '—') + '</td>',
+    owner: '<td>' + esc(userName(p.owner_email)) + (isActiveOwner(p.owner_email) ? '' : ' <span class="badge b-warn">inactif</span>') + '</td>',
+    status: '<td>' + statusBadge(p.status) + '</td>',
+    priority: '<td>' + esc(p.priority || 'Normale') + '</td>',
+    first: '<td>' + fmtDate(p.first_contact_at) + '</td>',
+    last: '<td>' + fmtDate(p.last_contact_at) + '</td>',
+    next: '<td>' + fmtDate(p.next_action_at) + '</td>',
+    amount: '<td class="num">' + (p.estimated_amount ? eur(p.estimated_amount) : '—') + '</td>'
+  };
+  return '<tr class="click" data-action="open" data-id="' + p.id + '">' + cols.map(c => cells[c]).join('') + '</tr>';
+}
+
+/* ───────── Vue CA ───────── */
+function renderCA() {
+  const w = isoWeek(S.week);
+  document.getElementById('week-label').textContent = 'Semaine ' + w.week + ' · ' + fmtDate(w.start).slice(0, 5) + ' → ' + fmtDate(w.end);
+  if (S.frozenGoals[w.key] === undefined) {
+    S.frozenGoals[w.key] = null;
+    db.collection('crm_config').doc('objectifs_historique').collection('semaines').doc(w.key).get()
+      .then(d => { S.frozenGoals[w.key] = d.exists ? num(d.data().objectif, S.goal) : null; renderCA(); }).catch(() => {});
+  }
+  const goal = goalFor(w.key);
+  document.getElementById('goal-label').textContent = 'Objectif : ' + goal + ' contacts / commercial';
+
+  const P = S.prospects;
+  const inWeek = f => P.filter(p => inRange(p[f], w.start, w.end));
+  const contacted = inWeek('first_contact_at');
+  const rdvWeek = P.filter(p => inRange(p.rdv_date, w.start, w.end));
+  const touched = inWeek('last_contact_at');
+  const count = s => touched.filter(p => p.status === s).length;
+  const rdvToUpdate = rdvItems().filter(r => r.state === 'todo').length;
+  document.getElementById('ca-kpis').innerHTML = [
+    ['Contactés', contacted.length, 'premiers contacts', 'accent'],
+    ['RDV planifiés', rdvWeek.length, 'RDV prévus cette semaine'],
+    ['RDV à mettre à jour', rdvToUpdate, 'tous commerciaux', rdvToUpdate ? 'warn' : ''],
+    ['Propositions', count('Proposition envoyée'), 'envoyées'],
+    ['Négociations', count('Négociation'), ''],
+    ['Signés', count('Signé'), ''],
+    ['Perdus', count('Perdu'), '']
+  ].map(k => '<div class="kpi ' + (k[3] || '') + '"><div class="v">' + k[1] + '</div><div class="l">' + k[0] + '</div>' + (k[2] ? '<div class="s">' + k[2] + '</div>' : '') + '</div>').join('');
+
+  // Classement
+  const rows = prospectors().map(u => {
+    const email = u.email || u.id;
+    return { name: fullName(u), n: contacted.filter(p => p.owner_email === email).length };
+  }).sort((a, b) => b.n - a.n);
+  document.getElementById('ranking').innerHTML = rows.length ? rows.map((r, i) => {
+    const gold = i < 3 && r.n > 0;
+    return '<div class="row" style="padding:7px 0;border-bottom:1px solid var(--border)">' +
+      '<span class="badge ' + (gold ? 'b-gold' : '') + '" style="width:30px;text-align:center">' + (i + 1) + '</span>' +
+      '<span class="grow"' + (gold ? ' style="color:var(--gold);font-weight:600"' : '') + '>' + esc(r.name) + '</span>' +
+      '<div class="bar ' + (r.n >= goal ? 'ok' : '') + '" style="width:90px"><i style="width:' + Math.min(100, pct(r.n, goal)) + '%"></i></div>' +
+      '<b style="width:56px;text-align:right">' + r.n + ' / ' + goal + '</b></div>';
+  }).join('') : '<div class="muted">Aucun commercial actif (case « Prospecte » dans Administration).</div>';
+
+  // Pipeline (montants estimés des prospects en cours)
+  const open = P.filter(p => STATUTS_OUVERTS.includes(p.status));
+  const sum = l => l.reduce((a, p) => a + num(p.estimated_amount), 0);
+  const orphans = open.filter(p => !isActiveOwner(p.owner_email));
+  document.getElementById('pipeline').innerHTML =
+    '<div class="kpi accent"><div class="v">' + eur(sum(open)) + '</div><div class="l">Pipeline en cours</div><div class="s">' + open.length + ' prospects</div></div>' +
+    '<div class="kpi"><div class="v">' + eur(sum(P.filter(p => p.status === 'Négociation'))) + '</div><div class="l">En négociation</div></div>' +
+    (orphans.length ? '<div class="kpi warn"><div class="v">' + eur(sum(orphans)) + '</div><div class="l">Orphelins à réaffecter</div><div class="s">' + orphans.length + ' prospects · commercial inactif</div></div>' : '');
+  document.getElementById('orphans').innerHTML = orphans.length ? '<div class="sub-title">Prospects orphelins</div><div class="list">' +
+    orphans.slice(0, 8).map(p => '<div class="item soft row" data-action="open" data-id="' + p.id + '" style="cursor:pointer"><b class="grow">' + esc(p.company_name) + '</b><span class="muted">' + esc(userName(p.owner_email)) + '</span>' + statusBadge(p.status) + '</div>').join('') +
+    (orphans.length > 8 ? '<div class="muted">… et ' + (orphans.length - 8) + ' autres (filtre « inactif » dans Tous les prospects)</div>' : '') + '</div>' : '';
+  renderChart();
+}
+
+function renderChart() {
+  const period = document.getElementById('chart-period').value;
+  const buckets = [];
+  const now = new Date();
+  if (period === 'week') {
+    for (let i = 11; i >= 0; i--) { const w = isoWeek(addDays(today(), -7 * i)); buckets.push({ label: 'S' + w.week, a: w.start, b: w.end }); }
+  } else if (period === 'month') {
+    for (let i = 11; i >= 0; i--) { const d = new Date(now.getFullYear(), now.getMonth() - i, 1); const e = new Date(d.getFullYear(), d.getMonth() + 1, 0);
+      buckets.push({ label: MOIS[d.getMonth()].slice(0, 4) + '. ' + String(d.getFullYear()).slice(2), a: dateStr(d), b: dateStr(e) }); }
+  } else {
+    const q0 = Math.floor(now.getMonth() / 3);
+    for (let i = 7; i >= 0; i--) { const d = new Date(now.getFullYear(), (q0 - i) * 3, 1); const e = new Date(d.getFullYear(), d.getMonth() + 3, 0);
+      buckets.push({ label: 'T' + (Math.floor(d.getMonth() / 3) + 1) + ' ' + d.getFullYear(), a: dateStr(d), b: dateStr(e) }); }
+  }
+  const data = buckets.map(bk => S.prospects.filter(p => inRange(p.first_contact_at, bk.a, bk.b)).length);
+  const signed = buckets.map(bk => S.prospects.filter(p => p.status === 'Signé' && inRange(p.last_contact_at, bk.a, bk.b)).length);
+  if (!window.Chart) return;
+  if (S.chart) S.chart.destroy();
+  S.chart = new Chart(document.getElementById('chart'), {
+    type: 'bar',
+    data: { labels: buckets.map(b => b.label), datasets: [
+      { label: 'Premiers contacts', data, backgroundColor: '#3A3A9C', borderRadius: 4 },
+      { label: 'Signés', data: signed, backgroundColor: '#A3215F', borderRadius: 4 }] },
+    options: { maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } }, scales: { y: { beginAtZero: true, ticks: { precision: 0 } }, x: { grid: { display: false } } } }
+  });
+}
+
+/* ───────── Mes prospects ───────── */
+function renderMine() {
+  const mine = S.prospects.filter(p => p.owner_email === ME);
+  const w = isoWeek();
+  const weekCount = mine.filter(p => inRange(p.first_contact_at, w.start, w.end)).length;
+  const due = mine.filter(p => p.next_action_at && p.next_action_at <= today() && !['Signé', 'Perdu'].includes(p.status));
+  const goal = goalFor(w.key);
+  document.getElementById('mine-kpis').innerHTML =
+    '<div class="kpi accent"><div class="v">' + weekCount + ' / ' + goal + '</div><div class="l">Contacts cette semaine</div><div class="bar" style="margin-top:8px"><i style="width:' + Math.min(100, pct(weekCount, goal)) + '%"></i></div></div>' +
+    '<div class="kpi' + (due.length ? ' warn' : '') + '"><div class="v">' + due.length + '</div><div class="l">À relancer</div></div>' +
+    '<div class="kpi"><div class="v">' + mine.filter(p => STATUTS_OUVERTS.includes(p.status)).length + '</div><div class="l">En cours</div></div>' +
+    '<div class="kpi"><div class="v">' + eur(mine.filter(p => STATUTS_OUVERTS.includes(p.status)).reduce((a, p) => a + num(p.estimated_amount), 0)) + '</div><div class="l">Mon pipeline</div></div>';
+  const q = document.getElementById('mine-q').value.toLowerCase();
+  const st = document.getElementById('mine-status').value;
+  const onlyDue = document.getElementById('mine-due').checked;
+  const list = mine.filter(p => (!q || (p.company_name + ' ' + (p.contact_name || '')).toLowerCase().includes(q)) && (!st || p.status === st) && (!onlyDue || due.includes(p)))
+    .sort((a, b) => (a.next_action_at || '9999').localeCompare(b.next_action_at || '9999'));
+  document.getElementById('mine-body').innerHTML = list.length ? list.map(p => prospectRow(p, ['company', 'contact', 'status', 'priority', 'last', 'next', 'amount'])).join('')
+    : '<tr><td colspan="7" class="empty">Aucun prospect. Clique sur « + Prospect » pour commencer.</td></tr>';
+}
+
+/* ───────── Tous les prospects ───────── */
+function filteredAll() {
+  const q = document.getElementById('all-q').value.toLowerCase();
+  const o = document.getElementById('all-owner').value, st = document.getElementById('all-status').value;
+  const se = document.getElementById('all-sector').value, wk = document.getElementById('all-week').value;
+  return S.prospects.filter(p => (!q || (p.company_name + ' ' + (p.contact_name || '')).toLowerCase().includes(q)) &&
+    (!o || p.owner_email === o) && (!st || p.status === st) && (!se || p.sector === se) &&
+    (!wk || (p.first_contact_at && isoWeek(p.first_contact_at).key === wk)))
+    .sort((a, b) => (b.last_contact_at || '').localeCompare(a.last_contact_at || '') || (a.company_name || '').localeCompare(b.company_name || ''));
+}
+function renderAllTab() {
+  const list = filteredAll();
+  document.getElementById('all-count').textContent = list.length + ' / ' + S.prospects.length;
+  document.getElementById('all-body').innerHTML = list.length ? list.map(p => prospectRow(p, ['company', 'sector', 'owner', 'status', 'first', 'last', 'amount'])).join('')
+    : '<tr><td colspan="7" class="empty">Aucun prospect pour ces filtres.</td></tr>';
+}
+
+/* ───────── Après RDV ───────── */
+function rdvItems() {
+  const items = S.rdvs.map(r => Object.assign({}, r));
+  // Prospects en « RDV planifié » sans fiche RDV (anciennes données) → on les affiche quand même
+  S.prospects.filter(p => p.status === 'RDV planifié' && p.rdv_date && !items.some(r => r.prospect_id === p.id && r.date === p.rdv_date))
+    .forEach(p => items.push({ id: '', prospect_id: p.id, entreprise: p.company_name, date: p.rdv_date, owner_email: p.owner_email, synthetic: true }));
+  items.forEach(r => { r.state = r.signe ? 'done' : (r.date && r.date < today() ? 'todo' : 'next'); });
+  return items;
+}
+function renderRdvBadge() {
+  const n = rdvItems().filter(r => r.state === 'todo' && r.owner_email === ME).length;
+  const el = document.getElementById('count-rdv');
+  if (el) { el.hidden = !n; el.textContent = n; }
+}
+function renderRdv() {
+  const o = document.getElementById('rdv-owner').value;
+  const items = rdvItems().filter(r => (IS_CA || r.owner_email === ME) && (!o || r.owner_email === o));
+  const card = r => {
+    const p = S.prospects.find(x => x.id === r.prospect_id);
+    const late = r.state === 'todo' ? ' <span class="badge b-bad">' + daysBetween(r.date, today()) + ' j de retard</span>' : '';
+    return '<div class="item"><div class="row"><div class="grow"><b>' + esc(r.entreprise || (p && p.company_name) || '—') + '</b>' + late +
+      '<div class="muted">' + fmtDate(r.date) + (r.heure ? ' · ' + esc(r.heure) : '') + (r.type_rdv ? ' · ' + esc(r.type_rdv) : '') + ' · ' + esc(userName(r.owner_email)) +
+      (p && p.contact_name ? ' · ' + esc(p.contact_name) : '') + '</div></div>' +
+      (r.signe ? '<span class="badge ' + (r.signe === 'Signé' ? 'b-ok' : r.signe === 'Non signé' ? 'b-bad' : 'b-warn') + '">' + esc(r.signe) + '</span>' : '') +
+      ((CAN_EDIT && (r.owner_email === ME || App.isCA())) ? '<button class="btn sm ' + (r.state === 'todo' ? 'primary' : '') + '" data-action="rdv" data-id="' + esc(r.id) + '" data-pid="' + esc(r.prospect_id || '') + '" data-date="' + esc(r.date || '') + '">' + (r.signe ? 'Modifier' : 'Compte rendu') + '</button>' : '') +
+      '</div>' + (r.notes_apres || r.next ? '<div style="margin-top:8px;font-size:13px">' + (r.notes_apres ? esc(r.notes_apres) : '') + (r.next ? '<div class="muted">Suite : ' + esc(r.next) + (r.next_date ? ' (' + fmtDate(r.next_date) + ')' : '') + '</div>' : '') + '</div>' : '') + '</div>';
+  };
+  const block = (id, list, empty) => { document.getElementById(id).innerHTML = list.length ? list.map(card).join('') : '<div class="muted">' + empty + '</div>'; };
+  block('rdv-todo', items.filter(r => r.state === 'todo').sort((a, b) => a.date.localeCompare(b.date)), 'Rien à mettre à jour 👍');
+  block('rdv-next', items.filter(r => r.state === 'next').sort((a, b) => (a.date || '').localeCompare(b.date || '')), 'Aucun RDV à venir.');
+  block('rdv-done', items.filter(r => r.state === 'done').sort((a, b) => (b.date || '').localeCompare(a.date || '')).slice(0, 30), 'Aucun compte rendu.');
+}
+
+/* ───────── Panneau prospect ───────── */
+function openProspect(id) { S.current = id; renderPanel(); openPanel('panel'); loadActions(id); }
+function renderPanel() {
+  const p = S.prospects.find(x => x.id === S.current); if (!p) return;
+  document.getElementById('p-title').textContent = p.company_name;
+  document.getElementById('p-meta').innerHTML = statusBadge(p.status) + '<span class="muted">' + esc(userName(p.owner_email)) + '</span>' +
+    (p.estimated_amount ? '<b style="color:var(--bordeaux)">' + eur(p.estimated_amount) + '</b>' : '');
+  const touch = canTouch(p);
+  const kv = (k, v) => v ? '<dt>' + k + '</dt><dd>' + v + '</dd>' : '';
+  let h = '<dl class="kv">' + kv('Interlocuteur', esc(p.contact_name) + (p.contact_poste ? ' — ' + esc(p.contact_poste) : '')) +
+    kv('Email', p.contact_email ? '<a href="mailto:' + esc(p.contact_email) + '">' + esc(p.contact_email) + '</a>' : '') +
+    kv('Téléphone', p.contact_phone ? '<a href="tel:' + esc(p.contact_phone) + '">' + esc(p.contact_phone) + '</a>' : '') +
+    kv('Secteur', esc(p.sector)) + kv('Source', esc(p.source)) + kv('Priorité', esc(p.priority)) +
+    kv('1er contact', fmtDate(p.first_contact_at)) + kv('Dernier contact', fmtDate(p.last_contact_at)) +
+    kv('Prochaine action', p.next_action_at ? fmtDate(p.next_action_at) : '') + kv('RDV', p.rdv_date ? fmtDate(p.rdv_date) : '') +
+    kv('Tags', esc(Array.isArray(p.tags) ? p.tags.join(', ') : p.tags)) + kv('Notes', esc(p.notes)) + '</dl>';
+  if (touch) h += '<div class="row" style="margin-top:12px"><button class="btn sm" data-action="edit-prospect">Modifier les infos</button>' +
+    (App.isSA() ? '<button class="btn sm danger" data-action="delete-prospect">Supprimer</button>' : '') + '</div>';
+  if (App.isSA()) {
+    h += '<div class="sub-title">Réaffecter (Super Admin)</div><div class="row"><select class="input grow" id="reassign">' +
+      options(prospectors().map(u => ({ value: u.email || u.id, label: fullName(u) })), p.owner_email) + '</select><button class="btn sm dark" data-action="reassign">Réaffecter</button></div>';
+  }
+  if (touch) {
+    h += '<div class="sub-title">Enregistrer une action</div><div class="form" id="action-form">' +
+      '<div class="field"><label>Canal</label><select data-f="canal">' + options(CANAUX, 'Appel') + '</select></div>' +
+      '<div class="field"><label>Date</label><input type="date" data-f="date" value="' + today() + '"></div>' +
+      '<div class="field full"><label>Nouveau statut</label><select data-f="new_status" id="af-status">' + options(STATUTS.filter(s => s !== 'À contacter'), '', '— Statut inchangé —') + '</select></div>' +
+      '<div class="field" data-rdv hidden><label>Date du RDV *</label><input type="date" data-f="rdv_date"></div>' +
+      '<div class="field" data-rdv hidden><label>Heure</label><input type="time" data-f="rdv_heure"></div>' +
+      '<div class="field"><label>Prochaine action le</label><input type="date" data-f="next_action_at"></div>' +
+      '<div class="field"><label>Montant estimé (€)</label><input type="number" min="0" data-f="new_amount" placeholder="' + esc(p.estimated_amount || '') + '"></div>' +
+      '<div class="field full"><label>Note</label><textarea data-f="note" placeholder="Ce qui s’est dit, la suite…"></textarea></div>' +
+      '<div class="full"><button class="btn primary" data-action="save-action">Enregistrer l’action</button></div></div>';
+  }
+  h += '<div class="sub-title">Historique</div><div class="timeline" id="timeline"><div class="muted">Chargement…</div></div>';
+  document.getElementById('p-body').innerHTML = h;
+  const st = document.getElementById('af-status');
+  if (st) st.addEventListener('change', () => document.querySelectorAll('#action-form [data-rdv]').forEach(el => { el.hidden = st.value !== 'RDV planifié'; }));
+  if (S.actions && S.actions.id === p.id) renderTimeline();
+}
+function loadActions(id) {
+  S.actions = { id, list: null };
+  getAll(db.collection('prospects').doc(id).collection('actions')).then(list => {
+    if (S.current !== id) return;
+    S.actions = { id, list: list.sort((a, b) => (b.date || b.created_at || '').localeCompare(a.date || a.created_at || '')) };
+    renderTimeline();
+  }).catch(fail);
+}
+function renderTimeline() {
+  const el = document.getElementById('timeline'); if (!el || !S.actions.list) return;
+  el.innerHTML = S.actions.list.length ? S.actions.list.map(a => '<div class="tl"><b>' + esc(a.canal || 'Action') + '</b> ' +
+    (a.new_status ? statusBadge(a.new_status) : '') + ' <small>' + fmtDate(a.date || a.created_at) + ' · ' + esc(userName(a.created_by)) + '</small>' +
+    (a.rdv_date ? '<div class="muted">RDV le ' + fmtDate(a.rdv_date) + '</div>' : '') +
+    (a.new_amount ? '<div class="muted">Montant estimé : ' + eur(a.new_amount) + '</div>' : '') +
+    (a.note ? '<div style="margin-top:3px;white-space:pre-wrap">' + esc(a.note) + '</div>' : '') + '</div>').join('')
+    : '<div class="muted">Aucune action enregistrée.</div>';
+}
+
+/* Cœur métier : une action met à jour le statut, les dates, le pipeline, l'après-RDV et crée l'étude si signé. */
+async function saveAction(p, a) {
+  const newStatus = a.new_status || null;
+  const entry = { canal: a.canal || 'Autre', date: a.date, note: a.note || '', created_by: ME, created_at: a.date, created_ts: FV.serverTimestamp() };
+  if (newStatus) entry.new_status = newStatus;
+  if (a.rdv_date) entry.rdv_date = a.rdv_date;
+  if (a.next_action_at) entry.next_action_at = a.next_action_at;
+  if (a.new_amount) entry.new_amount = a.new_amount;
+  await db.collection('prospects').doc(p.id).collection('actions').add(entry);
+
+  const status = newStatus || p.status;
+  const up = { updated_at: FV.serverTimestamp() };
+  if (newStatus) up.status = newStatus;
+  if (STATUTS_VALORISES.includes(status)) {
+    up.last_contact_at = a.date;
+    up.had_valuable_contact = true;
+    if (!p.first_contact_at) up.first_contact_at = a.date; // date figée : sert au calcul des objectifs hebdo
+  }
+  if (a.rdv_date) up.rdv_date = a.rdv_date;
+  if (a.next_action_at !== undefined) up.next_action_at = a.next_action_at || '';
+  if (a.new_amount) up.estimated_amount = a.new_amount;
+  await db.collection('prospects').doc(p.id).update(up);
+
+  if (newStatus === 'RDV planifié' && a.rdv_date) {
+    await db.collection('prospects_rdv').add({ prospect_id: p.id, entreprise: p.company_name, date: a.rdv_date, heure: a.rdv_heure || '',
+      owner_email: p.owner_email, owner_name: userName(p.owner_email), signe: '', created_at: FV.serverTimestamp(), updated_at: FV.serverTimestamp() });
+  }
+  if (newStatus === 'Signé') await createEtudeFromProspect(Object.assign({}, p, up));
+}
+
+async function createEtudeFromProspect(p) {
+  const existing = await db.collection('etudes').where('prospect_id', '==', p.id).get();
+  if (!existing.empty && !confirm('Une étude existe déjà pour ce prospect. En créer une nouvelle ?')) return;
+  const yy = String(new Date().getFullYear()).slice(2);
+  const code = (p.company_name || 'XXX').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 3).padEnd(3, 'X');
+  const same = await db.collection('etudes').where('reference', '>=', yy + code).where('reference', '<=', yy + code + '99').get();
+  await db.collection('etudes').add({
+    reference: yy + code + pad(same.size + 1), title: 'Étude — ' + p.company_name, client_id: '', client_name: p.company_name,
+    prospect_id: p.id, statut: 'Signé', montant_ht: num(p.estimated_amount), montant_encaisse: 0, frais_structure: 100, taux_intervenants: 50,
+    date_signature: today(), date_debut: '', date_fin: '', responsable_email: p.owner_email || ME, phases: [], intervenants: [],
+    mandat_id: S.mandatActif || '', source: 'prospection', a_completer: true,
+    notes: 'Créée automatiquement depuis la prospection. Compléter les phases.', created_at_str: today(), created_at: FV.serverTimestamp()
+  });
+  toast('Étude créée dans « Études » (à compléter)');
+}
+
+/* ───────── Formulaire prospect ───────── */
+function openProspectForm(p) {
+  S.editId = p ? p.id : null;
+  const form = document.getElementById('mp-form');
+  document.getElementById('mp-title').textContent = p ? 'Modifier le prospect' : 'Nouveau prospect';
+  form.querySelectorAll('[data-new]').forEach(el => { el.hidden = !!p; });
+  const ownerField = form.querySelector('[data-owner]');
+  ownerField.hidden = !App.isCA();
+  document.getElementById('mp-owner').innerHTML = options(prospectors().map(u => ({ value: u.email || u.id, label: fullName(u) })).concat(
+    prospectors().some(u => (u.email || u.id) === ME) ? [] : [{ value: ME, label: fullName(App.user) + ' (moi)' }]), p ? p.owner_email : ME);
+  fillForm(form, p ? Object.assign({}, p, { tags: Array.isArray(p.tags) ? p.tags.join(', ') : (p.tags || '') })
+    : { priority: 'Normale', status: 'À contacter', contact_date: today(), owner_email: ME });
+  document.getElementById('dl-companies').innerHTML = S.prospects.map(x => '<option value="' + esc(x.company_name) + '">').join('');
+  document.getElementById('mp-dup').textContent = '';
+  openModal('m-prospect');
+}
+function checkDuplicate(ev) {
+  const v = ev.target.value.trim().toLowerCase();
+  const d = v && S.prospects.find(p => p.id !== S.editId && (p.company_name || '').trim().toLowerCase() === v);
+  document.getElementById('mp-dup').innerHTML = d ? '<span style="color:var(--bad)">Déjà suivi par ' + esc(userName(d.owner_email)) + ' (' + esc(d.status) + ')</span>' : '';
+}
+async function saveProspectForm() {
+  const f = readForm(document.getElementById('mp-form'));
+  if (!f.company_name) return toast('Le nom de l’entreprise est obligatoire', true);
+  const data = { company_name: f.company_name, sector: f.sector, source: f.source, contact_name: f.contact_name, contact_poste: f.contact_poste,
+    contact_email: f.contact_email, contact_phone: f.contact_phone, estimated_amount: f.estimated_amount || 0, priority: f.priority,
+    tags: f.tags ? f.tags.split(',').map(t => t.trim()).filter(Boolean) : [], notes: f.notes, updated_at: FV.serverTimestamp() };
+  const owner = App.isCA() && f.owner_email ? f.owner_email : null;
+  if (S.editId) {
+    if (owner) { data.owner_email = owner; data.owner_name = userName(owner); }
+    await db.collection('prospects').doc(S.editId).update(data);
+  } else {
+    const contacted = f.status === 'Contacté';
+    const date = f.contact_date || today();
+    Object.assign(data, { status: f.status, owner_email: owner || ME, owner_name: userName(owner || ME), mandat_id: S.mandatActif || '',
+      first_contact_at: contacted ? date : '', last_contact_at: contacted ? date : '', had_valuable_contact: contacted,
+      next_action_at: '', created_at: FV.serverTimestamp() });
+    const ref = await db.collection('prospects').add(data);
+    if (contacted) await ref.collection('actions').add({ canal: 'Autre', date, note: 'Premier contact', new_status: 'Contacté', created_by: ME, created_at: date, created_ts: FV.serverTimestamp() });
+  }
+  closeModal('m-prospect'); toast('Prospect enregistré');
+}
+
+/* ───────── Compte rendu RDV ───────── */
+function openRdv(id, pid, date) {
+  const r = id ? S.rdvs.find(x => x.id === id) : null;
+  const p = S.prospects.find(x => x.id === (r ? r.prospect_id : pid));
+  S.rdvEditId = id || null; S.rdvProspectId = p ? p.id : (pid || null);
+  document.getElementById('mr-title').textContent = 'Compte rendu — ' + ((r && r.entreprise) || (p && p.company_name) || '');
+  document.getElementById('mr-result').innerHTML = options(RDV_RESULTS.map(x => x.v), '', '— Choisir —');
+  fillForm(document.getElementById('mr-form'), Object.assign({ date: date || today(), type_rdv: 'Présentiel', urgence: 'Normale', montant: p ? p.estimated_amount : '' }, r || {}));
+  openModal('m-rdv');
+}
+async function saveRdv() {
+  const f = readForm(document.getElementById('mr-form'));
+  if (!f.date || !f.signe) return toast('La date et le résultat sont obligatoires', true);
+  const p = S.prospects.find(x => x.id === S.rdvProspectId);
+  const data = Object.assign(f, { montant: f.montant || 0, rdv_status: f.signe, updated_at: FV.serverTimestamp() });
+  const wasResult = S.rdvEditId ? (S.rdvs.find(x => x.id === S.rdvEditId) || {}).signe : '';
+  if (S.rdvEditId) await db.collection('prospects_rdv').doc(S.rdvEditId).update(data);
+  else await db.collection('prospects_rdv').add(Object.assign(data, { prospect_id: S.rdvProspectId || '', entreprise: p ? p.company_name : '',
+    owner_email: p ? p.owner_email : ME, owner_name: userName(p ? p.owner_email : ME), created_at: FV.serverTimestamp() }));
+  // Le résultat du RDV fait avancer le prospect (une seule fois, quand le résultat change)
+  const res = RDV_RESULTS.find(x => x.v === f.signe);
+  if (p && f.signe !== wasResult) {
+    await saveAction(p, { canal: 'RDV', date: f.date, note: f.notes_apres || ('Compte rendu de RDV : ' + f.signe), new_status: res && res.status && res.status !== p.status ? res.status : null,
+      next_action_at: f.next_date || undefined, new_amount: f.montant || null });
+  }
+  closeModal('m-rdv'); toast('Compte rendu enregistré');
+}
+
+/* ───────── Objectif & export ───────── */
+async function editGoal() {
+  const v = prompt('Objectif de premiers contacts par commercial et par semaine :', S.goal);
+  if (v === null) return;
+  const n = parseInt(v, 10); if (!(n > 0)) return toast('Valeur invalide', true);
+  const w = isoWeek();
+  const batch = db.batch();
+  batch.set(db.collection('crm_config').doc('objectifs'), { objectif_semaine: n, modifie_par: ME, modifie_le: today() }, { merge: true });
+  batch.set(db.collection('crm_config').doc('objectifs_historique').collection('semaines').doc(w.key), { objectif: n, semaine: w.key, modifie_par: ME });
+  await batch.commit();
+  S.goal = n; S.frozenGoals[w.key] = n; renderAll(); toast('Objectif mis à jour');
+}
+function doExport() {
+  const list = S.tab === 'mine' ? S.prospects.filter(p => p.owner_email === ME) : S.tab === 'all' ? filteredAll() : S.prospects;
+  const rows = [['Entreprise', 'Secteur', 'Source', 'Interlocuteur', 'Poste', 'Email', 'Téléphone', 'Responsable', 'Statut', 'Priorité', '1er contact', 'Semaine 1er contact', 'Dernier contact', 'Prochaine action', 'Montant estimé', 'Notes']];
+  list.forEach(p => rows.push([p.company_name, p.sector, p.source, p.contact_name, p.contact_poste, p.contact_email, p.contact_phone, userName(p.owner_email),
+    p.status, p.priority, p.first_contact_at, p.first_contact_at ? isoWeek(p.first_contact_at).key : '', p.last_contact_at, p.next_action_at, num(p.estimated_amount), p.notes]));
+  const wk = document.getElementById('all-week').value;
+  exportExcel('Prospection_' + (S.tab === 'all' && wk ? wk : today()) + '.xlsx', { Prospects: rows });
+}
+
+onActions({
+  tab: el => setTab(el.dataset.tab),
+  week: el => { const d = +el.dataset.d; S.week = d === 0 ? today() : addDays(S.week, 7 * d); renderCA(); },
+  'edit-goal': editGoal,
+  open: el => openProspect(el.dataset.id),
+  add: () => openProspectForm(null),
+  'edit-prospect': () => openProspectForm(S.prospects.find(x => x.id === S.current)),
+  'save-prospect': () => saveProspectForm().catch(fail),
+  'delete-prospect': () => { if (confirm('Supprimer définitivement ce prospect ?')) db.collection('prospects').doc(S.current).delete().then(() => { closePanel('panel'); toast('Prospect supprimé'); }).catch(fail); },
+  reassign: () => {
+    const email = document.getElementById('reassign').value;
+    db.collection('prospects').doc(S.current).update({ owner_email: email, owner_name: userName(email), reassigned_by: ME, reassigned_at: today() })
+      .then(() => toast('Réaffecté à ' + userName(email))).catch(fail);
+  },
+  'save-action': () => {
+    const p = S.prospects.find(x => x.id === S.current);
+    const a = readForm(document.getElementById('action-form'));
+    if (!a.date) return toast('La date est obligatoire', true);
+    if (a.new_status === 'RDV planifié' && !a.rdv_date) return toast('La date du RDV est obligatoire', true);
+    if (!a.new_status && !a.note) return toast('Ajoute une note ou un nouveau statut', true);
+    saveAction(p, a).then(() => { toast('Action enregistrée'); loadActions(p.id); }).catch(fail);
+  },
+  rdv: el => openRdv(el.dataset.id, el.dataset.pid, el.dataset.date),
+  'save-rdv': () => saveRdv().catch(fail),
+  'reset-all': () => { ['all-q', 'all-owner', 'all-status', 'all-sector', 'all-week'].forEach(id => { document.getElementById(id).value = ''; }); renderAll(); },
+  export: doExport
+});
+</script>
+</body>
+</html>

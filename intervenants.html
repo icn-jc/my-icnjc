@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Intervenants — My-ICN-JC</title>
+<link rel="icon" href="assets/logo-mark.png"><link rel="stylesheet" href="assets/app.css">
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script src="assets/core.js"></script>
+</head>
+<body>
+<main hidden>
+  <div class="page-head">
+    <div><h1>Intervenants</h1><div class="sub">Vivier d'intervenants, missions réalisées et fiabilité</div></div>
+    <div class="actions"><button class="btn" data-action="export">Export Excel</button><button class="btn primary" data-action="add" id="btn-add" hidden>+ Intervenant</button></div>
+  </div>
+  <div class="kpis" id="kpis"></div>
+  <div class="filters"><input type="search" id="f-q" placeholder="Nom, école, compétence…"><select id="f-statut"></select><select id="f-dispo"></select><select id="f-mandat"></select><span class="muted" id="f-count"></span></div>
+  <div class="table-wrap"><div class="table-scroll"><table class="t"><thead><tr>
+    <th>Intervenant</th><th>École / situation</th><th>Ville</th><th>Statut</th><th>Disponibilité</th><th class="num">Missions</th><th class="num">JEH</th><th>Note interne</th>
+  </tr></thead><tbody id="body"></tbody></table></div></div>
+</main>
+
+<aside class="panel" id="panel">
+  <div class="panel-head"><span class="avatar" id="p-av" style="width:44px;height:44px;font-size:15px"></span><div class="grow"><h2 id="p-title"></h2><div class="row" id="p-meta" style="margin-top:4px"></div></div><button class="x" data-close="panel">×</button></div>
+  <div class="panel-body" id="p-body"></div>
+</aside>
+
+<div class="modal" id="m-iv"><div class="modal-box wide">
+  <div class="modal-head"><h2 id="m-title">Nouvel intervenant</h2><button class="x" data-close="m-iv">×</button></div>
+  <div class="modal-body"><div class="form" id="iv-form"></div></div>
+  <div class="modal-foot"><button class="btn" data-close="m-iv">Annuler</button><button class="btn primary" data-action="save">Enregistrer</button></div>
+</div></div>
+
+<script>
+const STATUTS_IV = ['Actif', 'Inactif', 'Ancien membre'];
+const DISPOS = ['Disponible', 'En mission', 'Indisponible'];
+const S = { ivs: [], etudes: [], mandats: [], current: null, editId: null };
+let CAN_EDIT;
+
+App.start('intervenants', () => {
+  CAN_EDIT = App.canEdit('intervenants');
+  document.getElementById('btn-add').hidden = !CAN_EDIT;
+  watch(db.collection('intervenants'), l => { S.ivs = l; render(); if (S.current) renderPanel(); });
+  watch(db.collection('etudes'), l => { S.etudes = l; render(); });
+  getAll(db.collection('mandats')).then(l => { S.mandats = l.sort((a, b) => (b.date_debut || '').localeCompare(a.date_debut || '')); render(); });
+  ['f-q', 'f-statut', 'f-dispo', 'f-mandat'].forEach(id => document.getElementById(id).addEventListener('input', render));
+});
+
+const name = iv => ((iv.prenom || '') + ' ' + (iv.nom || '')).trim() || iv.email || '—';
+/* Missions = assignations dans les phases des études (source unique, plus de compteur à maintenir à la main) */
+function missionsOf(iv) {
+  const out = [];
+  S.etudes.forEach(e => (e.phases || []).forEach(p => (p.intervenants || []).forEach(x => {
+    if (x.intervenant_id === iv.id || (iv.email && (x.email || '').toLowerCase() === iv.email.toLowerCase()))
+      out.push({ e, p, x, brut: montantBrutAssignation(x.jeh, p.montant_jeh, num(e.taux_intervenants, 50)) });
+  })));
+  return out;
+}
+const etudesCount = iv => new Set(missionsOf(iv).map(m => m.e.id)).size;
+const stars = n => n ? '<span style="color:#d97706;font-weight:700">' + '★'.repeat(n) + '<span style="color:#e5e7eb">' + '★'.repeat(5 - n) + '</span></span>' : '<span class="muted">—</span>';
+
+function render() {
+  const keep = (id, html) => { const el = document.getElementById(id); const v = el.value; el.innerHTML = html; el.value = v; };
+  keep('f-statut', options(STATUTS_IV, '', 'Tous statuts'));
+  keep('f-dispo', options(DISPOS, '', 'Toutes disponibilités'));
+  keep('f-mandat', options(S.mandats.map(m => ({ value: m.id, label: m.label || m.id })), '', 'Tous mandats'));
+  const actifs = S.ivs.filter(i => (i.statut || 'Actif') === 'Actif');
+  document.getElementById('kpis').innerHTML =
+    '<div class="kpi accent"><div class="v">' + actifs.length + '</div><div class="l">Intervenants actifs</div></div>' +
+    '<div class="kpi"><div class="v">' + S.ivs.filter(i => i.disponibilite === 'Disponible').length + '</div><div class="l">Disponibles</div></div>' +
+    '<div class="kpi"><div class="v">' + S.ivs.filter(i => etudesCount(i) > 0).length + '</div><div class="l">Déjà missionnés</div></div>';
+  const q = document.getElementById('f-q').value.toLowerCase(), st = document.getElementById('f-statut').value,
+    di = document.getElementById('f-dispo').value, ma = document.getElementById('f-mandat').value;
+  const list = S.ivs.filter(i => (!q || [name(i), i.ecole, i.specialite, i.competences, i.email].join(' ').toLowerCase().includes(q)) &&
+    (!st || (i.statut || 'Actif') === st) && (!di || i.disponibilite === di) && (!ma || (i.mandats_ids || []).includes(ma)))
+    .sort((a, b) => (a.nom || '').localeCompare(b.nom || ''));
+  document.getElementById('f-count').textContent = list.length + ' / ' + S.ivs.length;
+  document.getElementById('body').innerHTML = list.length ? list.map(i => {
+    const m = missionsOf(i);
+    return '<tr class="click" data-action="open" data-id="' + i.id + '"><td><b>' + esc(name(i)) + '</b><div class="muted">' + esc(i.email || '') + '</div></td>' +
+      '<td>' + esc(i.ecole || i.situation || '—') + '<div class="muted">' + esc(i.niveau_etudes || '') + '</div></td><td>' + esc(i.ville || '—') + '</td>' +
+      '<td><span class="badge ' + ((i.statut || 'Actif') === 'Actif' ? 'b-ok' : '') + '">' + esc(i.statut || 'Actif') + '</span></td>' +
+      '<td><span class="badge ' + (i.disponibilite === 'Disponible' ? 'b-info' : i.disponibilite === 'En mission' ? 'b-warn' : '') + '">' + esc(i.disponibilite || '—') + '</span></td>' +
+      '<td class="num">' + new Set(m.map(x => x.e.id)).size + '</td><td class="num">' + m.reduce((a, x) => a + num(x.x.jeh), 0) + '</td><td>' + stars(num(i.note_interne)) + '</td></tr>';
+  }).join('') : '<tr><td colspan="8" class="empty">Aucun intervenant.</td></tr>';
+}
+
+function openIv(id) { S.current = id; renderPanel(); openPanel('panel'); }
+function renderPanel() {
+  const i = S.ivs.find(x => x.id === S.current); if (!i) return;
+  const m = missionsOf(i);
+  document.getElementById('p-av').textContent = initials(i.prenom, i.nom);
+  document.getElementById('p-title').textContent = name(i);
+  document.getElementById('p-meta').innerHTML = '<span class="badge ' + ((i.statut || 'Actif') === 'Actif' ? 'b-ok' : '') + '">' + esc(i.statut || 'Actif') + '</span><span class="muted">' + esc(i.disponibilite || '') + '</span>';
+  const kv = (k, v) => v ? '<dt>' + k + '</dt><dd>' + esc(v) + '</dd>' : '';
+  let h = '<div class="kpis" style="grid-template-columns:repeat(3,1fr)"><div class="kpi"><div class="v">' + new Set(m.map(x => x.e.id)).size + '</div><div class="l">Études</div></div>' +
+    '<div class="kpi"><div class="v">' + m.reduce((a, x) => a + num(x.x.jeh), 0) + '</div><div class="l">JEH</div></div>' +
+    '<div class="kpi"><div class="v">' + eur(m.reduce((a, x) => a + x.brut, 0)) + '</div><div class="l">Rémunération brute</div></div></div>';
+  h += '<dl class="kv">' + kv('Email', i.email) + kv('Téléphone', i.tel) + kv('École', i.ecole) + kv('Niveau', i.niveau_etudes) + kv('Spécialité', i.specialite) +
+    kv('Situation', i.situation) + kv('Ville', i.ville) + kv('Compétences', Array.isArray(i.competences) ? i.competences.join(', ') : i.competences) +
+    kv('Langues', Array.isArray(i.langues) ? i.langues.join(', ') : i.langues) + kv('Notes', i.notes) + '</dl>';
+  if (CAN_EDIT) h += '<div class="row" style="margin-top:12px"><button class="btn sm" data-action="edit">Modifier la fiche</button>' + (App.isSA() ? '<button class="btn sm danger" data-action="delete">Supprimer</button>' : '') + '</div>';
+
+  h += '<div class="sub-title">Notation interne (fiabilité)</div><div class="stars">' + [1, 2, 3, 4, 5].map(n => '<button class="' + (num(i.note_interne) >= n ? 'on' : '') + '" ' + (CAN_EDIT ? 'data-action="rate" data-n="' + n + '"' : 'disabled') + '>' + n + '</button>').join('') + '</div>' +
+    '<textarea class="input" id="note-comment" rows="2" style="margin-top:8px" placeholder="Commentaire : ponctualité, qualité des livrables…"' + (CAN_EDIT ? '' : ' disabled') + '>' + esc(i.note_commentaire || '') + '</textarea>' +
+    (CAN_EDIT ? '<button class="btn sm" style="margin-top:6px" data-action="save-comment">Enregistrer le commentaire</button>' : '');
+
+  h += '<div class="sub-title">Mandats</div><div class="chips">' + (S.mandats.length ? S.mandats.map(md => {
+    const on = (i.mandats_ids || []).includes(md.id);
+    return '<button class="chip' + (on ? ' on' : '') + '" ' + (CAN_EDIT ? 'data-action="mandat" data-m="' + esc(md.id) + '"' : 'disabled') + '>' + esc(md.label || md.id) + (md.statut === 'actif' ? ' · actif' : '') + '</button>';
+  }).join('') : '<span class="muted">Aucun mandat créé (Administration → Mandats).</span>') + '</div>';
+
+  h += '<div class="sub-title">Missions</div>' + (m.length ? '<div class="list">' + m.map(x => '<div class="item row"><span class="ref">' + esc(x.e.reference || '—') + '</span><span class="grow">' + esc(x.p.label) +
+    '<div class="muted">' + esc(x.e.client_name || '') + ' · ' + esc(x.e.statut) + '</div></span><span class="muted">' + num(x.x.jeh) + ' JEH</span><b style="color:var(--ok)">' + eur(x.brut) + '</b></div>').join('') + '</div>' : '<div class="muted">Aucune mission pour l’instant.</div>');
+  document.getElementById('p-body').innerHTML = h;
+}
+
+function openForm(iv) {
+  S.editId = iv ? iv.id : null;
+  document.getElementById('m-title').textContent = iv ? 'Modifier — ' + name(iv) : 'Nouvel intervenant';
+  const form = document.getElementById('iv-form');
+  form.innerHTML = '<div class="field"><label>Prénom *</label><input data-f="prenom"></div><div class="field"><label>Nom *</label><input data-f="nom"></div>' +
+    '<div class="field"><label>Email *</label><input data-f="email" type="email"><div class="hint">Sert à lui donner accès à « Mes missions »</div></div><div class="field"><label>Téléphone</label><input data-f="tel"></div>' +
+    '<div class="field"><label>École</label><input data-f="ecole"></div><div class="field"><label>Niveau d’études</label><input data-f="niveau_etudes" placeholder="L3, M1, PGE2…"></div>' +
+    '<div class="field"><label>Spécialité</label><input data-f="specialite"></div><div class="field"><label>Situation</label><input data-f="situation" placeholder="Étudiant, alternant…"></div>' +
+    '<div class="field"><label>Ville</label><input data-f="ville"></div><div class="field"><label>Langues</label><input data-f="langues" placeholder="Français, Anglais"></div>' +
+    '<div class="field full"><label>Compétences</label><input data-f="competences" placeholder="Excel, enquêtes terrain, Power BI…"></div>' +
+    '<div class="field"><label>Statut</label><select data-f="statut">' + options(STATUTS_IV) + '</select></div><div class="field"><label>Disponibilité</label><select data-f="disponibilite">' + options(DISPOS) + '</select></div>' +
+    '<div class="field full"><label>Notes</label><textarea data-f="notes"></textarea></div>';
+  const join = v => Array.isArray(v) ? v.join(', ') : (v || '');
+  fillForm(form, iv ? Object.assign({}, iv, { langues: join(iv.langues), competences: join(iv.competences) }) : { statut: 'Actif', disponibilite: 'Disponible', langues: 'Français' });
+  openModal('m-iv');
+}
+async function save() {
+  const f = readForm(document.getElementById('iv-form'));
+  if (!f.prenom || !f.nom || !f.email) return toast('Prénom, nom et email sont obligatoires', true);
+  f.email = f.email.toLowerCase();
+  const split = v => v ? v.split(',').map(s => s.trim()).filter(Boolean) : [];
+  f.langues = split(f.langues); f.competences = split(f.competences);
+  if (S.ivs.some(i => i.id !== S.editId && (i.email || '').toLowerCase() === f.email)) return toast('Un intervenant a déjà cet email', true);
+  if (S.editId) await db.collection('intervenants').doc(S.editId).update(f);
+  else await db.collection('intervenants').add(Object.assign(f, { mandats_ids: [], note_interne: 0, created_at: FV.serverTimestamp() }));
+  closeModal('m-iv'); toast('Fiche enregistrée');
+}
+
+onActions({
+  open: el => openIv(el.dataset.id),
+  add: () => openForm(null),
+  edit: () => openForm(S.ivs.find(x => x.id === S.current)),
+  save: () => save().catch(fail),
+  delete: () => { if (confirm('Supprimer cette fiche intervenant ?')) db.collection('intervenants').doc(S.current).delete().then(() => { closePanel('panel'); toast('Supprimé'); }).catch(fail); },
+  rate: el => db.collection('intervenants').doc(S.current).update({ note_interne: +el.dataset.n }).catch(fail),
+  'save-comment': () => db.collection('intervenants').doc(S.current).update({ note_commentaire: document.getElementById('note-comment').value.trim() }).then(() => toast('Commentaire enregistré')).catch(fail),
+  mandat: el => {
+    const i = S.ivs.find(x => x.id === S.current), id = el.dataset.m;
+    db.collection('intervenants').doc(i.id).update({ mandats_ids: (i.mandats_ids || []).includes(id) ? FV.arrayRemove(id) : FV.arrayUnion(id) }).catch(fail);
+  },
+  export: () => {
+    const rows = [['Prénom', 'Nom', 'Email', 'Téléphone', 'École', 'Niveau', 'Ville', 'Statut', 'Disponibilité', 'Nb études', 'JEH', 'Note interne']];
+    S.ivs.forEach(i => { const m = missionsOf(i); rows.push([i.prenom, i.nom, i.email, i.tel, i.ecole, i.niveau_etudes, i.ville, i.statut || 'Actif', i.disponibilite, new Set(m.map(x => x.e.id)).size, m.reduce((a, x) => a + num(x.x.jeh), 0), num(i.note_interne)]); });
+    exportExcel('Intervenants_' + today() + '.xlsx', { Intervenants: rows });
+  }
+});
+</script>
+</body>
+</html>

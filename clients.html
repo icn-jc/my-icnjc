@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Clients — My-ICN-JC</title>
+<link rel="icon" href="assets/logo-mark.png"><link rel="stylesheet" href="assets/app.css">
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script src="assets/core.js"></script>
+</head>
+<body>
+<main hidden>
+  <div class="page-head">
+    <div><h1>Clients</h1><div class="sub">Fiches clients, contacts, historique des études et passation de mandat en mandat</div></div>
+    <div class="actions"><button class="btn" data-action="export">Export Excel</button><button class="btn primary" data-action="add" id="btn-add" hidden>+ Client</button></div>
+  </div>
+  <div class="kpis" id="kpis"></div>
+  <div class="filters"><input type="search" id="f-q" placeholder="Nom, ville, code…"><select id="f-status"></select><select id="f-sector"></select><span class="muted" id="f-count"></span></div>
+  <div class="table-wrap"><div class="table-scroll"><table class="t"><thead><tr>
+    <th>Client</th><th>Secteur</th><th>Ville</th><th>Statut</th><th>Code SAGE</th><th class="num">Études</th><th class="num">CA signé</th>
+  </tr></thead><tbody id="body"></tbody></table></div></div>
+</main>
+
+<aside class="panel" id="panel">
+  <div class="panel-head"><div class="grow"><h2 id="p-title"></h2><div class="row" id="p-meta" style="margin-top:6px"></div></div><button class="x" data-close="panel">×</button></div>
+  <div class="panel-body"><div class="tabs" id="p-tabs"></div><div id="p-body"></div></div>
+</aside>
+
+<div class="modal" id="m-client"><div class="modal-box">
+  <div class="modal-head"><h2>Nouveau client</h2><button class="x" data-close="m-client">×</button></div>
+  <div class="modal-body"><div class="form" id="add-form">
+    <div class="field full"><label>Nom de l'entreprise *</label><input data-f="company_name"></div>
+    <div class="field"><label>Secteur</label><input data-f="sector"></div>
+    <div class="field"><label>Ville</label><input data-f="ville"></div>
+    <div class="field"><label>Email</label><input data-f="email" type="email"></div>
+    <div class="field"><label>Téléphone</label><input data-f="tel"></div>
+    <div class="field"><label>Site web</label><input data-f="website"></div>
+    <div class="field"><label>Code client SAGE</label><input data-f="code_comptable"></div>
+    <div class="field full"><label>Notes</label><textarea data-f="notes"></textarea></div>
+  </div></div>
+  <div class="modal-foot"><button class="btn" data-close="m-client">Annuler</button><button class="btn primary" data-action="create">Créer</button></div>
+</div></div>
+
+<script>
+const STATUS = ['Actif', 'Prospect', 'Inactif'];
+const STYLES = ['Directif', 'Collaboratif', 'Analytique', 'Créatif', 'Pragmatique', 'Exigeant', 'Flexible', 'Formel', 'Informel'];
+const CANAUX = ['Email', 'Téléphone', 'Visio', 'Présentiel', 'Slack / Teams', 'WhatsApp'];
+const FREQ = ['Hebdomadaire', 'Bimensuelle', 'Mensuelle', 'À la demande', 'Jalons uniquement'];
+const S = { clients: [], etudes: [], current: null, tab: 'infos', contacts: null };
+let CAN_EDIT;
+
+App.start('clients', () => {
+  CAN_EDIT = App.canEdit('clients');
+  document.getElementById('btn-add').hidden = !CAN_EDIT;
+  watch(db.collection('clients'), l => { S.clients = l; render(); if (S.current && S.tab !== 'infos' && S.tab !== 'contacts') renderPanel(); });
+  watch(db.collection('etudes'), l => { S.etudes = l; render(); });
+  ['f-q', 'f-status', 'f-sector'].forEach(id => document.getElementById(id).addEventListener('input', render));
+});
+
+const etudesOf = c => S.etudes.filter(e => e.client_id === c.id || (!e.client_id && (e.client_name || '').trim().toLowerCase() === (c.company_name || '').trim().toLowerCase()));
+const caOf = c => etudesOf(c).filter(e => ETUDE_SIGNEE.includes(e.statut)).reduce((a, e) => a + num(e.montant_ht), 0);
+
+function render() {
+  const keep = (id, html) => { const el = document.getElementById(id); const v = el.value; el.innerHTML = html; el.value = v; };
+  keep('f-status', options(STATUS, '', 'Tous statuts'));
+  keep('f-sector', options([...new Set(S.clients.map(c => c.sector).filter(Boolean))].sort(), '', 'Tous secteurs'));
+  const withCa = S.clients.filter(c => caOf(c) > 0);
+  document.getElementById('kpis').innerHTML =
+    '<div class="kpi accent"><div class="v">' + S.clients.length + '</div><div class="l">Clients</div></div>' +
+    '<div class="kpi"><div class="v">' + withCa.length + '</div><div class="l">Avec étude signée</div></div>' +
+    '<div class="kpi"><div class="v">' + S.clients.filter(c => etudesOf(c).filter(e => ETUDE_SIGNEE.includes(e.statut)).length > 1).length + '</div><div class="l">Clients récurrents</div></div>';
+  const q = document.getElementById('f-q').value.toLowerCase(), st = document.getElementById('f-status').value, se = document.getElementById('f-sector').value;
+  const list = S.clients.filter(c => (!q || [c.company_name, c.ville, c.code_comptable].join(' ').toLowerCase().includes(q)) && (!st || (c.status || 'Actif') === st) && (!se || c.sector === se))
+    .sort((a, b) => (a.company_name || '').localeCompare(b.company_name || ''));
+  document.getElementById('f-count').textContent = list.length + ' / ' + S.clients.length;
+  document.getElementById('body').innerHTML = list.length ? list.map(c => '<tr class="click" data-action="open" data-id="' + c.id + '"><td><b>' + esc(c.company_name) + '</b></td><td>' + esc(c.sector || '—') + '</td><td>' + esc(c.ville || '—') + '</td>' +
+    '<td><span class="badge ' + ((c.status || 'Actif') === 'Actif' ? 'b-ok' : '') + '">' + esc(c.status || 'Actif') + '</span></td><td>' + esc(c.code_comptable || '—') + '</td>' +
+    '<td class="num">' + etudesOf(c).length + '</td><td class="num"><b>' + eur(caOf(c)) + '</b></td></tr>').join('') : '<tr><td colspan="7" class="empty">Aucun client.</td></tr>';
+}
+
+function openClient(id) { S.current = id; S.tab = 'infos'; S.contacts = null; renderPanel(); openPanel('panel'); }
+function renderPanel() {
+  const c = S.clients.find(x => x.id === S.current); if (!c) return;
+  document.getElementById('p-title').textContent = c.company_name;
+  document.getElementById('p-meta').innerHTML = '<span class="badge b-ok">' + esc(c.status || 'Actif') + '</span><b style="color:var(--bordeaux)">' + eur(caOf(c)) + '</b><span class="muted">CA signé</span>';
+  document.getElementById('p-tabs').innerHTML = [['infos', 'Infos'], ['contacts', 'Contacts'], ['etudes', 'Études'], ['perso', 'Personnalité']]
+    .map(t => '<button class="tab' + (S.tab === t[0] ? ' on' : '') + '" data-action="ptab" data-t="' + t[0] + '">' + t[1] + '</button>').join('');
+  const body = document.getElementById('p-body');
+  if (S.tab === 'infos') {
+    const dis = CAN_EDIT ? '' : ' disabled';
+    body.innerHTML = '<div class="form" id="info-form">' +
+      '<div class="field full"><label>Nom</label><input data-f="company_name"' + dis + '></div>' +
+      '<div class="field"><label>Statut</label><select data-f="status"' + dis + '>' + options(STATUS) + '</select></div>' +
+      '<div class="field"><label>Secteur</label><input data-f="sector"' + dis + '></div>' +
+      '<div class="field"><label>Ville</label><input data-f="ville"' + dis + '></div>' +
+      '<div class="field"><label>Code client SAGE</label><input data-f="code_comptable"' + dis + '></div>' +
+      '<div class="field"><label>Email</label><input data-f="email"' + dis + '></div>' +
+      '<div class="field"><label>Téléphone</label><input data-f="tel"' + dis + '></div>' +
+      '<div class="field full"><label>Site web</label><input data-f="website"' + dis + '></div>' +
+      '<div class="field full"><label>Notes</label><textarea data-f="notes"' + dis + '></textarea></div>' +
+      (CAN_EDIT ? '<div class="full row"><button class="btn primary" data-action="save-info">Enregistrer</button>' + (App.isSA() ? '<button class="btn danger" data-action="delete">Supprimer le client</button>' : '') + '</div>' : '') + '</div>';
+    fillForm(document.getElementById('info-form'), Object.assign({ status: 'Actif' }, c));
+  } else if (S.tab === 'contacts') {
+    if (!S.contacts) S.contacts = JSON.parse(JSON.stringify(c.contacts || []));
+    body.innerHTML = '<div class="list" id="contacts">' + (S.contacts.length ? S.contacts.map((k, i) => CAN_EDIT ?
+      '<div class="item form" data-i="' + i + '"><div class="field"><label>Nom</label><input data-c="nom" value="' + esc(k.nom || '') + '"></div><div class="field"><label>Poste</label><input data-c="poste" value="' + esc(k.poste || '') + '"></div>' +
+      '<div class="field"><label>Email</label><input data-c="email" value="' + esc(k.email || '') + '"></div><div class="field"><label>Téléphone</label><input data-c="tel" value="' + esc(k.tel || '') + '"></div>' +
+      '<div class="full"><button class="btn sm danger" data-action="contact-del" data-i="' + i + '">Retirer</button></div></div>'
+      : '<div class="item"><b>' + esc(k.nom) + '</b> <span class="muted">' + esc(k.poste || '') + '</span><div class="muted">' + esc(k.email || '') + ' ' + esc(k.tel || '') + '</div></div>').join('') : '<div class="muted">Aucun contact.</div>') + '</div>' +
+      (CAN_EDIT ? '<div class="row" style="margin-top:10px"><button class="btn sm" data-action="contact-add">+ Contact</button><button class="btn sm primary" data-action="contacts-save">Enregistrer les contacts</button></div>' : '');
+  } else if (S.tab === 'etudes') {
+    const l = etudesOf(c).sort((a, b) => (b.date_signature || '').localeCompare(a.date_signature || ''));
+    body.innerHTML = l.length ? '<div class="list">' + l.map(e => '<a class="item row" style="text-decoration:none;color:inherit" href="etudes.html"><span class="ref">' + esc(e.reference || '—') + '</span><span class="grow">' + esc(e.title || '') + '<div class="muted">' + fmtDate(e.date_signature) + ' · ' + esc(e.type_etude || '') + '</div></span>' +
+      '<span class="badge ' + (ETUDE_BADGE[e.statut] || '') + '">' + esc(e.statut) + '</span><b>' + eur(e.montant_ht) + '</b></a>').join('') + '</div>' : '<div class="muted">Aucune étude pour ce client.</div>';
+  } else {
+    const p = c.personnalite || {};
+    const chips = (field, list, single) => '<div class="chips">' + list.map(v => {
+      const on = single ? p[field] === v : (p[field] || []).includes(v);
+      return '<button class="chip' + (on ? ' on' : '') + '" ' + (CAN_EDIT ? 'data-action="chip" data-field="' + field + '" data-v="' + esc(v) + '"' + (single ? ' data-single="1"' : '') : 'disabled') + '>' + esc(v) + '</button>';
+    }).join('') + '</div>';
+    body.innerHTML = '<p class="muted">Comment ce client aime travailler — à transmettre au mandat suivant.</p>' +
+      '<div class="sub-title">Style de travail</div>' + chips('styles', STYLES) +
+      '<div class="sub-title">Canaux préférés</div>' + chips('canaux', CANAUX) +
+      '<div class="sub-title">Fréquence de contact souhaitée</div>' + chips('frequence', FREQ, true) +
+      '<div class="sub-title">Qualité de la relation</div><div class="stars">' + [1, 2, 3, 4, 5].map(n => '<button class="' + (num(p.note_relation) >= n ? 'on' : '') + '" ' + (CAN_EDIT ? 'data-action="rate" data-n="' + n + '"' : 'disabled') + '>' + n + '</button>').join('') + '</div>' +
+      '<div class="sub-title">Notes de passation</div><textarea class="input" id="perso-notes" rows="6"' + (CAN_EDIT ? '' : ' disabled') + ' placeholder="Attentes, points de vigilance, interlocuteur clé, historique important…">' + esc(p.notes || '') + '</textarea>' +
+      (CAN_EDIT ? '<button class="btn sm primary" style="margin-top:8px" data-action="perso-notes">Enregistrer les notes</button>' : '');
+  }
+}
+const savePerso = patch => { const c = S.clients.find(x => x.id === S.current); return db.collection('clients').doc(c.id).update({ personnalite: Object.assign({}, c.personnalite || {}, patch) }).catch(fail); };
+const syncContacts = () => document.querySelectorAll('#contacts [data-i]').forEach(row => { const k = S.contacts[+row.dataset.i]; row.querySelectorAll('[data-c]').forEach(inp => { k[inp.dataset.c] = inp.value.trim(); }); });
+
+onActions({
+  open: el => openClient(el.dataset.id),
+  ptab: el => { if (S.tab === 'contacts') syncContacts(); S.tab = el.dataset.t; renderPanel(); },
+  add: () => { fillForm(document.getElementById('add-form'), {}); openModal('m-client'); },
+  create: () => {
+    const f = readForm(document.getElementById('add-form'));
+    if (!f.company_name) return toast('Le nom est obligatoire', true);
+    if (S.clients.some(c => (c.company_name || '').trim().toLowerCase() === f.company_name.toLowerCase())) return toast('Ce client existe déjà', true);
+    db.collection('clients').add(Object.assign(f, { status: 'Actif', contacts: [], source: 'manuel', created_at_str: today(), created_at: FV.serverTimestamp() }))
+      .then(() => { closeModal('m-client'); toast('Client créé'); }).catch(fail);
+  },
+  'save-info': () => db.collection('clients').doc(S.current).update(readForm(document.getElementById('info-form'))).then(() => toast('Enregistré')).catch(fail),
+  delete: () => { if (confirm('Supprimer ce client ? Ses études restent en place.')) db.collection('clients').doc(S.current).delete().then(() => { closePanel('panel'); toast('Client supprimé'); }).catch(fail); },
+  'contact-add': () => { syncContacts(); S.contacts.push({ nom: '', poste: '', email: '', tel: '' }); renderPanel(); },
+  'contact-del': el => { syncContacts(); S.contacts.splice(+el.dataset.i, 1); renderPanel(); },
+  'contacts-save': () => { syncContacts(); db.collection('clients').doc(S.current).update({ contacts: S.contacts.filter(k => k.nom || k.email) }).then(() => toast('Contacts enregistrés')).catch(fail); },
+  chip: el => {
+    const c = S.clients.find(x => x.id === S.current), p = c.personnalite || {}, f = el.dataset.field, v = el.dataset.v;
+    if (el.dataset.single) return savePerso({ [f]: p[f] === v ? '' : v });
+    const l = (p[f] || []).slice(); const i = l.indexOf(v); if (i >= 0) l.splice(i, 1); else l.push(v);
+    savePerso({ [f]: l });
+  },
+  rate: el => savePerso({ note_relation: +el.dataset.n }),
+  'perso-notes': () => savePerso({ notes: document.getElementById('perso-notes').value.trim() }).then(() => toast('Notes enregistrées')),
+  export: () => {
+    const rows = [['Client', 'Secteur', 'Ville', 'Statut', 'Code SAGE', 'Email', 'Téléphone', 'Nb études', 'CA signé']];
+    S.clients.forEach(c => rows.push([c.company_name, c.sector, c.ville, c.status || 'Actif', c.code_comptable, c.email, c.tel, etudesOf(c).length, caOf(c)]));
+    exportExcel('Clients_' + today() + '.xlsx', { Clients: rows });
+  }
+});
+</script>
+</body>
+</html>

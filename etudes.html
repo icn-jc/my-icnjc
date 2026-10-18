@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Études — My-ICN-JC</title>
+<link rel="icon" href="assets/logo-mark.png"><link rel="stylesheet" href="assets/app.css">
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script src="assets/core.js"></script>
+</head>
+<body>
+<main hidden>
+  <div class="page-head">
+    <div><h1>Études</h1><div class="sub" id="sub"></div></div>
+    <div class="actions"><button class="btn" data-action="export">Export Excel</button><button class="btn primary" data-action="add" id="btn-add" hidden>+ Nouvelle étude</button></div>
+  </div>
+  <div id="readonly" class="readonly-note" hidden>Accès en lecture seule.</div>
+  <div class="kpis" id="kpis"></div>
+  <div class="filters">
+    <input type="search" id="f-q" placeholder="Réf, titre, client…">
+    <select id="f-statut"></select><select id="f-mandat"></select><select id="f-resp"></select>
+    <label class="muted"><input type="checkbox" id="f-todo"> À compléter</label>
+    <span class="muted" id="f-count"></span>
+  </div>
+  <div class="table-wrap"><div class="table-scroll"><table class="t"><thead><tr>
+    <th>Réf.</th><th>Titre</th><th>Client</th><th>Statut</th><th class="num">Montant HT</th><th>Encaissé</th><th>Responsable</th><th>Début</th><th>Fin</th>
+  </tr></thead><tbody id="body"></tbody></table></div></div>
+</main>
+
+<aside class="panel" id="panel" style="width:640px">
+  <div class="panel-head"><div class="grow"><span class="ref" id="p-ref"></span><h2 id="p-title" style="margin-top:6px"></h2><div class="row" id="p-meta" style="margin-top:6px"></div></div><button class="x" data-close="panel">×</button></div>
+  <div class="panel-body" id="p-body"></div>
+</aside>
+
+<div class="modal" id="m-add"><div class="modal-box wide">
+  <div class="modal-head"><h2>Nouvelle étude</h2><button class="x" data-close="m-add">×</button></div>
+  <div class="modal-body">
+    <div class="form" id="add-form">
+      <div class="field"><label>Client *</label><input data-f="client_name" list="dl-clients" id="add-client" placeholder="Nom du client (nouveau ou existant)"></div>
+      <div class="field"><label>Référence</label><input data-f="reference" id="add-ref"><div class="hint">AA + 3 lettres du client + n°, générée automatiquement</div></div>
+      <div class="field full"><label>Titre *</label><input data-f="title"></div>
+      <div class="field"><label>Type d'étude *</label><select data-f="type_etude" id="add-type"></select></div>
+      <div class="field"><label>Statut</label><select data-f="statut"></select></div>
+      <div class="field full"><label>Description de la mission</label><textarea data-f="description"></textarea></div>
+      <div class="field"><label>Date de signature</label><input type="date" data-f="date_signature"></div>
+      <div class="field"><label>Responsable</label><select data-f="responsable_email" id="add-resp"></select></div>
+      <div class="field"><label>Date de début</label><input type="date" data-f="date_debut"></div>
+      <div class="field"><label>Date de fin prévue</label><input type="date" data-f="date_fin"></div>
+      <div class="field"><label>Frais de structure (€)</label><input type="number" min="0" data-f="frais_structure" id="add-frais"></div>
+      <div class="field"><label>% rémunération intervenants</label><input type="number" min="0" max="100" data-f="taux_intervenants" id="add-taux"></div>
+    </div>
+    <div class="sub-title">Phases & JEH</div>
+    <div id="add-phases"></div>
+  </div>
+  <div class="modal-foot"><button class="btn" data-close="m-add">Annuler</button><button class="btn primary" data-action="create">Créer l'étude</button></div>
+</div></div>
+
+<div class="modal" id="m-assign"><div class="modal-box">
+  <div class="modal-head"><h2 id="as-title">Assigner un intervenant</h2><button class="x" data-close="m-assign">×</button></div>
+  <div class="modal-body"><div class="form" id="as-form">
+    <div class="field full"><label>Intervenant</label><select data-f="iv" id="as-iv"></select></div>
+    <div class="field"><label>JEH</label><input type="number" min="0.5" step="0.5" data-f="jeh" id="as-jeh"><div class="hint" id="as-max"></div></div>
+    <div class="field"><label>Rémunération brute</label><div class="input" id="as-brut" style="background:#f6f6f6">0 €</div></div>
+  </div><p class="muted">Une fiche RM est créée automatiquement : il suffira d'y ajouter le lien GDrive dans « Documents ».</p></div>
+  <div class="modal-foot"><button class="btn" data-close="m-assign">Annuler</button><button class="btn primary" data-action="confirm-assign">Assigner</button></div>
+</div></div>
+<datalist id="dl-clients"></datalist>
+
+<script>
+const TYPES = {
+  'Marché & Stratégie': ['Étude de marché', 'Étude de lancement de produit', 'Benchmark', 'Veille stratégique'],
+  'Marketing & Communication': ['Étude de notoriété et image', 'Plan de communication', 'Étude de satisfaction client'],
+  'Finance & Audit': ['Business plan', 'Diagnostic RSE', 'Visite mystère'],
+  'Affaires publiques': ["Sondage d'opinion"]
+};
+const PHASES_TPL = {
+  'Marché & Stratégie': [['Cadrage', 'Objectifs, problématique, périmètre'], ['Conception', 'Méthodologie, questionnaires, guides d’entretien'], ['Collecte', 'Enquêtes terrain, interviews, recherche documentaire'], ['Analyse', 'Traitement des données, segmentation, insights'], ['Recommandations', 'Opportunités, positionnement, axes de développement'], ['Restitution', 'Rapport détaillé, présentation client']],
+  'Marketing & Communication': [['Cadrage', 'KPIs, identification des cibles'], ['Conception', 'Questionnaires, sondages, choix des canaux'], ['Collecte', 'Diffusion des enquêtes, retours clients'], ['Analyse', 'Indicateurs, analyse qualitative'], ['Recommandations', 'Actions marketing, stratégie de communication'], ['Restitution', 'Synthèse opérationnelle, plan d’actions']],
+  'Finance & Audit': [['Cadrage', 'Analyse des besoins'], ['Collecte', 'Données financières, documents internes'], ['Analyse', 'Diagnostic, calculs de rentabilité'], ['Construction', 'Business plan, scénarios financiers'], ['Recommandations', 'Décisions d’investissement, optimisation'], ['Restitution', 'Livrables, tableaux, projections']],
+  'Affaires publiques': [['Cadrage', 'Public cible, objectif du sondage'], ['Conception', 'Création du questionnaire'], ['Collecte', 'Diffusion à l’échantillon'], ['Analyse', 'Traitement statistique, interprétation'], ['Recommandations', 'Aide à la décision'], ['Restitution', 'Rapport et synthèse décisionnelle']]
+};
+const typeFamily = t => Object.keys(TYPES).find(k => TYPES[k].includes(t)) || 'Marché & Stratégie';
+const newPhase = (label, sub) => ({ id: 'ph_' + Math.random().toString(36).slice(2, 9), label, sub: sub || '', jeh_total: 0, montant_jeh: 0, actif: true, intervenants: [] });
+const tplPhases = type => PHASES_TPL[typeFamily(type)].map(p => newPhase(p[0], p[1]));
+const typeOptions = cur => '<option value="">— Choisir —</option>' + Object.keys(TYPES).map(g => '<optgroup label="' + esc(g) + '">' + options(TYPES[g], cur) + '</optgroup>').join('');
+
+const S = { etudes: [], clients: [], users: [], mandats: [], ivs: [], factures: [], current: null, draft: null, addDraft: [], assign: null };
+let CAN_EDIT;
+
+App.start('etudes', () => {
+  CAN_EDIT = App.canEdit('etudes');
+  document.getElementById('sub').textContent = longDate();
+  document.getElementById('btn-add').hidden = !CAN_EDIT;
+  document.getElementById('readonly').hidden = CAN_EDIT;
+  watch(db.collection('etudes'), l => {
+    S.etudes = l; render();
+    // Ne redessine le panneau que si l'étude ouverte a changé (évite d'effacer une saisie en cours)
+    const cur = S.current && JSON.stringify(l.find(x => x.id === S.current) || null);
+    if (S.current && cur !== S.curJson) { S.curJson = cur; S.draft = null; renderPanel(false); }
+  });
+  watch(db.collection('factures'), l => { S.factures = l; render(); });
+  getAll(db.collection('clients')).then(l => { S.clients = l; });
+  getAll(db.collection('users')).then(l => { S.users = l; render(); });
+  getAll(db.collection('mandats')).then(l => { S.mandats = l.sort((a, b) => (b.date_debut || '').localeCompare(a.date_debut || '')); render(); });
+  getAll(db.collection('intervenants')).then(l => { S.ivs = l.sort((a, b) => (a.nom || '').localeCompare(b.nom || '')); });
+  ['f-q', 'f-statut', 'f-mandat', 'f-resp', 'f-todo'].forEach(id => document.getElementById(id).addEventListener('input', render));
+  document.getElementById('add-type').addEventListener('change', ev => { S.addDraft = tplPhases(ev.target.value); renderAddPhases(); });
+  document.getElementById('add-client').addEventListener('input', () => { document.getElementById('add-ref').value = genRef(document.getElementById('add-client').value); });
+  ['add-frais', 'add-taux'].forEach(id => document.getElementById(id).addEventListener('input', renderAddPhases));
+});
+
+const userName = e => { const u = S.users.find(x => (x.email || x.id) === e); return u ? fullName(u) : (e || '—').split('@')[0]; };
+const respList = () => S.users.filter(u => (u.roles || [u.role]).some(r => CA.includes(r))).map(u => ({ value: u.email || u.id, label: fullName(u) }));
+const encaisse = e => { const f = S.factures.filter(x => x.etude_id === e.id && x.statut === 'Encaissée').reduce((a, x) => a + num(x.montant_ht), 0); return Math.max(f, num(e.montant_encaisse)); };
+const isFrozen = e => e.statut === 'Clôturé' && !e.defige;
+const editable = e => CAN_EDIT && !isFrozen(e);
+
+function genRef(clientName) {
+  const yy = String(new Date().getFullYear()).slice(2);
+  const code = (clientName || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 3);
+  if (!code) return '';
+  const prefix = yy + code.padEnd(3, 'X');
+  const n = S.etudes.filter(e => (e.reference || '').startsWith(prefix)).length + 1;
+  return prefix + pad(n);
+}
+
+function render() {
+  const keep = (id, html) => { const el = document.getElementById(id); const v = el.value; el.innerHTML = html; el.value = v; };
+  keep('f-statut', options(ETUDE_STATUTS, '', 'Tous statuts'));
+  keep('f-mandat', options(S.mandats.map(m => ({ value: m.id, label: m.label || m.id })), '', 'Tous mandats'));
+  keep('f-resp', options([...new Set(S.etudes.map(e => e.responsable_email).filter(Boolean))].map(e => ({ value: e, label: userName(e) })), '', 'Tous responsables'));
+  const E = S.etudes, signed = E.filter(e => ETUDE_SIGNEE.includes(e.statut));
+  const todo = E.filter(e => e.a_completer).length;
+  document.getElementById('kpis').innerHTML =
+    '<div class="kpi accent"><div class="v">' + signed.length + '</div><div class="l">Études signées</div><div class="s">Signé → Clôturé</div></div>' +
+    '<div class="kpi"><div class="v">' + E.filter(e => e.statut === 'En cours').length + '</div><div class="l">En cours</div></div>' +
+    '<div class="kpi"><div class="v">' + eur(signed.reduce((a, e) => a + num(e.montant_ht), 0)) + '</div><div class="l">CA signé (total)</div></div>' +
+    '<div class="kpi"><div class="v">' + eur(signed.reduce((a, e) => a + encaisse(e), 0)) + '</div><div class="l">CA encaissé</div></div>' +
+    (todo ? '<div class="kpi warn"><div class="v">' + todo + '</div><div class="l">À compléter</div></div>' : '');
+  const q = document.getElementById('f-q').value.toLowerCase(), st = document.getElementById('f-statut').value,
+    ma = document.getElementById('f-mandat').value, re = document.getElementById('f-resp').value, td = document.getElementById('f-todo').checked;
+  const list = E.filter(e => (!q || [e.reference, e.title, e.client_name].join(' ').toLowerCase().includes(q)) && (!st || e.statut === st) &&
+    (!ma || e.mandat_id === ma) && (!re || e.responsable_email === re) && (!td || e.a_completer))
+    .sort((a, b) => (b.date_signature || b.created_at_str || '').localeCompare(a.date_signature || a.created_at_str || ''));
+  document.getElementById('f-count').textContent = list.length + ' / ' + E.length;
+  document.getElementById('body').innerHTML = list.length ? list.map(e => {
+    const enc = encaisse(e), p = pct(enc, num(e.montant_ht));
+    return '<tr class="click" data-action="open" data-id="' + e.id + '"><td><span class="ref">' + esc(e.reference || '—') + '</span>' + (e.a_completer ? ' <span class="badge b-warn">à compléter</span>' : '') + '</td>' +
+      '<td><b>' + esc(e.title || '—') + '</b><div class="muted">' + esc(e.type_etude || '') + '</div></td><td>' + esc(e.client_name || '—') + '</td>' +
+      '<td><span class="badge ' + (ETUDE_BADGE[e.statut] || '') + '">' + esc(e.statut || '—') + '</span></td>' +
+      '<td class="num"><b>' + (e.montant_ht ? eur(e.montant_ht) : '—') + '</b></td>' +
+      '<td>' + (ETUDE_SIGNEE.includes(e.statut) ? '<div class="row" style="flex-wrap:nowrap"><div class="bar ' + (p >= 100 ? 'ok' : '') + '"><i style="width:' + Math.min(100, p) + '%"></i></div><span class="muted">' + p + '%</span></div>' : '') + '</td>' +
+      '<td>' + esc(userName(e.responsable_email)) + '</td><td>' + fmtDate(e.date_debut) + '</td><td>' + fmtDate(e.date_fin) + '</td></tr>';
+  }).join('') : '<tr><td colspan="9" class="empty">Aucune étude.</td></tr>';
+}
+
+/* ───────── Panneau étude ───────── */
+function openEtude(id) { S.current = id; S.draft = null; S.curJson = JSON.stringify(S.etudes.find(x => x.id === id) || null); renderPanel(true); openPanel('panel'); }
+function renderPanel(resetDraft) {
+  const e = S.etudes.find(x => x.id === S.current); if (!e) return;
+  if (resetDraft || !S.draft) S.draft = JSON.parse(JSON.stringify(e.phases || []));
+  const can = editable(e), c = calcEtude(Object.assign({}, e, { phases: S.draft })), enc = encaisse(e);
+  document.getElementById('p-ref').textContent = e.reference || '—';
+  document.getElementById('p-title').textContent = e.title || 'Sans titre';
+  document.getElementById('p-meta').innerHTML = '<span class="badge ' + (ETUDE_BADGE[e.statut] || '') + '">' + esc(e.statut) + '</span><span class="muted">' + esc(e.client_name || '') + '</span>';
+  let h = '';
+  if (e.a_completer && e.prospect_id) h += '<div class="alert info"><span>Créée depuis la prospection. Complète les phases puis coupe le lien.</span>' + (can ? '<a href="#" data-action="break-link">Couper le lien</a>' : '') + '</div>';
+  if (isFrozen(e)) h += '<div class="alert warn"><span>🔒 Étude clôturée — lecture seule.</span>' + (App.isSA() ? '<a href="#" data-action="defreeze">Défiger</a>' : '') + '</div>';
+  h += '<div class="kpis" style="grid-template-columns:repeat(3,1fr);margin-bottom:6px">' +
+    '<div class="kpi accent"><div class="v">' + eur(e.montant_ht) + '</div><div class="l">Facturé client HT</div><div class="s">dont ' + eur(c.frais) + ' frais de structure</div></div>' +
+    '<div class="kpi"><div class="v" style="color:var(--ok)">' + eur(c.brutIv) + '</div><div class="l">Brut intervenants (' + c.taux + ' %)</div></div>' +
+    '<div class="kpi"><div class="v">' + eur(c.partJe) + '</div><div class="l">Part JE</div><div class="s">' + (100 - c.taux) + ' % des JEH + frais</div></div></div>' +
+    '<div class="muted">Encaissé : <b>' + eur(enc) + '</b> (' + pct(enc, num(e.montant_ht)) + ' %) — mis à jour par les factures dans Comptabilité</div>';
+
+  // Informations
+  h += '<div class="sub-title">Informations</div>';
+  if (can) {
+    h += '<div class="form" id="info-form">' +
+      '<div class="field"><label>Statut</label><select data-f="statut">' + options(ETUDE_STATUTS, e.statut) + '</select></div>' +
+      '<div class="field"><label>Type d’étude</label><select data-f="type_etude">' + typeOptions(e.type_etude) + '</select></div>' +
+      '<div class="field"><label>Responsable</label><select data-f="responsable_email">' + options(respList(), e.responsable_email, '—') + '</select></div>' +
+      '<div class="field"><label>Mandat</label><select data-f="mandat_id">' + options(S.mandats.map(m => ({ value: m.id, label: m.label || m.id })), e.mandat_id, '—') + '</select></div>' +
+      '<div class="field"><label>Signature</label><input type="date" data-f="date_signature" value="' + esc(e.date_signature || '') + '"></div>' +
+      '<div class="field"><label>Début</label><input type="date" data-f="date_debut" value="' + esc(e.date_debut || '') + '"></div>' +
+      '<div class="field"><label>Fin prévue</label><input type="date" data-f="date_fin" value="' + esc(e.date_fin || '') + '"></div>' +
+      '<div class="field"><label>Montant HT (€)</label><input type="number" data-f="montant_ht" value="' + num(e.montant_ht) + '"' + (c.montantJeh > 0 ? ' disabled' : '') + '><div class="hint">' + (c.montantJeh > 0 ? 'Calculé depuis les phases' : 'Saisie libre tant qu’aucune phase n’est chiffrée') + '</div></div>' +
+      '<div class="field"><label>Frais de structure (€)</label><input type="number" min="0" data-f="frais_structure" value="' + c.frais + '"></div>' +
+      '<div class="field"><label>% brut intervenants</label><input type="number" min="0" max="100" data-f="taux_intervenants" value="' + c.taux + '"></div>' +
+      '<div class="field full"><label>Description</label><textarea data-f="description">' + esc(e.description || '') + '</textarea></div>' +
+      '<div class="field full"><label>Notes</label><textarea data-f="notes">' + esc(e.notes || '') + '</textarea></div>' +
+      (App.isSA() ? '<div class="field"><label>Référence (SA)</label><input data-f="reference" value="' + esc(e.reference || '') + '"></div><div class="field"><label>Titre (SA)</label><input data-f="title" value="' + esc(e.title || '') + '"></div>' : '') +
+      '<div class="full"><button class="btn primary" data-action="save-info">Enregistrer les informations</button></div></div>';
+  } else {
+    h += '<dl class="kv"><dt>Type</dt><dd>' + esc(e.type_etude || '—') + '</dd><dt>Responsable</dt><dd>' + esc(userName(e.responsable_email)) + '</dd>' +
+      '<dt>Signature</dt><dd>' + fmtDate(e.date_signature) + '</dd><dt>Période</dt><dd>' + fmtDate(e.date_debut) + ' → ' + fmtDate(e.date_fin) + '</dd>' +
+      '<dt>Mandat</dt><dd>' + esc(e.mandat_id || '—') + '</dd>' + (e.description ? '<dt>Description</dt><dd>' + esc(e.description) + '</dd>' : '') + '</dl>';
+  }
+
+  // Phases
+  h += '<div class="sub-title">Phases & JEH · ' + c.jeh + ' JEH</div>';
+  if (can) h += '<div class="row" style="margin-bottom:10px"><button class="btn sm" data-action="phase-add">+ Phase</button>' +
+    (e.type_etude ? '<button class="btn sm" data-action="phase-tpl">Phases types « ' + esc(typeFamily(e.type_etude)) + ' »</button>' : '') +
+    '<span class="grow"></span><button class="btn sm primary" data-action="phase-save">Enregistrer les phases</button></div>';
+  h += '<div id="phases-box"></div>';
+
+  // Avenants
+  const av = e.avenants || [];
+  h += '<div class="sub-title">Avenants</div>' + (av.length ? '<div class="list">' + av.map((a, i) => '<div class="item soft"><b>Avenant ' + (i + 1) + '</b> <span class="muted">' + fmtDate(a.date_avenant) + '</span><div>' + fmtDate(a.date_debut) + ' → ' + fmtDate(a.date_fin) + '</div>' + (a.note ? '<div class="muted">' + esc(a.note) + '</div>' : '') + '</div>').join('') + '</div>' : '<div class="muted">Aucun avenant.</div>');
+  if (can) h += '<div class="form" id="av-form" style="margin-top:10px"><div class="field"><label>Nouveau début</label><input type="date" data-f="date_debut"></div><div class="field"><label>Nouvelle fin</label><input type="date" data-f="date_fin"></div><div class="field full"><label>Motif</label><input data-f="note"></div><div class="full"><button class="btn sm" data-action="avenant">Enregistrer l’avenant</button></div></div>';
+  if (App.isSA()) h += '<div class="sub-title">Super Admin</div><button class="btn sm danger" data-action="delete">Supprimer l’étude</button>';
+  document.getElementById('p-body').innerHTML = h;
+  renderPhases();
+}
+function renderPhases() {
+  const e = S.etudes.find(x => x.id === S.current), can = editable(e);
+  const c = calcEtude(Object.assign({}, e, { phases: S.draft }));
+  document.getElementById('phases-box').innerHTML = (S.draft.length ? '<div class="list">' + S.draft.map((p, i) => phaseCard(e, p, i, can, c.taux)).join('') + '</div>' : '<div class="muted">Aucune phase.</div>') +
+    (can ? '<div class="item soft row" style="margin-top:8px"><span class="grow">Total des phases : <b id="draft-jeh">' + c.jeh + '</b> JEH</span><span>Facturé client HT (avec frais) : <b id="draft-ht" style="color:var(--bordeaux)">' + eur(c.ht) + '</b></span></div>' : '');
+}
+function updateDraftTotals(i) {
+  const e = S.etudes.find(x => x.id === S.current), p = S.draft[i];
+  const c = calcEtude(Object.assign({}, e, { phases: S.draft }));
+  const t = document.querySelector('[data-total="' + i + '"]'); if (t) t.textContent = eur(num(p.jeh_total) * num(p.montant_jeh));
+  if (document.getElementById('draft-jeh')) { document.getElementById('draft-jeh').textContent = c.jeh; document.getElementById('draft-ht').textContent = eur(c.ht); }
+}
+
+function phaseCard(e, p, i, can, taux) {
+  const ivs = p.intervenants || [];
+  const assigned = ivs.reduce((a, x) => a + num(x.jeh), 0), left = num(p.jeh_total) - assigned;
+  const total = num(p.jeh_total) * num(p.montant_jeh);
+  let h = '<div class="item" style="' + (p.actif === false ? 'opacity:.55' : '') + '">';
+  if (can) {
+    h += '<div class="row"><input type="checkbox" data-ph="' + i + '" data-k="actif"' + (p.actif !== false ? ' checked' : '') + ' title="Phase active">' +
+      '<input class="input grow" style="min-width:140px" data-ph="' + i + '" data-k="label" value="' + esc(p.label) + '">' +
+      '<input class="input" style="width:72px" type="number" min="0" step="0.5" data-ph="' + i + '" data-k="jeh_total" value="' + num(p.jeh_total) + '" title="JEH">' +
+      '<span class="muted">JEH ×</span><input class="input" style="width:84px" type="number" min="0" data-ph="' + i + '" data-k="montant_jeh" value="' + num(p.montant_jeh) + '" title="€ par JEH">' +
+      '<b style="min-width:70px;text-align:right" data-total="' + i + '">' + eur(total) + '</b><button class="icon-btn" data-action="phase-del" data-i="' + i + '" title="Supprimer la phase">×</button></div>';
+  } else {
+    h += '<div class="row"><b class="grow">' + esc(p.label) + '</b><span class="muted">' + num(p.jeh_total) + ' JEH × ' + eur(p.montant_jeh) + '</span><b>' + eur(total) + '</b></div>';
+  }
+  if (p.sub) h += '<div class="muted" style="margin-top:4px">' + esc(p.sub) + '</div>';
+  ivs.forEach(x => {
+    h += '<div class="row" style="margin-top:8px;background:#faf9f7;border-radius:8px;padding:6px 10px"><span class="avatar" style="width:26px;height:26px;font-size:11px">' + esc((x.nom || '?')[0]) + '</span>' +
+      '<span class="grow">' + esc(x.nom || '') + (x.statut === 'Terminé' ? ' <span class="badge b-ok">terminé</span>' : '') + '</span><span class="muted">' + num(x.jeh) + ' JEH</span><b style="color:var(--ok)">' + eur(montantBrutAssignation(x.jeh, p.montant_jeh, taux)) + '</b>' +
+      (can ? '<button class="icon-btn" data-action="unassign" data-pid="' + esc(p.id) + '" data-iv="' + esc(x.intervenant_id) + '" title="Retirer">×</button>' : '') + '</div>';
+  });
+  if (can && p.actif !== false && p.id) {
+    const saved = ((S.etudes.find(x => x.id === S.current) || {}).phases || []).some(sp => sp.id === p.id);
+    h += '<div class="row" style="margin-top:8px"><span class="muted grow">' + (left > 0 ? left + ' JEH à assigner' : left < 0 ? '⚠ ' + (-left) + ' JEH en trop' : 'JEH entièrement assignés') + '</span>' +
+      (left > 0 && saved ? '<button class="btn sm" data-action="assign" data-pid="' + esc(p.id) + '">+ Intervenant</button>' : '') + (left > 0 && !saved ? '<span class="muted">Enregistre les phases pour assigner</span>' : '') + '</div>';
+  }
+  return h + '</div>';
+}
+
+// Saisie dans les phases → brouillon local (enregistré via le bouton)
+document.addEventListener('input', ev => {
+  const el = ev.target; if (!el.dataset || el.dataset.ph === undefined) return;
+  const target = el.closest('#add-phases') ? S.addDraft : S.draft;
+  const p = target[+el.dataset.ph]; const k = el.dataset.k;
+  p[k] = k === 'actif' ? el.checked : (k === 'label' ? el.value : num(el.value));
+  if (el.closest('#add-phases')) renderAddTotals(); else updateDraftTotals(+el.dataset.ph);
+});
+
+async function savePhases() {
+  const e = S.etudes.find(x => x.id === S.current);
+  const c = calcEtude(Object.assign({}, e, { phases: S.draft }));
+  const up = { phases: S.draft, jeh_total_etude: c.jeh, updated_at: FV.serverTimestamp() };
+  if (c.montantJeh > 0) up.montant_ht = c.ht;
+  if (S.draft.some(p => num(p.jeh_total) > 0)) up.a_completer = false;
+  await db.collection('etudes').doc(e.id).update(up);
+  toast('Phases enregistrées');
+}
+
+async function saveInfo() {
+  const e = S.etudes.find(x => x.id === S.current);
+  const f = readForm(document.getElementById('info-form'));
+  if (f.date_debut && f.date_fin && f.date_debut > f.date_fin) return toast('La date de début doit précéder la date de fin', true);
+  const c = calcEtude(Object.assign({}, e, f, { phases: e.phases || [] }));
+  if (c.montantJeh > 0) f.montant_ht = c.ht; else f.montant_ht = num(f.montant_ht);
+  f.frais_structure = num(f.frais_structure, 100); f.taux_intervenants = Math.min(100, Math.max(0, num(f.taux_intervenants, 50)));
+  f.updated_at = FV.serverTimestamp();
+  // Recalcule la rémunération des intervenants si le taux change
+  if (f.taux_intervenants !== num(e.taux_intervenants, 50)) {
+    f.phases = (e.phases || []).map(p => Object.assign({}, p, { intervenants: (p.intervenants || []).map(x => Object.assign({}, x, { montant_brut: montantBrutAssignation(x.jeh, p.montant_jeh, f.taux_intervenants) })) }));
+  }
+  await db.collection('etudes').doc(e.id).update(f);
+  if (ETUDE_SIGNEE.includes(f.statut)) await ensureClient(e.id, e.client_name, e.client_id);
+  toast('Étude mise à jour');
+}
+
+async function ensureClient(etudeId, name, clientId) {
+  if (clientId || !name) return clientId;
+  const found = S.clients.find(c => (c.company_name || '').trim().toLowerCase() === name.trim().toLowerCase());
+  let id = found && found.id;
+  if (!id) {
+    const ref = await db.collection('clients').add({ company_name: name.trim(), status: 'Actif', source: 'etudes', contacts: [], created_at_str: today(), created_at: FV.serverTimestamp() });
+    id = ref.id; S.clients.push({ id, company_name: name.trim() });
+  }
+  if (etudeId) await db.collection('etudes').doc(etudeId).update({ client_id: id });
+  return id;
+}
+
+/* ───────── Assignation ───────── */
+function openAssign(phaseId) {
+  const e = S.etudes.find(x => x.id === S.current), p = e.phases.find(x => x.id === phaseId);
+  const left = num(p.jeh_total) - (p.intervenants || []).reduce((a, x) => a + num(x.jeh), 0);
+  S.assign = { phaseId, left, montant: num(p.montant_jeh), taux: num(e.taux_intervenants, 50) };
+  document.getElementById('as-title').textContent = 'Assigner — ' + p.label;
+  document.getElementById('as-iv').innerHTML = options(S.ivs.filter(i => i.statut !== 'Inactif').map(i => ({ value: i.id, label: ((i.prenom || '') + ' ' + (i.nom || '')).trim() })), '', '— Choisir —');
+  document.getElementById('as-jeh').value = left;
+  document.getElementById('as-max').textContent = 'Maximum ' + left + ' JEH';
+  updAssignBrut(); openModal('m-assign');
+}
+function updAssignBrut() { document.getElementById('as-brut').textContent = eur(montantBrutAssignation(document.getElementById('as-jeh').value, S.assign.montant, S.assign.taux)); }
+document.getElementById('as-jeh').addEventListener('input', updAssignBrut);
+async function confirmAssign() {
+  const ivId = document.getElementById('as-iv').value, jeh = num(document.getElementById('as-jeh').value);
+  if (!ivId || jeh <= 0) return toast('Choisis un intervenant et un nombre de JEH', true);
+  if (jeh > S.assign.left) return toast('Maximum ' + S.assign.left + ' JEH', true);
+  const e = S.etudes.find(x => x.id === S.current), iv = S.ivs.find(x => x.id === ivId);
+  const phases = JSON.parse(JSON.stringify(e.phases));
+  const p = phases.find(x => x.id === S.assign.phaseId);
+  const nom = ((iv.prenom || '') + ' ' + (iv.nom || '')).trim();
+  p.intervenants = (p.intervenants || []).filter(x => x.intervenant_id !== ivId);
+  p.intervenants.push({ intervenant_id: ivId, nom, email: (iv.email || '').toLowerCase(), jeh, montant_brut: montantBrutAssignation(jeh, p.montant_jeh, S.assign.taux), statut: 'Assigné' });
+  await db.collection('etudes').doc(e.id).update({ phases });
+  await db.collection('documents').add({ type: 'RM', etude_id: e.id, etude_ref: e.reference || '', phase_id: p.id, phase_label: p.label, intervenant_id: ivId,
+    intervenant_nom: nom, intervenant_email: (iv.email || '').toLowerCase(), nom_affiche: 'RM — ' + (e.reference || '') + ' — ' + p.label + ' — ' + nom,
+    lien_gdrive: '', statut: 'en_attente_lien', vu_par_intervenant: false, created_at: FV.serverTimestamp() });
+  closeModal('m-assign'); S.draft = null; toast(nom + ' assigné(e)');
+}
+async function unassign(phaseId, ivId) {
+  if (!confirm('Retirer cet intervenant de la phase ? Sa fiche RM sans lien sera supprimée.')) return;
+  const e = S.etudes.find(x => x.id === S.current);
+  const phases = JSON.parse(JSON.stringify(e.phases));
+  const p = phases.find(x => x.id === phaseId);
+  p.intervenants = (p.intervenants || []).filter(x => x.intervenant_id !== ivId);
+  await db.collection('etudes').doc(e.id).update({ phases });
+  const docs = await db.collection('documents').where('etude_id', '==', e.id).get();
+  await Promise.all(docs.docs.filter(d => d.data().phase_id === phaseId && d.data().intervenant_id === ivId && !d.data().lien_gdrive).map(d => d.ref.delete()));
+  S.draft = null; toast('Intervenant retiré');
+}
+
+/* ───────── Création ───────── */
+function openAdd() {
+  const form = document.getElementById('add-form');
+  form.querySelector('[data-f=statut]').innerHTML = options(ETUDE_STATUTS, 'Signé');
+  document.getElementById('add-type').innerHTML = typeOptions('');
+  document.getElementById('add-resp').innerHTML = options(respList(), App.user.email, '—');
+  document.getElementById('dl-clients').innerHTML = S.clients.map(c => '<option value="' + esc(c.company_name) + '">').join('');
+  fillForm(form, { statut: 'Signé', responsable_email: App.user.email, frais_structure: 100, taux_intervenants: 50, date_signature: today() });
+  S.addDraft = []; renderAddPhases(); openModal('m-add');
+}
+function renderAddPhases() {
+  document.getElementById('add-phases').innerHTML = (S.addDraft.length ? S.addDraft.map((p, i) =>
+    '<div class="row" style="margin-bottom:6px"><input type="checkbox" data-ph="' + i + '" data-k="actif"' + (p.actif !== false ? ' checked' : '') + '>' +
+    '<input class="input grow" data-ph="' + i + '" data-k="label" value="' + esc(p.label) + '">' +
+    '<input class="input" style="width:72px" type="number" min="0" step="0.5" data-ph="' + i + '" data-k="jeh_total" value="' + (p.jeh_total || '') + '" placeholder="JEH">' +
+    '<input class="input" style="width:84px" type="number" min="0" data-ph="' + i + '" data-k="montant_jeh" value="' + (p.montant_jeh || '') + '" placeholder="€/JEH">' +
+    '<button class="icon-btn" data-action="add-phase-del" data-i="' + i + '">×</button></div>').join('') : '<div class="muted">Choisis un type d’étude pour générer les phases, ou ajoute-les.</div>') +
+    '<button class="btn sm" data-action="add-phase-new">+ Phase</button><div class="item soft" id="add-totals" style="margin-top:10px"></div>';
+  renderAddTotals();
+}
+function renderAddTotals() {
+  const f = readForm(document.getElementById('add-form'));
+  const c = calcEtude({ phases: S.addDraft, frais_structure: f.frais_structure, taux_intervenants: f.taux_intervenants });
+  document.getElementById('add-totals').innerHTML = '<div class="row"><span class="grow">Total JEH</span><b>' + c.jeh + '</b></div>' +
+    '<div class="row"><span class="grow">JEH facturés</span><b>' + eur(c.montantJeh) + '</b></div><div class="row"><span class="grow">Frais de structure</span><b>' + eur(c.frais) + '</b></div>' +
+    '<div class="row" style="border-top:1px solid var(--border);margin-top:4px;padding-top:4px"><span class="grow">Total facturé client HT</span><b style="color:var(--bordeaux)">' + eur(c.ht) + '</b></div>' +
+    '<div class="row"><span class="grow">Brut intervenants (' + c.taux + ' %)</span><b style="color:var(--ok)">' + eur(c.brutIv) + '</b></div><div class="row"><span class="grow">Part JE</span><b>' + eur(c.partJe) + '</b></div>';
+}
+async function createEtude() {
+  const f = readForm(document.getElementById('add-form'));
+  if (!f.client_name || !f.title || !f.type_etude) return toast('Client, titre et type sont obligatoires', true);
+  if (f.date_debut && f.date_fin && f.date_debut > f.date_fin) return toast('La date de début doit précéder la date de fin', true);
+  const c = calcEtude({ phases: S.addDraft, frais_structure: f.frais_structure, taux_intervenants: f.taux_intervenants });
+  const actif = S.mandats.find(m => m.statut === 'actif');
+  const clientId = await ensureClient(null, f.client_name, null);
+  await db.collection('etudes').add(Object.assign(f, {
+    reference: f.reference || genRef(f.client_name), client_id: clientId, phases: S.addDraft, jeh_total_etude: c.jeh,
+    montant_ht: c.ht, montant_encaisse: 0, frais_structure: c.frais, taux_intervenants: c.taux, intervenants: [], avenants: [],
+    mandat_id: actif ? actif.id : '', a_completer: !S.addDraft.some(p => num(p.jeh_total) > 0), created_at_str: today(), created_at: FV.serverTimestamp()
+  }));
+  closeModal('m-add'); toast('Étude créée');
+}
+
+onActions({
+  open: el => openEtude(el.dataset.id),
+  add: openAdd,
+  create: () => createEtude().catch(fail),
+  'save-info': () => saveInfo().catch(fail),
+  'phase-add': () => { S.draft.push(newPhase('Nouvelle phase')); renderPhases(); },
+  'phase-tpl': () => { const e = S.etudes.find(x => x.id === S.current); if (S.draft.length && !confirm('Remplacer les phases actuelles par les phases types ?')) return; S.draft = tplPhases(e.type_etude); renderPhases(); },
+  'phase-del': el => { const p = S.draft[+el.dataset.i]; if ((p.intervenants || []).length && !confirm('Cette phase a des intervenants assignés. Supprimer quand même ?')) return; S.draft.splice(+el.dataset.i, 1); renderPhases(); },
+  'phase-save': () => savePhases().catch(fail),
+  'add-phase-new': () => { S.addDraft.push(newPhase('Nouvelle phase')); renderAddPhases(); },
+  'add-phase-del': el => { S.addDraft.splice(+el.dataset.i, 1); renderAddPhases(); },
+  assign: el => openAssign(el.dataset.pid),
+  'confirm-assign': () => confirmAssign().catch(fail),
+  unassign: el => unassign(el.dataset.pid, el.dataset.iv).catch(fail),
+  'break-link': () => { if (confirm('Couper le lien avec la prospection ?')) db.collection('etudes').doc(S.current).update({ a_completer: false, lien_crm_stoppe: true, prospect_id: FV.delete() }).catch(fail); },
+  defreeze: () => { if (confirm('Rendre cette étude clôturée à nouveau modifiable ?')) db.collection('etudes').doc(S.current).update({ defige: true }).catch(fail); },
+  avenant: () => {
+    const a = readForm(document.getElementById('av-form'));
+    if (!a.date_debut || !a.date_fin) return toast('Les deux dates sont obligatoires', true);
+    const e = S.etudes.find(x => x.id === S.current);
+    db.collection('etudes').doc(e.id).update({ avenants: (e.avenants || []).concat([Object.assign(a, { date_avenant: today() })]), date_debut: a.date_debut, date_fin: a.date_fin, statut: 'En cours' })
+      .then(() => toast('Avenant enregistré — statut repassé à « En cours »')).catch(fail);
+  },
+  delete: () => { if (confirm('Supprimer définitivement cette étude ?')) db.collection('etudes').doc(S.current).delete().then(() => { closePanel('panel'); toast('Étude supprimée'); }).catch(fail); },
+  export: () => {
+    const rows = [['Référence', 'Titre', 'Client', 'Type', 'Statut', 'Montant HT', 'Encaissé', 'Frais structure', 'Taux intervenants', 'Responsable', 'Signature', 'Début', 'Fin', 'Mandat']];
+    S.etudes.forEach(e => rows.push([e.reference, e.title, e.client_name, e.type_etude, e.statut, num(e.montant_ht), encaisse(e), num(e.frais_structure, 100), num(e.taux_intervenants, 50), userName(e.responsable_email), e.date_signature, e.date_debut, e.date_fin, e.mandat_id]));
+    exportExcel('Etudes_' + today() + '.xlsx', { 'Études': rows });
+  }
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Mes missions — My-ICN-JC</title>
+<link rel="icon" href="assets/logo-mark.png"><link rel="stylesheet" href="assets/app.css">
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script src="assets/core.js"></script>
+</head>
+<body>
+<main hidden>
+  <div class="page-head"><div><h1>Mes missions</h1><div class="sub" id="sub"></div></div></div>
+  <div class="tabs">
+    <button class="tab on" data-action="tab" data-t="current">En cours</button>
+    <button class="tab" data-action="tab" data-t="history">Historique</button>
+    <button class="tab" data-action="tab" data-t="links">Mes liens<span class="count" id="count-links" hidden></span></button>
+  </div>
+  <div id="content"><div class="loading">Chargement…</div></div>
+</main>
+<script>
+const S = { etudes: [], docs: [], ivIds: [], tab: 'current' };
+let ME;
+const DONE = ['Livré', 'Facturé', 'Clôturé'];
+
+App.start('missions', async () => {
+  ME = App.user.email;
+  document.getElementById('sub').textContent = 'Bonjour ' + App.user.prenom + ', voici les missions sur lesquelles tu es intervenant(e).';
+  S.ivIds = (await db.collection('intervenants').where('email', '==', ME).get()).docs.map(d => d.id);
+  watch(db.collection('etudes'), l => { S.etudes = l; render(); });
+  const docs = {};
+  const merge = l => { l.forEach(d => { docs[d.id] = d; }); S.docs = Object.values(docs); render(); };
+  watch(db.collection('documents').where('intervenant_email', '==', ME), merge);
+  if (S.ivIds.length) watch(db.collection('documents').where('intervenant_id', 'in', S.ivIds.slice(0, 10)), merge);
+});
+
+const mine = x => S.ivIds.includes(x.intervenant_id) || (x.email || '').toLowerCase() === ME;
+function missions() {
+  return S.etudes.map(e => {
+    const taux = num(e.taux_intervenants, 50);
+    const phases = [];
+    (e.phases || []).forEach((p, pi) => (p.intervenants || []).forEach((x, xi) => { if (mine(x)) phases.push({ p, x, pi, xi, brut: montantBrutAssignation(x.jeh, p.montant_jeh, taux) }); }));
+    return { e, phases, brut: phases.reduce((a, y) => a + y.brut, 0), jeh: phases.reduce((a, y) => a + num(y.x.jeh), 0), docs: S.docs.filter(d => d.etude_id === e.id) };
+  }).filter(m => m.phases.length);
+}
+
+function card(m, history) {
+  const e = m.e;
+  return '<div class="card" style="margin-bottom:14px"><div class="row"><span class="ref">' + esc(e.reference || '—') + '</span><span class="badge ' + (ETUDE_BADGE[e.statut] || '') + '">' + esc(e.statut) + '</span>' +
+    '<span class="grow"></span><b style="font-size:20px;color:var(--ok)">' + eur(m.brut) + '</b><span class="muted">brut</span></div>' +
+    '<h3 style="margin:8px 0 2px;font-size:18px">' + esc(e.title || 'Mission') + '</h3><div class="muted">' + esc(e.client_name || '') + ' · ' + fmtDate(e.date_debut) + ' → ' + fmtDate(e.date_fin) + ' · ' + m.jeh + ' JEH</div>' +
+    (e.description ? '<p style="margin:10px 0 0;color:var(--ink-2)">' + esc(e.description) + '</p>' : '') +
+    '<div class="sub-title">Mes phases</div><div class="list">' + m.phases.map(y => '<div class="item soft row"><b class="grow">' + esc(y.p.label) + '</b><span class="muted">' + num(y.x.jeh) + ' JEH</span><b>' + eur(y.brut) + '</b>' +
+      (y.x.statut === 'Terminé' ? '<span class="badge b-ok">terminée</span>' : (!history ? '<button class="btn sm" data-action="done" data-e="' + e.id + '" data-pi="' + y.pi + '" data-xi="' + y.xi + '">J’ai terminé</button>' : '')) + '</div>').join('') + '</div>' +
+    (m.docs.length ? '<div class="sub-title">Documents</div><div class="list">' + m.docs.map(docRow).join('') + '</div>' : '') + '</div>';
+}
+function docRow(d) {
+  const label = d.type === 'QUESTIONNAIRE' ? 'Questionnaire de fin de mission' : (d.nom_affiche || d.type || 'Document');
+  return '<div class="item row"><span class="badge ' + (d.type === 'QUESTIONNAIRE' ? 'b-pink' : 'b-violet') + '">' + esc(d.type === 'QUESTIONNAIRE' ? 'Sphinx' : (d.type || 'Doc')) + '</span><span class="grow">' + esc(label) +
+    '<div class="muted">' + esc(d.etude_ref || '') + (d.phase_label ? ' · ' + esc(d.phase_label) : '') + '</div></span>' +
+    (d.lien_gdrive ? '<a class="btn sm primary" href="' + esc(d.lien_gdrive) + '" target="_blank" rel="noopener" data-seen="' + d.id + '">Ouvrir</a>' : '<span class="muted">Lien bientôt disponible</span>') + '</div>';
+}
+
+function render() {
+  const all = missions();
+  const cur = all.filter(m => !DONE.includes(m.e.statut)), hist = all.filter(m => DONE.includes(m.e.statut));
+  const newLinks = S.docs.filter(d => d.lien_gdrive && !d.vu_par_intervenant).length;
+  const c = document.getElementById('count-links'); c.hidden = !newLinks; c.textContent = newLinks;
+  let h = '';
+  if (S.tab === 'current') h = cur.length ? cur.map(m => card(m, false)).join('') : '<div class="card empty">Aucune mission en cours. Dès qu’une phase te sera assignée, elle apparaîtra ici.</div>';
+  else if (S.tab === 'history') {
+    h = '<div class="kpis"><div class="kpi accent"><div class="v">' + eur(hist.reduce((a, m) => a + m.brut, 0)) + '</div><div class="l">Total brut des missions livrées</div></div>' +
+      '<div class="kpi"><div class="v">' + hist.length + '</div><div class="l">Missions livrées</div></div><div class="kpi"><div class="v">' + hist.reduce((a, m) => a + m.jeh, 0) + '</div><div class="l">JEH réalisés</div></div></div>' +
+      (hist.length ? hist.map(m => card(m, true)).join('') : '<div class="card empty">Pas encore de mission livrée.</div>');
+  } else {
+    const l = S.docs.slice().sort((a, b) => (b.lien_gdrive ? 1 : 0) - (a.lien_gdrive ? 1 : 0));
+    h = l.length ? '<div class="list">' + l.map(docRow).join('') + '</div>' : '<div class="card empty">Tes RM et questionnaires apparaîtront ici.</div>';
+  }
+  document.getElementById('content').innerHTML = h;
+}
+
+document.addEventListener('click', ev => {
+  const a = ev.target.closest('[data-seen]'); if (!a) return;
+  db.collection('documents').doc(a.dataset.seen).update({ vu_par_intervenant: true }).catch(() => {});
+});
+onActions({
+  tab: el => { S.tab = el.dataset.t; document.querySelectorAll('.tab').forEach(b => b.classList.toggle('on', b === el)); render(); },
+  done: async el => {
+    if (!confirm('Confirmer que tu as terminé cette phase ? Le responsable qualité en sera informé.')) return;
+    const e = S.etudes.find(x => x.id === el.dataset.e);
+    const phases = JSON.parse(JSON.stringify(e.phases));
+    phases[+el.dataset.pi].intervenants[+el.dataset.xi].statut = 'Terminé';
+    phases[+el.dataset.pi].intervenants[+el.dataset.xi].termine_le = today();
+    db.collection('etudes').doc(e.id).update({ phases }).then(() => toast('Phase marquée comme terminée')).catch(fail);
+  }
+});
+</script>
+</body>
+</html>

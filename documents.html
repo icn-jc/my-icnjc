@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Documents — My-ICN-JC</title>
+<link rel="icon" href="assets/logo-mark.png"><link rel="stylesheet" href="assets/app.css">
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script src="assets/core.js"></script>
+</head>
+<body>
+<main hidden>
+  <div class="page-head">
+    <div><h1>Documents</h1><div class="sub">Liens GDrive des RM et questionnaires Sphinx envoyés aux intervenants. Ils apparaissent dans leur espace « Mes missions ».</div></div>
+    <div class="actions"><button class="btn primary" data-action="sphinx">+ Questionnaire Sphinx</button></div>
+  </div>
+  <div class="kpis" id="kpis"></div>
+  <div class="filters"><input type="search" id="f-q" placeholder="Réf, intervenant…"><select id="f-etude"></select>
+    <select id="f-state"><option value="">Tous</option><option value="missing">Lien manquant</option><option value="ok">Lien ajouté</option></select>
+    <select id="f-type"><option value="">Tous types</option><option value="RM">RM</option><option value="QUESTIONNAIRE">Questionnaire Sphinx</option></select></div>
+  <div id="list"></div>
+</main>
+
+<div class="modal" id="m-sphinx"><div class="modal-box">
+  <div class="modal-head"><h2>Envoyer le questionnaire de fin de mission</h2><button class="x" data-close="m-sphinx">×</button></div>
+  <div class="modal-body"><div class="form" id="sp-form">
+    <div class="field full"><label>Étude</label><select data-f="etude_id" id="sp-etude"></select></div>
+    <div class="field full"><label>Lien Sphinx</label><input data-f="lien" id="sp-lien" placeholder="https://…"><div class="hint">Lien par défaut modifiable dans Administration → Paramètres</div></div>
+    <div class="field full"><label>Intervenants</label><div id="sp-ivs" class="list"></div></div>
+  </div></div>
+  <div class="modal-foot"><button class="btn" data-close="m-sphinx">Annuler</button><button class="btn primary" data-action="send-sphinx">Ajouter le lien</button></div>
+</div></div>
+
+<script>
+const S = { docs: [], etudes: [], sphinx: '' };
+App.start('documents', () => {
+  watch(db.collection('documents'), l => { S.docs = l; render(); });
+  watch(db.collection('etudes'), l => { S.etudes = l; render(); });
+  db.collection('crm_config').doc('parametres').get().then(d => { S.sphinx = d.exists ? (d.data().sphinx_url || '') : ''; });
+  ['f-q', 'f-etude', 'f-state', 'f-type'].forEach(id => document.getElementById(id).addEventListener('input', render));
+  document.getElementById('sp-etude').addEventListener('change', renderSphinxIvs);
+});
+
+function render() {
+  const fe = document.getElementById('f-etude'), v = fe.value;
+  const refs = [...new Set(S.docs.map(d => d.etude_id))].map(id => S.etudes.find(e => e.id === id)).filter(Boolean);
+  fe.innerHTML = options(refs.map(e => ({ value: e.id, label: (e.reference || '—') + ' — ' + (e.client_name || '') })), '', 'Toutes les études'); fe.value = v;
+  const missing = S.docs.filter(d => !d.lien_gdrive);
+  document.getElementById('kpis').innerHTML = '<div class="kpi' + (missing.length ? ' warn' : '') + '"><div class="v">' + missing.length + '</div><div class="l">Liens manquants</div></div>' +
+    '<div class="kpi"><div class="v">' + S.docs.filter(d => d.lien_gdrive).length + '</div><div class="l">Liens disponibles</div></div>' +
+    '<div class="kpi"><div class="v">' + S.docs.filter(d => d.lien_gdrive && d.vu_par_intervenant).length + '</div><div class="l">Ouverts par l’intervenant</div></div>';
+  const q = document.getElementById('f-q').value.toLowerCase(), st = document.getElementById('f-state').value, ty = document.getElementById('f-type').value;
+  const l = S.docs.filter(d => (!q || [d.etude_ref, d.intervenant_nom, d.phase_label].join(' ').toLowerCase().includes(q)) && (!v || d.etude_id === v) &&
+    (!st || (st === 'missing' ? !d.lien_gdrive : !!d.lien_gdrive)) && (!ty || (d.type || 'RM') === ty))
+    .sort((a, b) => (a.lien_gdrive ? 1 : 0) - (b.lien_gdrive ? 1 : 0) || (a.etude_ref || '').localeCompare(b.etude_ref || ''));
+  document.getElementById('list').innerHTML = l.length ? '<div class="list">' + l.map(d => '<div class="item"><div class="row">' +
+    '<span class="badge ' + (d.type === 'QUESTIONNAIRE' ? 'b-pink' : 'b-violet') + '">' + (d.type === 'QUESTIONNAIRE' ? 'Sphinx' : esc(d.type || 'RM')) + '</span>' +
+    '<span class="ref">' + esc(d.etude_ref || '—') + '</span><span class="grow"><b>' + esc(d.intervenant_nom || '—') + '</b>' + (d.phase_label ? ' <span class="muted">· ' + esc(d.phase_label) + '</span>' : '') + '</span>' +
+    (d.lien_gdrive ? (d.vu_par_intervenant ? '<span class="badge b-ok">ouvert</span>' : '<span class="badge">pas encore ouvert</span>') : '<span class="badge b-warn">lien manquant</span>') + '</div>' +
+    '<div class="row" style="margin-top:8px"><input class="input grow" data-link="' + d.id + '" value="' + esc(d.lien_gdrive || '') + '" placeholder="Coller le lien GDrive…">' +
+    '<button class="btn sm primary" data-action="save" data-id="' + d.id + '">Enregistrer</button>' + (d.lien_gdrive ? '<a class="btn sm" href="' + esc(d.lien_gdrive) + '" target="_blank" rel="noopener">Ouvrir</a>' : '') +
+    '<button class="icon-btn" data-action="del" data-id="' + d.id + '" title="Supprimer">×</button></div></div>').join('') + '</div>'
+    : '<div class="card empty">Aucun document. Les fiches RM se créent quand un intervenant est assigné à une phase dans « Études ».</div>';
+}
+
+function renderSphinxIvs() {
+  const e = S.etudes.find(x => x.id === document.getElementById('sp-etude').value);
+  const ivs = {};
+  if (e) (e.phases || []).forEach(p => (p.intervenants || []).forEach(x => { ivs[x.intervenant_id] = x; }));
+  const l = Object.values(ivs);
+  document.getElementById('sp-ivs').innerHTML = l.length ? l.map(x => {
+    const sent = S.docs.some(d => d.type === 'QUESTIONNAIRE' && d.etude_id === e.id && d.intervenant_id === x.intervenant_id);
+    return '<label class="item row"><input type="checkbox" data-iv="' + esc(x.intervenant_id) + '"' + (sent ? ' disabled' : ' checked') + '><span class="grow">' + esc(x.nom) + '</span>' + (sent ? '<span class="badge b-ok">déjà envoyé</span>' : '') + '</label>';
+  }).join('') : '<div class="muted">Aucun intervenant assigné sur cette étude.</div>';
+}
+
+onActions({
+  save: el => {
+    const v = document.querySelector('[data-link="' + el.dataset.id + '"]').value.trim();
+    if (v && !/^https?:\/\//.test(v)) return toast('Le lien doit commencer par https://', true);
+    db.collection('documents').doc(el.dataset.id).update({ lien_gdrive: v, statut: v ? 'disponible' : 'en_attente_lien', vu_par_intervenant: false, updated_at: FV.serverTimestamp() })
+      .then(() => toast(v ? 'Lien enregistré — visible par l’intervenant' : 'Lien retiré')).catch(fail);
+  },
+  del: el => { if (confirm('Supprimer ce document ?')) db.collection('documents').doc(el.dataset.id).delete().catch(fail); },
+  sphinx: () => {
+    const l = S.etudes.filter(e => (e.phases || []).some(p => (p.intervenants || []).length)).sort((a, b) => (b.date_fin || '').localeCompare(a.date_fin || ''));
+    document.getElementById('sp-etude').innerHTML = options(l.map(e => ({ value: e.id, label: (e.reference || '—') + ' — ' + (e.client_name || '') + ' (' + e.statut + ')' })), '', '— Choisir —');
+    document.getElementById('sp-lien').value = S.sphinx;
+    renderSphinxIvs(); openModal('m-sphinx');
+  },
+  'send-sphinx': async () => {
+    const e = S.etudes.find(x => x.id === document.getElementById('sp-etude').value), lien = document.getElementById('sp-lien').value.trim();
+    const ids = [...document.querySelectorAll('#sp-ivs [data-iv]:checked')].map(c => c.dataset.iv);
+    if (!e || !lien || !ids.length) return toast('Choisis une étude, un lien et au moins un intervenant', true);
+    const ivs = {}; (e.phases || []).forEach(p => (p.intervenants || []).forEach(x => { ivs[x.intervenant_id] = x; }));
+    await Promise.all(ids.map(id => db.collection('documents').add({ type: 'QUESTIONNAIRE', etude_id: e.id, etude_ref: e.reference || '', intervenant_id: id,
+      intervenant_nom: ivs[id].nom || '', intervenant_email: (ivs[id].email || '').toLowerCase(), nom_affiche: 'Questionnaire de fin de mission — ' + (e.reference || ''),
+      lien_gdrive: lien, statut: 'disponible', vu_par_intervenant: false, created_at: FV.serverTimestamp() })));
+    closeModal('m-sphinx'); toast('Questionnaire ajouté pour ' + ids.length + ' intervenant(s)');
+  }
+});
+</script>
+</body>
+</html>
